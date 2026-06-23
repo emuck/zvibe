@@ -1,0 +1,318 @@
+#!/usr/bin/env python3
+# Copyright (c) 2025 Martin R. Raumann
+# SPDX-License-Identifier: BSD-3-Clause
+"""
+MAX10 XIP POF Generator - Simple Execute-In-Place Workflow
+
+Creates a .pof file for MAX10 UFM programming in XIP mode.
+NO BOOTLOADER - firmware executes directly from UFM.
+
+Usage:
+    # Build with game file
+    ./build_xip_pof.py firmware.bin game.z3
+
+    # Or just firmware (like echo test)
+    ./build_xip_pof.py uart_echo_xip.bin
+
+Outputs:
+    - ufm_xip.hex    - UFM initialization file (Intel HEX)
+    - xip.cof        - Quartus conversion file
+    - xip.pof        - Final programming file
+
+XIP Memory Map:
+    UFM 0x000000 → CPU 0x80000000  (unused - could be metadata)
+    UFM 0x001000 → CPU 0x80001000  (firmware entry point)
+
+Author: Generated for ZVibe MAX10 XIP project
+License: BSD-3-Clause
+"""
+
+import argparse
+import struct
+import subprocess
+import sys
+from pathlib import Path
+from datetime import datetime
+
+# MAX10 UFM configuration
+UFM_SIZE = 172 * 1024  # 172KB
+UFM_FIRMWARE_OFFSET = 0x1000  # Firmware at 1KB offset
+UFM_FILL_BYTE = 0xFF  # Erased flash state
+
+SCRIPT_DIR = Path(__file__).parent
+
+
+def create_ufm_image(firmware_path: Path, game_path: Path = None) -> bytes:
+    """
+    Create UFM image with firmware (and optional game) for XIP execution.
+
+    Layout:
+        0x000000:  Reserved (256 bytes)
+        0x001000:  Firmware binary (executes at CPU address 0x80001000)
+
+    Args:
+        firmware_path: Path to firmware .bin file
+        game_path: Optional path to game .z3 file
+
+    Returns:
+        172KB UFM image as bytes
+    """
+    print(f"Creating XIP UFM image...")
+
+    # Read firmware
+    firmware = firmware_path.read_bytes()
+    print(f"  Firmware: {len(firmware):,} bytes - {firmware_path.name}")
+
+    # Read game if provided
+    if game_path:
+        game = game_path.read_bytes()
+        print(f"  Game:     {len(game):,} bytes - {game_path.name}")
+        # Combine firmware + game
+        combined = firmware + game
+    else:
+        combined = firmware
+
+    # Validate size
+    max_size = UFM_SIZE - UFM_FIRMWARE_OFFSET
+    if len(combined) > max_size:
+        print(f"ERROR: Combined size ({len(combined):,} bytes) exceeds "
+              f"available space ({max_size:,} bytes)")
+        sys.exit(1)
+
+    print(f"  Total:    {len(combined):,} bytes")
+    print(f"  Available: {max_size:,} bytes")
+    print(f"  Margin:   {max_size - len(combined):,} bytes")
+
+    # Create UFM image (erased state = 0xFF)
+    ufm = bytearray([UFM_FILL_BYTE] * UFM_SIZE)
+
+    # Place firmware at 0x1000
+    ufm[UFM_FIRMWARE_OFFSET:UFM_FIRMWARE_OFFSET + len(combined)] = combined
+
+    print(f"  UFM offset: 0x{UFM_FIRMWARE_OFFSET:06X}")
+    print(f"  CPU address: 0x{0x80000000 + UFM_FIRMWARE_OFFSET:08X}")
+
+    return bytes(ufm)
+
+
+def write_intel_hex(data: bytes, output_path: Path):
+    """
+    Write binary data as Intel HEX format.
+
+    Uses Extended Linear Address records for >64KB addressing.
+
+    Args:
+        data: Binary data to convert
+        output_path: Path to output .hex file
+    """
+    print(f"\nGenerating Intel HEX: {output_path}")
+
+    with open(output_path, 'w') as f:
+        # Extended Linear Address record - set upper 16 bits to 0x0000
+        f.write(":020000040000FA\n")
+
+        addr = 0
+        current_segment = 0
+        BYTES_PER_LINE = 16
+
+        while addr < len(data):
+            # Check if we need new Extended Linear Address record
+            segment = addr >> 16
+            if segment != current_segment:
+                # Extended Linear Address record
+                checksum = 2 + 0 + 0 + 4 + (segment >> 8) + (segment & 0xFF)
+                checksum = (~checksum + 1) & 0xFF
+                f.write(f":02000004{segment:04X}{checksum:02X}\n")
+                current_segment = segment
+
+            # Data record
+            line_len = min(BYTES_PER_LINE, len(data) - addr)
+            line_addr = addr & 0xFFFF  # Lower 16 bits
+            line_data = data[addr:addr + line_len]
+
+            checksum = line_len + (line_addr >> 8) + (line_addr & 0xFF) + 0x00
+            checksum += sum(line_data)
+            checksum = (~checksum + 1) & 0xFF
+
+            hex_data = ''.join(f'{b:02X}' for b in line_data)
+            f.write(f":{line_len:02X}{line_addr:04X}00{hex_data}{checksum:02X}\n")
+
+            addr += line_len
+
+        # End of file record
+        f.write(":00000001FF\n")
+
+    print(f"  Size: {output_path.stat().st_size:,} bytes")
+
+
+def create_cof_file(sof_path: Path, hex_path: Path, output_cof: Path,
+                    output_pof: Path):
+    """
+    Create Quartus .cof conversion file for MAX10 UFM programming.
+
+    Args:
+        sof_path: Path to .sof bitstream file
+        hex_path: Path to UFM .hex file
+        output_cof: Path to output .cof file
+        output_pof: Path to output .pof file
+    """
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    template = f"""<?xml version="1.0" encoding="US-ASCII" standalone="yes"?>
+<!-- Generated by build_xip_pof.py on {timestamp} -->
+<!-- XIP MODE - NO BOOTLOADER -->
+<!-- SOF: {sof_path.name} -->
+<!-- HEX: {hex_path.name} -->
+<cof>
+\t<output_filename>{output_pof.absolute()}</output_filename>
+\t<n_pages>1</n_pages>
+\t<width>1</width>
+\t<mode>14</mode>
+\t<sof_data>
+\t\t<user_name>Page_0</user_name>
+\t\t<page_flags>1</page_flags>
+\t\t<bit0>
+\t\t\t<sof_filename>{sof_path.absolute()}<compress_bitstream>1</compress_bitstream></sof_filename>
+\t\t</bit0>
+\t</sof_data>
+\t<version>10</version>
+\t<create_cvp_file>0</create_cvp_file>
+\t<create_hps_iocsr>0</create_hps_iocsr>
+\t<auto_create_rpd>0</auto_create_rpd>
+\t<rpd_little_endian>1</rpd_little_endian>
+\t<options>
+\t\t<map_file>1</map_file>
+\t</options>
+\t<MAX10_device_options>
+\t\t<por>0</por>
+\t\t<io_pullup>1</io_pullup>
+\t\t<config_from_cfm0_only>1</config_from_cfm0_only>
+\t\t<isp_source>0</isp_source>
+\t\t<verify_protect>0</verify_protect>
+\t\t<epof>0</epof>
+\t\t<ufm_source>2</ufm_source>
+\t\t<ufm_filepath>{hex_path.absolute()}</ufm_filepath>
+\t</MAX10_device_options>
+\t<advanced_options>
+\t\t<ignore_epcs_id_check>1</ignore_epcs_id_check>
+\t\t<ignore_condone_check>2</ignore_condone_check>
+\t\t<plc_adjustment>0</plc_adjustment>
+\t\t<post_chain_bitstream_pad_bytes>-1</post_chain_bitstream_pad_bytes>
+\t\t<post_device_bitstream_pad_bytes>-1</post_device_bitstream_pad_bytes>
+\t\t<bitslice_pre_padding>1</bitslice_pre_padding>
+\t</advanced_options>
+</cof>
+"""
+
+    output_cof.write_text(template)
+    print(f"\nGenerated: {output_cof}")
+
+
+def run_quartus_cpf(cof_path: Path) -> bool:
+    """
+    Run quartus_cpf to convert .sof + .hex to .pof.
+
+    Returns:
+        True if successful, False otherwise
+    """
+    print(f"\nRunning quartus_cpf...")
+    cmd = ['quartus_cpf', '-c', str(cof_path)]
+
+    try:
+        result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+        # Check for success
+        if "was successful" in result.stdout:
+            print("✓ quartus_cpf completed successfully")
+            return True
+        else:
+            print("✗ quartus_cpf failed")
+            print(result.stdout)
+            return False
+
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: quartus_cpf failed: {e}")
+        print(e.stdout)
+        print(e.stderr)
+        return False
+    except FileNotFoundError:
+        print("ERROR: quartus_cpf not found in PATH")
+        return False
+
+
+def find_sof() -> Path:
+    """Find the .sof bitstream file."""
+    candidates = [
+        SCRIPT_DIR / "build" / "servant_zvibe_max10_08_eval_xip.sof",
+        SCRIPT_DIR / "output_files" / "servant_zvibe_max10_08_eval_xip.sof",
+    ]
+
+    for sof in candidates:
+        if sof.exists():
+            return sof
+
+    print("ERROR: .sof file not found. Run 'make build' first.")
+    sys.exit(1)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="MAX10 XIP POF Generator - No bootloader, firmware runs from UFM"
+    )
+    parser.add_argument('firmware', type=Path,
+                       help='Firmware binary file (e.g., uart_echo_xip.bin)')
+    parser.add_argument('game', type=Path, nargs='?',
+                       help='Optional game file (e.g., plunderedhearts.z3)')
+    parser.add_argument('--sof', type=Path,
+                       help='Path to .sof file (auto-discovered if not specified)')
+    parser.add_argument('--output', type=Path, default=Path('xip.pof'),
+                       help='Output .pof filename (default: xip.pof)')
+
+    args = parser.parse_args()
+
+    # Validate inputs
+    if not args.firmware.exists():
+        print(f"ERROR: Firmware not found: {args.firmware}")
+        sys.exit(1)
+
+    if args.game and not args.game.exists():
+        print(f"ERROR: Game not found: {args.game}")
+        sys.exit(1)
+
+    # Find .sof
+    sof_path = args.sof if args.sof else find_sof()
+    print(f"Using SOF: {sof_path}")
+
+    # Generate output paths
+    hex_path = SCRIPT_DIR / "ufm_xip.hex"
+    cof_path = SCRIPT_DIR / "xip.cof"
+    pof_path = SCRIPT_DIR / args.output
+
+    print("\n" + "="*70)
+    print("MAX10 XIP POF Generator")
+    print("="*70)
+
+    # Create UFM image
+    ufm_data = create_ufm_image(args.firmware, args.game)
+
+    # Convert to Intel HEX
+    write_intel_hex(ufm_data, hex_path)
+
+    # Create COF file
+    create_cof_file(sof_path, hex_path, cof_path, pof_path)
+
+    # Run quartus_cpf
+    if not run_quartus_cpf(cof_path):
+        sys.exit(1)
+
+    print("\n" + "="*70)
+    print("SUCCESS!")
+    print("="*70)
+    print(f"Programming file: {pof_path}")
+    print(f"\nTo program device:")
+    print(f"  quartus_pgm -c 1 -m jtag -o \"p;{pof_path}\"")
+    print("="*70)
+
+
+if __name__ == '__main__':
+    main()

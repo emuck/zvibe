@@ -1,0 +1,217 @@
+Luther
+Raumann
+yes
+turn on videophone
+get microphone
+turn on microphone
+tune videophone
+ask bly about problem
+say "good-bye" to bly
+drop microphone
+e
+e
+look at panel
+close breaker
+w
+s
+s
+w
+get capsule
+n
+verbose
+s
+ask tip for magazine
+open magazine
+read article
+close hatch
+fill tank
+put capsule in reactor
+close reactor
+turn on reactor
+turn on engine
+open gate
+open throttle
+east
+look at sonar
+d
+e
+e
+e
+e
+look at sonar
+e
+e
+e
+e
+look at sonar
+e
+wait
+no
+look at sonar
+n
+n
+sonar
+look at sonar
+e
+e
+n
+look at sonar
+n
+e
+n
+e
+e
+n
+look at sonar
+e
+e
+n
+look at sonar
+n
+n
+n
+look at sonar
+n
+n
+look at sonar
+n
+n
+look at sonar
+n
+look at sonar
+e
+look at sonar
+turn on autopilot
+e
+wait
+no
+look at sonar
+n
+wait
+no
+look at sonar
+w
+n
+look at sonar
+wait
+no
+look at sonar
+e
+wait
+no
+look at sonar
+turn on autopilot
+set throttle to fast
+wait
+yes
+no
+close throttle
+turn off engine
+ask tip for tool
+open access panel with tool
+enter crawl space
+fix regulator carefully
+out
+turn on engine
+open throttle
+set throttle to fast
+wait
+yes
+no
+get phone
+wait
+dock
+wait
+open hatch
+exit
+n
+n
+n
+open air supply system with tool
+get relay
+screw relay into space
+se
+s
+get bazooka
+n
+e
+wait
+yes
+no
+ask about evidence
+open box with tool
+look in box
+w
+get wrench
+open office door
+wait
+no
+w
+yes
+yes
+yes
+yes
+yes
+w
+wait
+wait
+yes
+no
+give magazine to doc
+yes
+wait
+no
+put dart on claw
+s
+put bazooka on claw
+yes
+no
+ask tip about grid
+yes
+yes
+wait
+no
+s
+s
+get syringe
+open hatch
+out
+n
+n
+show syringe to doc
+wait
+no
+s
+s
+arrest bill
+turn off electricity
+turn on electricity
+w
+w
+s
+s
+s
+fill tank
+wait
+no
+turn on engine
+open gate
+open throttle
+s
+e
+e
+se
+wait
+wait
+yes
+no
+yes
+no
+yes
+e
+e
+wait
+aim bazooka at pod
+shoot bazooka
+yes
+quit

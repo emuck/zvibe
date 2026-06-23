@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  source-check:
+    name: Source check (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools (Ubuntu)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -q && sudo apt-get install -y build-essential gcc-riscv64-unknown-elf
+
+      # macOS runners ship with Xcode CLT (cc + make) — nothing to install.
+
+      - name: Source change gate
+        run: ./scripts/ci-source-check.sh

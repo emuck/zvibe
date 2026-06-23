@@ -1,0 +1,29 @@
+# FPGA build artifacts
+fpga/build/
+fpga/.Xil/
+fpga/*.jou
+fpga/*.log
+fpga/*.str
+
+# UART test outputs
+fpga/uart_*.txt
+fpga/build_log.txt
+tb/uart_output.txt
+tb/uart_input.txt
+
+# Software build artifacts (already covered by root .gitignore, but explicit here)
+sw/*.elf
+sw/*.hex
+sw/*.bin
+sw/*.dis
+sw/*.o
+sw/*.map
+
+# Testbench build directories
+tb/build_*/
+tb/xsim_*/
+tb/obj_dir/
+
+# Verilator artifacts
+tb/*.vcd
+tb/*.fst

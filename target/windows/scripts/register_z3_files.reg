@@ -1,0 +1,29 @@
+Windows Registry Editor Version 5.00
+
+; Register ZVibe as the default handler for .z3 files
+; Double-click this file to install the association
+
+[HKEY_CLASSES_ROOT\.z3]
+@="ZMachineStory"
+"Content Type"="application/x-zmachine"
+
+[HKEY_CLASSES_ROOT\ZMachineStory]
+@="Z-Machine Story File"
+
+[HKEY_CLASSES_ROOT\ZMachineStory\DefaultIcon]
+@="C:\\tmp\\zvibe_win\\Z3.ico,0"
+
+[HKEY_CLASSES_ROOT\ZMachineStory\shell]
+@="open"
+
+[HKEY_CLASSES_ROOT\ZMachineStory\shell\open]
+@="Play with ZVibe"
+
+[HKEY_CLASSES_ROOT\ZMachineStory\shell\open\command]
+@="\"C:\\tmp\\zvibe_win\\win\\zvibe_console.exe\" \"%1\""
+
+[HKEY_CLASSES_ROOT\ZMachineStory\shell\minimal]
+@="Play with ZVibe (Minimal)"
+
+[HKEY_CLASSES_ROOT\ZMachineStory\shell\minimal\command]
+@="\"C:\\tmp\\zvibe_win\\win\\zvibe_minimal.exe\" \"%1\""

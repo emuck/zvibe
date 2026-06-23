@@ -1,0 +1,255 @@
+verbose
+get up
+inventory
+look under bed
+take coffer
+examine coffer
+examine smelling salts
+read tag
+examine banknote
+look
+save
+hit andy with coffer
+hit andy with coffer
+wait
+read missive
+yes
+wait
+get up
+inventory
+wait
+wait
+save
+wait
+look
+examine window
+open curtain
+wait
+take coffer
+open coffer
+take invitation
+read invitation
+n
+save
+d
+n
+examine cage
+n
+take bottle
+take mirror
+s
+look
+inventory
+s
+save
+u
+open door
+enter bed
+take clothes
+n
+s
+examine window
+throw coffer through window
+undress
+wear breeches
+save
+wear shirt
+grab ladder
+s
+grab ladder
+u
+u
+u
+u
+n
+n
+save
+n
+examine winch
+read lever
+pull lever up
+enter shack
+take dagger
+out
+s
+look
+examine barrels
+save
+open canvas
+examine frock
+cut frock
+put rag in water
+d
+throw rag at fuse
+u
+s
+enter cask
+cut line
+save
+take slab of pork
+wait
+wait
+wait
+get out of cask
+w
+n
+e
+move bamboo slat
+tell jamison about crulley
+save
+wait
+yes
+wait
+w
+w
+n
+e
+wait
+take garter
+w
+save
+s
+ne
+u
+undress
+take gown
+wear gown
+n
+e
+d
+s
+save
+show invitation to butler
+s
+wait
+wait
+wait
+wait
+open door
+s
+n
+yes
+save
+wait
+examine ring
+e
+n
+n
+take hat
+examine books
+take treatise of power
+examine globe
+press st sinistra
+save
+n
+close portrait
+d
+e
+e
+take horn and key
+w
+s
+open door
+e
+save
+w
+close door
+n
+w
+s
+examine bottle
+read label
+put laudanum on pork
+give pork to crocodile
+wait
+save
+wait
+s
+w
+unlock door with key
+open door
+n
+wait
+s
+e
+n
+save
+n
+u
+open portrait
+s
+close portrait
+u
+w
+s
+wait
+n
+save
+e
+e
+open door
+n
+drink wine
+fill blue goblet
+put laudanum in blue
+put mirror in beam
+wait
+yes
+save
+drink wine
+wait
+wait
+wait
+take spices
+blow spices at Lafond
+s
+n
+take all
+s
+save
+w
+d
+Cookie, follow me
+e
+n
+take hat
+take treatise of power
+push st sinistra
+n
+d
+save
+s
+s
+take rapier
+fight crulley with rapier
+fight crulley with rapier
+close trapdoor
+give smelling salts to jamison
+unlock chains with brooch
+n
+n
+save
+u
+s
+s
+w
+u
+e
+s
+untie rope
+take rope
+go down with rope
+save
+take all
+s
+s
+s
+take stone
+examine stone
+yes
+take pistol
+load pistol
+wait
+save
+shoot crulley
+quit

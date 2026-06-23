@@ -1,0 +1,361 @@
+# Makefile for Servant ZVibe SoC XIP Testbench
+# Comprehensive testing of full SoC with s25fl_xip and s25fl_simple_rw flash model
+# Supports Verilator simulation
+
+VERILATOR = verilator
+VERILATOR_FLAGS = --binary --trace --assert -Wall
+VERILATOR_FLAGS += -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-UNUSEDSIGNAL
+VERILATOR_FLAGS += -Wno-IMPLICITSTATIC -Wno-INITIALDLY -Wno-BLKSEQ
+VERILATOR_FLAGS += -Wno-GENUNNAMED -Wno-PROCASSINIT -Wno-UNDRIVEN
+VERILATOR_FLAGS += -Wno-PINMISSING -Wno-TIMESCALEMOD -Wno-UNUSEDPARAM
+VERILATOR_FLAGS += -Wno-MULTIDRIVEN -Wno-CASEINCOMPLETE -Wno-PINCONNECTEMPTY
+
+RTL_DIR = ../../../../common/rtl
+QSPI_DIR = $(RTL_DIR)/qspi
+TB_DIR = .
+MODEL_DIR = ../../../../common/tb/models
+SERV_DIR = ../../../../serv/rtl
+SERV_SERVILE_DIR = ../../../../serv/servile
+SERV_SERVANT_DIR = ../../../../serv/servant
+SW_DIR = ../../../../common/sw
+BUILD_DIR = build_xip
+
+# Testbench source
+TB_SRC = servant_zvibe_xip_tb.sv
+
+# RTL source files - servant_zvibe with s25fl_xip (NOT qflexpress!)
+RTL_SRCS = \
+	$(RTL_DIR)/servant_zvibe.sv \
+	$(QSPI_DIR)/qspi_cache_bram.sv \
+	$(RTL_DIR)/servant_zvibe_mux.sv \
+	$(RTL_DIR)/servant_mem_mux.sv \
+	$(RTL_DIR)/servant_ram.sv \
+	$(SERV_SERVANT_DIR)/servant_timer.v \
+	$(RTL_DIR)/uart/uart_wb.sv \
+	$(RTL_DIR)/uart/uart_tx.sv \
+	$(RTL_DIR)/uart/uart_rx.sv \
+	$(RTL_DIR)/uart/fifo_sync.sv \
+	$(MODEL_DIR)/uart_wb_model.sv \
+	$(RTL_DIR)/gpio_leds.sv \
+	$(QSPI_DIR)/s25fl_xip.sv \
+	$(MODEL_DIR)/s25fl_simple_rw.v \
+	$(SERV_SERVILE_DIR)/servile.v \
+	$(RTL_DIR)/servile_mux.sv \
+	$(SERV_SERVILE_DIR)/servile_arbiter.v \
+	$(SERV_DIR)/serv_top.v \
+	$(SERV_DIR)/serv_state.v \
+	$(SERV_DIR)/serv_decode.v \
+	$(SERV_DIR)/serv_ctrl.v \
+	$(SERV_DIR)/serv_alu.v \
+	$(SERV_DIR)/serv_rf_top.v \
+	$(SERV_DIR)/serv_rf_if.v \
+	$(SERV_DIR)/serv_rf_ram.v \
+	$(SERV_DIR)/serv_rf_ram_if.v \
+	$(SERV_DIR)/serv_mem_if.v \
+	$(SERV_DIR)/serv_csr.v \
+	$(SERV_DIR)/serv_immdec.v \
+	$(SERV_DIR)/serv_aligner.v \
+	$(SERV_DIR)/serv_bufreg.v \
+	$(SERV_DIR)/serv_bufreg2.v \
+	$(SERV_DIR)/serv_compdec.v
+
+# Test firmware (placed in BUILD_DIR at runtime by test targets)
+TEST_FW = test_xip_simple.hex
+
+.PHONY: all build run clean wave help test1 test2 test3 test4 test5 test6 arty-echo build-arty-echo arty-echo-cache build-arty-echo-cache run-arty-echo-cache
+
+# Default target
+all: build
+
+# Check and initialize SERV submodule if needed
+.PHONY: check-serv
+check-serv:
+	@if [ ! -f $(SERV_DIR)/serv_top.v ]; then \
+		echo ""; \
+		echo "==========================================";\
+		echo "SERV submodule not initialized!";\
+		echo "==========================================";\
+		echo "Initializing SERV submodule...";\
+		echo "";\
+		git submodule update --init target/riscv/serv_zvibe/serv;\
+		echo "";\
+		echo "✓ SERV submodule initialized";\
+		echo "";\
+	fi
+
+# Build testbench
+build: check-serv $(BUILD_DIR)/Vservant_zvibe_xip_tb
+
+$(BUILD_DIR)/Vservant_zvibe_xip_tb: $(TB_SRC) $(RTL_SRCS)
+	@echo "=========================================="
+	@echo "Building Servant ZVibe XIP Testbench..."
+	@echo "=========================================="
+	@echo "RTL Files:"
+	@echo "  SoC: servant_zvibe.sv (with s25fl_xip)"
+	@echo "  Flash Controller: s25fl_xip.v"
+	@echo "  Flash Model: s25fl_simple.v"
+	@echo "  SERV CPU: $(SERV_DIR)/*.v"
+	@echo ""
+	@mkdir -p $(BUILD_DIR)
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		-Mdir $(BUILD_DIR) \
+		--top-module servant_zvibe_xip_tb \
+		-I$(RTL_DIR) -I$(QSPI_DIR) \
+		$(RTL_SRCS) \
+		$(TB_SRC)
+	@echo ""
+	@echo "✓ Build complete: $(BUILD_DIR)/Vservant_zvibe_xip_tb"
+	@echo ""
+
+# Boot stub for arty-echo: built on demand by build-arty-echo target
+
+# Run simulation with specific test firmware
+run: build
+	@echo ""
+	@echo "=========================================="
+	@echo "Running Servant ZVibe XIP Simulation"
+	@echo "=========================================="
+	@echo "Test firmware: $(TEST_FW)"
+	@echo ""
+	cd $(BUILD_DIR) && ./Vservant_zvibe_xip_tb
+	@echo ""
+	@echo "=========================================="
+	@echo "Simulation Complete"
+	@echo "Waveform: $(BUILD_DIR)/servant_zvibe_xip_tb.vcd"
+	@echo "=========================================="
+
+# Test 1: Simple boot and UART output
+test1: TEST_FW = test_xip_simple.hex
+test1: build-test1 run
+
+build-test1:
+	@echo "Building Test 1: Simple boot and UART output"
+	$(MAKE) -C $(SW_DIR) test_xip_simple.hex flash_boot.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_xip_simple.hex $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+
+# Test 2: Memory test (const data)
+test2: TEST_FW = test_xip_memory.hex
+test2: build-test2 run
+
+build-test2:
+	@echo "Building Test 2: Memory test"
+	$(MAKE) -C $(SW_DIR) test_xip_memory.hex flash_boot.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_xip_memory.hex $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+
+# Test 3: Stack test (factorial)
+test3: TEST_FW = test_xip_stack.hex
+test3: build-test3 run
+
+build-test3:
+	@echo "Building Test 3: Stack test"
+	$(MAKE) -C $(SW_DIR) test_xip_stack.hex flash_boot.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_xip_stack.hex $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+
+# Test 4: Branch test
+test4: TEST_FW = test_xip_branch.hex
+test4: build-test4 run
+
+build-test4:
+	@echo "Building Test 4: Branch test"
+	$(MAKE) -C $(SW_DIR) test_xip_branch.hex flash_boot.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_xip_branch.hex $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+
+# Test 5: Long running test
+test5: TEST_FW = test_xip_long.hex
+test5: build-test5 run
+
+build-test5:
+	@echo "Building Test 5: Long running test"
+	$(MAKE) -C $(SW_DIR) test_xip_long.hex flash_boot.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_xip_long.hex $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+
+# Test 6: Comprehensive flash controller test (continuous mode, address switching, patterns)
+test6: TEST_FW = test_xip_comprehensive.hex
+test6: build-test6 run
+
+build-test6:
+	@echo "Building Test 6: Comprehensive flash controller test"
+	$(MAKE) -C $(SW_DIR) test_xip_comprehensive.hex flash_boot.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_xip_comprehensive.hex $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+
+# Pattern Test: Flash pattern read test (RAM-based program reading from flash)
+pattern: TEST_FW = test_flash_pattern.hex
+pattern: build-pattern run
+
+build-pattern:
+	@echo "Building Pattern Test: Flash Read Verification"
+	@echo "  This test reads a known pattern from flash and verifies it"
+	@echo "  Helps debug flash controller read issues"
+	$(MAKE) -C $(SW_DIR) test_flash_pattern.hex flash_pattern_for_sim.hex PATH=/opt/riscv/bin:$$PATH
+	@mkdir -p $(BUILD_DIR)
+	# Pattern test runs from RAM, flash_pattern_for_sim.hex goes in flash
+	cp $(SW_DIR)/test_flash_pattern.hex $(BUILD_DIR)/ram_boot.hex
+	cp $(SW_DIR)/flash_pattern_for_sim.hex $(BUILD_DIR)/test_firmware.hex
+	@echo "✓ Pattern test firmware prepared"
+
+# Echo Test: Interactive UART echo (for hardware verification)
+echo: TEST_FW = uart_echo_xip_flash.hex
+echo: build-echo run
+
+build-echo:
+	@echo "Building Echo Test: UART Echo (XIP)"
+	@echo "  This test echoes back user input via UART"
+	@echo "  Use for verifying hardware UART I/O"
+	$(MAKE) -C $(SW_DIR) uart_echo_xip.hex flash_boot.hex PATH=/opt/riscv/bin:$$PATH
+	@mkdir -p $(BUILD_DIR)
+	# Convert XIP hex from CPU address (0x80400000) to flash physical (0x00400000)
+	sed 's/@80400000/@00400000/' $(SW_DIR)/uart_echo_xip.hex > $(BUILD_DIR)/test_firmware.hex
+	cp $(SW_DIR)/flash_boot.hex $(BUILD_DIR)/ram_boot.hex
+	@echo "✓ Echo test firmware prepared"
+
+# Arty Echo Test: XIP direct boot (no boot stub), equivalent to MAX10 behaviour
+# CPU resets to 0x80100100; XIP stall signal holds the bus until flash init completes.
+ARTY_ECHO_BUILD_DIR = build_arty_echo
+
+arty-echo: build-arty-echo run-arty-echo
+
+build-arty-echo:
+	@echo "=========================================="
+	@echo "Building Arty Echo Test (XIP direct boot from 0x80100100)"
+	@echo "=========================================="
+	$(MAKE) -C $(SW_DIR) uart_echo_xip_arty.hex
+	@mkdir -p $(ARTY_ECHO_BUILD_DIR)
+	cp $(SW_DIR)/uart_echo_xip_arty.hex $(ARTY_ECHO_BUILD_DIR)/test_firmware.hex
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		-GBOOT_STUB_HEX='""' \
+		-GRESET_PC=32\'h80100100 \
+		-GINACTIVITY_TIMEOUT=2000000 \
+		-Mdir $(ARTY_ECHO_BUILD_DIR) \
+		--top-module servant_zvibe_xip_tb \
+		-I$(RTL_DIR) -I$(QSPI_DIR) \
+		$(RTL_SRCS) \
+		$(TB_SRC)
+	@echo "✓ Arty echo firmware prepared"
+	@echo "  Flash image: uart_echo_xip_arty.hex (entry at phys 0x100100)"
+	@echo "  No boot stub — CPU resets directly to 0x80100100 (XIP stall handles startup)"
+
+run-arty-echo:
+	@echo ""
+	@echo "Running Arty Echo Test (XIP direct boot)..."
+	cd $(ARTY_ECHO_BUILD_DIR) && ./Vservant_zvibe_xip_tb; \
+	if grep -q "Ready>" uart_output.txt 2>/dev/null; then \
+		echo "PASS: arty_xip_echo"; \
+	else \
+		echo "FAIL: arty_xip_echo (expected 'Ready>' in uart_output.txt)"; \
+		exit 1; \
+	fi
+
+# Arty Echo + Cache Test: same as arty-echo but with 4KB BRAM cache (USE_CACHE=1)
+# Validates qspi_cache_bram + BURST_WORDS=4 XIP end-to-end via full SoC simulation.
+ARTY_ECHO_CACHE_BUILD_DIR = build_arty_echo_cache
+
+.PHONY: arty-echo-cache build-arty-echo-cache run-arty-echo-cache
+
+arty-echo-cache: build-arty-echo-cache run-arty-echo-cache
+
+build-arty-echo-cache:
+	@echo "=========================================="
+	@echo "Building Arty Echo + Cache Test (USE_CACHE=1)"
+	@echo "=========================================="
+	$(MAKE) -C $(SW_DIR) uart_echo_xip_arty.hex
+	@mkdir -p $(ARTY_ECHO_CACHE_BUILD_DIR)
+	cp $(SW_DIR)/uart_echo_xip_arty.hex $(ARTY_ECHO_CACHE_BUILD_DIR)/test_firmware.hex
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		-GBOOT_STUB_HEX='""' \
+		-GRESET_PC=32\'h80100100 \
+		-GUSE_CACHE=1 \
+		-GINACTIVITY_TIMEOUT=2000000 \
+		-Mdir $(ARTY_ECHO_CACHE_BUILD_DIR) \
+		--top-module servant_zvibe_xip_tb \
+		-I$(RTL_DIR) -I$(QSPI_DIR) \
+		$(RTL_SRCS) \
+		$(TB_SRC)
+	@echo "✓ Arty echo+cache firmware prepared"
+	@echo "  Flash image: uart_echo_xip_arty.hex (entry at phys 0x100100)"
+	@echo "  Cache: 4KB direct-mapped BRAM (256 lines × 16B), BURST_WORDS=4"
+
+run-arty-echo-cache:
+	@echo ""
+	@echo "Running Arty Echo + Cache Test..."
+	cd $(ARTY_ECHO_CACHE_BUILD_DIR) && ./Vservant_zvibe_xip_tb; \
+	if grep -q "Ready>" uart_output.txt 2>/dev/null; then \
+		echo "PASS: arty_xip_echo_cache"; \
+	else \
+		echo "FAIL: arty_xip_echo_cache (expected 'Ready>' in uart_output.txt)"; \
+		exit 1; \
+	fi
+
+# Run all tests
+test-all: test1 test2 test3 test4 test5 test6
+	@echo ""
+	@echo "=========================================="
+	@echo "All Tests Complete"
+	@echo "=========================================="
+
+# Default test firmware (if not specified)
+$(BUILD_DIR)/$(TEST_FW):
+	@echo "No test firmware found in build directory"
+	@echo "Please run: make -f Makefile.xip test1 (or test2, test3, test4, test5)"
+	@exit 1
+
+# View waveform (requires GTKWave)
+wave: run
+	@if command -v gtkwave >/dev/null 2>&1; then \
+		gtkwave $(BUILD_DIR)/servant_zvibe_xip_tb.vcd &\
+	else \
+		echo "GTKWave not installed - open $(BUILD_DIR)/servant_zvibe_xip_tb.vcd manually"; \
+	fi
+
+# Clean build artifacts
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f *.vcd
+
+# Help
+help:
+	@echo "Servant ZVibe SoC XIP Testbench Makefile"
+	@echo "========================================="
+	@echo ""
+	@echo "Targets:"
+	@echo "  all (build)  - Build the testbench"
+	@echo "  run          - Run simulation with current test firmware"
+	@echo "  test1        - Build and run Test 1: Simple boot + UART"
+	@echo "  test2        - Build and run Test 2: Memory test"
+	@echo "  test3        - Build and run Test 3: Stack test"
+	@echo "  test4        - Build and run Test 4: Branch test"
+	@echo "  test5        - Build and run Test 5: Long running test"
+	@echo "  test6        - Build and run Test 6: Comprehensive test"
+	@echo "  echo         - Build and run Echo test (UART interactive)"
+	@echo "  test-all     - Run all tests"
+	@echo "  wave         - Run simulation and view waveform"
+	@echo "  clean        - Remove build artifacts"
+	@echo "  help         - Show this help"
+	@echo ""
+	@echo "Test firmware location: $(SW_DIR)"
+	@echo "Build directory: $(BUILD_DIR)"
+	@echo ""
+
+# Flash Pattern Test - runs from RAM, reads flash pattern
+flash-pattern: build-flash-pattern run
+
+build-flash-pattern:
+	@echo "Building Flash Pattern Test"
+	$(MAKE) -C $(SW_DIR) test_flash_pattern.hex
+	@echo "Generating flash pattern data..."
+	$(MAKE) -C $(SW_DIR) flash_pattern_for_sim.hex
+	@mkdir -p $(BUILD_DIR)
+	cp $(SW_DIR)/test_flash_pattern.hex $(BUILD_DIR)/ram_boot.hex
+	cp $(SW_DIR)/flash_pattern_for_sim.hex $(BUILD_DIR)/test_firmware.hex
+	@echo "✓ Flash pattern test ready"

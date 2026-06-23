@@ -1,0 +1,19 @@
+# Keep documentation
+!README.md
+!.gitignore
+
+# Ignore all game files (copyrighted content)
+catalog/*.z3
+catalog/*.json
+tests/*.z3
+*.z4
+*.z5
+*.z8
+*.dat
+
+# Exceptions: public domain / original works committed to the repo
+!catalog/czech.z3
+!catalog/restaurant.z3
+
+# Ignore download caches and temp files
+size_cache.json

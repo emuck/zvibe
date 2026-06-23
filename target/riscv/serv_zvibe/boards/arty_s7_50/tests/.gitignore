@@ -1,0 +1,3 @@
+# Test output files (regenerated each run)
+*.log
+*.csv

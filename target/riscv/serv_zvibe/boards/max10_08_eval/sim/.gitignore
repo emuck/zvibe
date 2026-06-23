@@ -1,0 +1,39 @@
+# Verilator build artifacts
+obj_dir/
+obj_dir_*/
+
+# ModelSim/Questa artifacts
+work/
+libraries/
+modelsim.ini
+transcript
+vsim.wlf
+*.vcd
+*.fst
+*.ghw
+
+# Generated test files
+*.dat
+*.hex
+*.ver
+*.mif
+ufm_init_bytes.hex
+uart_output.txt
+
+# Build logs
+*.log
+
+# Temporary files
+*.tmp
+*.old
+*~
+.DS_Store
+*.vstf
+
+# Keep important files
+!ufm_init.dat
+!*.sv
+!*.v
+!*.tcl
+!*.do
+!Makefile

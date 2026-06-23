@@ -1,0 +1,213 @@
+.
+wait
+.
+wait
+.
+wait
+.
+examine panel
+@capture panel_code /code:\s*(\d+)/
+.
+open satchel
+.
+get bundle
+.
+get filament
+.
+examine bundle
+.
+unfold towel
+.
+wrap towel
+.
+s
+.
+se
+.
+se
+.
+get fragment
+.
+nw
+.
+sw
+.
+get piece
+.
+ne
+.
+s
+.
+tie filament to mandible
+.
+breathe through towel
+.
+s
+.
+w
+.
+rub fragment with piece
+.
+e
+.
+s
+.
+open gown
+.
+take toothbrush
+.
+show card to door
+.
+s
+.
+give card to slartibartfast
+.
+e
+.
+get screwdriver
+.
+pry device with screwdriver
+.
+get device
+.
+w
+.
+clean device with toothbrush
+.
+give device to zaphod
+.
+n
+.
+n
+.
+n
+.
+n
+.
+nw
+.
+n
+.
+take off towel
+.
+enter {panel_code}
+.
+n
+.
+take fluff
+.
+wait
+.
+wait
+.
+wait
+.
+wait
+.
+listen
+.
+listen to wail
+.
+n
+.
+examine ledger
+.
+pull ribbon
+.
+turn hourglass
+.
+show ledger to agrajag
+.
+wait
+.
+wait
+.
+smell
+.
+examine shadow
+.
+e
+.
+take off towel
+.
+drop all
+.
+s
+.
+ask concierge about olive
+.
+ask concierge about olive
+.
+ask concierge about olive
+.
+ask concierge about olive
+.
+s
+.
+take sticky glass
+.
+n
+.
+n
+.
+get fluff
+.
+take glass
+.
+w
+.
+w
+.
+give fluff to marvin
+.
+give sticky glass to marvin
+.
+give olive to marvin
+.
+give glass to marvin
+.
+e
+.
+e
+.
+put gargle blaster in thing
+.
+drop all
+.
+s
+.
+wait
+.
+get gargle blaster from thing
+.
+give gargle blaster to hotblack
+.
+give record to luther
+.
+n
+.
+w
+.
+w
+.
+se
+.
+e
+.
+d
+.
+w
+.
+d
+.
+w
+.
+d
+.
+d
+.
+e
+.
+enter nothing
+.
+.
