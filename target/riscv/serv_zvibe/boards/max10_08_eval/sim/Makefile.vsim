@@ -1,0 +1,138 @@
+# Makefile for MAX10 Questa simulations (vendor Intel UFM IP)
+#
+# Two tests:
+#   uart-echo   — XIP boot + UART echo (pre-built firmware in uart_echo_xip_test.dat)
+#   ufm-write   — runtime UFM erase/write/verify (firmware built from ufm_write_xip_test.c)
+#
+# Both use Intel's msim_setup.tcl for correct library hierarchy (onchip_flash_0, etc.)
+#
+# Usage:
+#   make -f Makefile.vsim uart-echo           # run uart-echo test
+#   make -f Makefile.vsim ufm-write           # build firmware + run UFM write test
+#   make -f Makefile.vsim ufm-write-firmware  # build .dat only (no sim)
+#   make -f Makefile.vsim clean
+
+VSIM = vsim
+CC   = riscv64-unknown-elf-gcc
+OBJCOPY = riscv64-unknown-elf-objcopy
+OBJDUMP = riscv64-unknown-elf-objdump
+
+UFM_V   = ../fpga/ip/ufm/simulation/ufm.v
+INIT_DAT = altera_onchip_flash.dat
+
+# ---------------------------------------------------------------------------
+# ensure-ufm-ip: generate UFM IP if missing, patch INIT_FILENAME_SIM
+#
+# Quartus regenerates ufm.v with INIT_FILENAME_SIM="" (empty).
+# The vendor UFM model needs this set to "altera_onchip_flash.dat" so
+# $readmemh can load the firmware at sim time.  We patch it every run so
+# fresh generate-ip output is always corrected automatically.
+# ---------------------------------------------------------------------------
+.PHONY: ensure-ufm-ip
+ensure-ufm-ip:
+	@if [ ! -f "$(UFM_V)" ]; then \
+		echo "UFM IP not found — running make generate-ip..."; \
+		$(MAKE) -C ../fpga generate-ip; \
+	fi
+	@if grep -q 'INIT_FILENAME_SIM.*("")' "$(UFM_V)" 2>/dev/null; then \
+		echo "Patching INIT_FILENAME_SIM in ufm.v → \"$(INIT_DAT)\""; \
+		sed -i 's/\.INIT_FILENAME_SIM[[:space:]]*("")/.INIT_FILENAME_SIM                   ("$(INIT_DAT)")/' "$(UFM_V)"; \
+	fi
+
+# ---------------------------------------------------------------------------
+# uart-echo test firmware (uart_echo_xip.c → uart_echo_xip_test.dat)
+# ---------------------------------------------------------------------------
+SW_DIR = ../../../common/sw
+
+uart_echo_xip_test.dat:
+	$(MAKE) -C $(SW_DIR) uart_echo_xip_test.dat
+	cp $(SW_DIR)/uart_echo_xip_test.dat $@
+
+.PHONY: uart-echo-firmware
+uart-echo-firmware: uart_echo_xip_test.dat
+
+# ---------------------------------------------------------------------------
+# uart-echo test: build firmware then run Questa
+# ---------------------------------------------------------------------------
+.PHONY: uart-echo
+uart-echo: ensure-ufm-ip uart_echo_xip_test.dat
+	@echo "=== uart-echo XIP test (vendor UFM model) ==="
+	@cp uart_echo_xip_test.dat altera_onchip_flash.dat
+	$(VSIM) -c -do run_questa_soc.tcl 2>&1 | tee uart_echo_questa.log
+	@echo "=== Output: uart_output.txt ==="
+	@cat uart_output.txt 2>/dev/null || echo "(no uart_output.txt)"
+	@echo
+	@if grep -q "EcHo!" uart_output.txt 2>/dev/null; then \
+		echo "PASS: max10_xip_questa_uart_echo"; \
+	else \
+		echo "FAIL: max10_xip_questa_uart_echo (no EcHo! in uart_output.txt)"; \
+		exit 1; \
+	fi
+
+# ---------------------------------------------------------------------------
+# UFM write test firmware (ufm_write_xip_test.c → test_ufm_write.dat)
+# ---------------------------------------------------------------------------
+CFLAGS = -march=rv32i -mabi=ilp32 -Os -Wall -Wextra \
+         -fno-builtin -nostdlib -ffreestanding \
+         -ffunction-sections -fdata-sections \
+         -fno-tree-loop-distribute-patterns
+
+ufm_write_xip_start.o: ufm_write_xip_start.S
+	$(CC) $(CFLAGS) -c $< -o $@
+
+ufm_write_xip_test.o: ufm_write_xip_test.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+ufm_write_xip_test.elf: ufm_write_xip_start.o ufm_write_xip_test.o
+	$(CC) $(CFLAGS) -T ufm_write_xip_test.ld -nostartfiles -Wl,--gc-sections \
+		-o $@ $^
+
+ufm_write_xip_test.hex: ufm_write_xip_test.elf
+	$(OBJCOPY) -O verilog --verilog-data-width=4 $< $@
+
+test_ufm_write.dat: ufm_write_xip_test.hex
+	./hex_to_ufm_dat.sh $< $@
+
+.PHONY: ufm-write-firmware
+ufm-write-firmware: test_ufm_write.dat
+
+# ---------------------------------------------------------------------------
+# UFM write test: build firmware then run Questa
+# ---------------------------------------------------------------------------
+.PHONY: ufm-write
+ufm-write: ensure-ufm-ip test_ufm_write.dat
+	@echo "=== UFM write test (vendor UFM model) ==="
+	$(VSIM) -c -do run_questa_ufm_write.tcl 2>&1 | tee ufm_write_questa.log
+	@echo "=== Output: uart_output.txt ==="
+	@cat uart_output.txt 2>/dev/null || echo "(no uart_output.txt)"
+	@echo
+	@if grep -q "completed!" uart_output.txt 2>/dev/null; then \
+		echo "PASS: max10_xip_questa_ufm_write"; \
+	else \
+		echo "FAIL: max10_xip_questa_ufm_write (no 'completed!' in uart_output.txt)"; \
+		exit 1; \
+	fi
+
+# ---------------------------------------------------------------------------
+.PHONY: clean help
+clean:
+	rm -rf libraries/ work/
+	rm -f transcript vsim.wlf *.vcd uart_output.txt ufm_init.dat
+	rm -f *.log
+	rm -f ufm_write_xip_start.o ufm_write_xip_test.o
+	rm -f ufm_write_xip_test.elf ufm_write_xip_test.hex test_ufm_write.dat
+	rm -f uart_echo_xip_test.dat altera_onchip_flash.dat
+
+help:
+	@echo "MAX10 Questa Simulation Targets"
+	@echo "================================"
+	@echo "  uart-echo              Run uart-echo XIP test (vendor UFM model)"
+	@echo "  uart-echo-firmware     Build uart_echo_xip_test.dat only"
+	@echo "  ufm-write              Build firmware + run UFM write test"
+	@echo "  ufm-write-firmware     Build test_ufm_write.dat only"
+	@echo "  clean                  Remove build + simulation artifacts"
+	@echo ""
+	@echo "Prerequisites:"
+	@echo "  vsim on PATH (Questa FSE or ModelSim)"
+	@echo "  UFM IP is auto-generated and patched if missing (ensure-ufm-ip)"
+	@echo "  To force regeneration: cd ../fpga && make generate-ip"

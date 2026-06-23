@@ -1,0 +1,197 @@
+/**
+ * @defgroup PublicAPI Public API
+ * @brief Application-facing API for Z-machine interpreter
+ *
+ * The public API provides a clean interface for embedding the Z-machine
+ * interpreter in desktop and embedded applications. All public functions
+ * use the `zvibe_` prefix.
+ *
+ * **Key Features:**
+ * - Context-based API (opaque zvibeContext pointer)
+ * - Explicit request/response execution model
+ * - Output callback plus optional status callback
+ * - Conditional compilation for optional file I/O, status, and save features
+ * - No dynamic allocation (uses static buffers)
+ *
+ * **Typical Usage:**
+ * 1. Create context with zvibe_create()
+ * 2. Load story with zvibe_load_story() or zvibe_load_story_from_memory()
+ * 3. Run interpreter with zvibe_run() in a loop
+ * 4. Provide input when ZVIBE_WAIT_FOR_INPUT returned
+ * 5. Destroy context with zvibe_destroy()
+ */
+
+/**
+ * @defgroup CoreInterpreter Core Interpreter
+ * @brief Main execution loop, opcode dispatch, and PC management
+ *
+ * The core interpreter implements the Z-machine fetch-decode-execute cycle
+ * for Version 3 story files. It manages the program counter, decodes
+ * instructions, and dispatches to opcode handlers.
+ *
+ * **Responsibilities:**
+ * - Instruction fetch and decode
+ * - Opcode dispatch
+ * - Program counter management
+ * - Global state management
+ *
+ * **Implementation Notes:**
+ * - Z-machine Version 3 only
+ * - Big-endian architecture (per Z-machine spec)
+ * - No dynamic allocation
+ */
+
+/**
+ * @defgroup MemoryAbstraction Memory Abstraction
+ * @brief Split memory architecture for embedded systems
+ *
+ * Implements a split memory model that separates dynamic (RAM) and static
+ * (flash/ROM) memory regions. This reduces RAM requirements by 85-95%
+ * compared to loading the entire story file into RAM.
+ *
+ * **Memory Layout:**
+ * - Dynamic memory: 0 to staticmem_addr (writable, in RAM)
+ * - Static memory: staticmem_addr to story_size (read-only, in flash)
+ * - Stack: Grows upward from end of dynamic memory
+ *
+ * **Key Functions:**
+ * - zmem_read_byte() / zmem_write_byte()
+ * - zmem_read_word() / zmem_write_word()
+ * - zmem_get_ptr() for legacy pointer access
+ *
+ * **Embedded Constraints:**
+ * - RAM: 16KB default (configurable via ZVIBE_MEMORY_BUFFER_SIZE)
+ * - No malloc: Static buffers only
+ * - Write protection: Static memory is read-only
+ */
+
+/**
+ * @defgroup ObjectTable Object Table
+ * @brief Z-machine object tree operations
+ *
+ * Manages the Z-machine object tree, which represents the game world
+ * hierarchy. Objects have attributes, properties, and parent/child/sibling
+ * relationships.
+ *
+ * **Version 3 Specifics:**
+ * - Maximum 255 objects
+ * - 32 attributes per object
+ * - 31 property defaults
+ * - 9-byte object entries
+ *
+ * **Operations:**
+ * - Get/set attributes
+ * - Get/set properties
+ * - Navigate object tree (parent, child, sibling)
+ * - Insert/remove objects
+ */
+
+/**
+ * @defgroup Opcodes Opcode Implementations
+ * @brief Z-machine instruction implementations
+ *
+ * Implements all Z-machine Version 3 opcodes organized by category.
+ * Each opcode handler reads operands from G->operands[] and performs
+ * the specified operation.
+ */
+
+/**
+ * @defgroup OpcodesBase Control Flow Opcodes
+ * @ingroup Opcodes
+ * @brief Call, return, branch, and stack manipulation
+ *
+ * **Control Flow:**
+ * - op_call() - Subroutine call
+ * - op_ret(), op_rtrue(), op_rfalse() - Return operations
+ * - op_jump() - Unconditional jump
+ *
+ * **Branching:**
+ * - z_do_branch() - Branch decision logic
+ * - Various conditional branches (je, jl, jg, jz, etc.)
+ *
+ * **Stack:**
+ * - op_push(), op_pop(), op_pull() - Stack manipulation
+ * - Stack grows upward from staticmem_addr
+ */
+
+/**
+ * @defgroup OpcodesMath Arithmetic and Logic Opcodes
+ * @ingroup Opcodes
+ * @brief Arithmetic, bitwise, and comparison operations
+ *
+ * **Arithmetic:**
+ * - op_add(), op_sub(), op_mul(), op_div(), op_mod()
+ * - Signed 16-bit arithmetic
+ * - Division by zero is fatal error
+ *
+ * **Bitwise:**
+ * - op_and(), op_or(), op_not()
+ * - op_test() - Test if bits set
+ *
+ * **Comparison:**
+ * - op_je() - Jump if equal (variable operands)
+ * - op_jl(), op_jg() - Signed comparison
+ * - op_inc_chk(), op_dec_chk() - Increment/decrement with comparison
+ */
+
+/**
+ * @defgroup OpcodesMem Memory Access Opcodes
+ * @ingroup Opcodes
+ * @brief Load, store, and memory manipulation
+ *
+ * **Direct Access:**
+ * - op_loadb(), op_loadw() - Load byte/word from memory
+ * - op_storeb(), op_storew() - Store byte/word to memory
+ *
+ * **Variable Access:**
+ * - op_load(), op_store() - Load/store variables (stack/local/global)
+ *
+ * **Properties:**
+ * - op_get_prop(), op_put_prop() - Object property access
+ * - op_get_prop_addr(), op_get_prop_len() - Property metadata
+ * - op_get_next_prop() - Property enumeration
+ */
+
+/**
+ * @defgroup OpcodesText Text Output Opcodes
+ * @ingroup Opcodes
+ * @brief Text output, printing, and string handling
+ *
+ * **Text Output:**
+ * - op_print(), op_print_ret() - Inline text printing
+ * - op_print_addr(), op_print_paddr() - Print from address
+ * - op_print_char(), op_print_num() - Character/number output
+ * - op_print_obj() - Print object name
+ * - op_new_line() - Line break
+ *
+ * **Text Encoding:**
+ * - ZSCII character set
+ * - 3-letter alphabet table
+ * - Abbreviation table support
+ * - Big-endian word encoding
+ *
+ * **Input:**
+ * - op_read() - Read user input into buffer
+ */
+
+/**
+ * @defgroup PlatformCallbacks Platform Integration
+ * @brief Callback interfaces for platform-specific I/O
+ *
+ * The interpreter uses a small callback surface for output and optional
+ * status updates, plus an explicit drive loop for input and save/restore.
+ *
+ * **Required Callback:**
+ * - zvibeOutputFunc - Text output
+ *
+ * **Internal Callback:**
+ * - Die callback - Fatal error handling
+ *
+ * **Optional Callbacks:**
+ * - zvibeStatusFunc - Status line updates (if ZVIBE_ENABLE_STATUS_LINE)
+ *
+ * **Platform Requirements:**
+ * - Text output must handle ZSCII character set
+ * - Input must provide null-terminated strings via `zvibe_input()`
+ * - Save/restore hosts must persist opaque binary save data
+ */

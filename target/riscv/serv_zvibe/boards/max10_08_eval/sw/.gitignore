@@ -1,0 +1,16 @@
+# Generated build artifacts
+*.elf
+*.bin
+*.dis
+*.hex
+*.o
+*.map
+src/
+
+# Generated flash layout files
+flash_layout.h
+flash_layout.ld
+max10_layout.json
+
+# Generated simulation .dat file
+altera_onchip_flash.dat

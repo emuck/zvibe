@@ -1,0 +1,71 @@
+# Doxyfile for ZVibe Z-Machine Emulator
+#
+# Build Configuration:
+# This configuration generates documentation for the full-featured desktop build.
+# PREDEFINED macros set ZVIBE_ENABLE_SAVE_RESTORE=1 and ZVIBE_ENABLE_STATUS_LINE=1.
+#
+# For minimal embedded build documentation, override PREDEFINED:
+#   PREDEFINED = "ZVIBE_MINIMAL_FEATURES=1 ZVIBE_ENABLE_SAVE_RESTORE=0 ZVIBE_ENABLE_STATUS_LINE=0"
+#
+# Main page: docs/ARCHITECTURE.md provides system overview
+
+# Project details
+PROJECT_NAME           = "ZVibe"
+PROJECT_BRIEF          = "Optimized Z-Machine implementation for version 3 games"
+PROJECT_NUMBER         = 0.1
+OUTPUT_DIRECTORY       = .
+
+# Input settings
+INPUT                  = ../src ../include groups.dox ARCHITECTURE.md
+FILE_PATTERNS          = *.c *.h *.dox *.md
+RECURSIVE              = YES
+EXCLUDE                = ../build ../tmp ../tests
+USE_MDFILE_AS_MAINPAGE = ARCHITECTURE.md
+
+# Output settings
+GENERATE_HTML          = YES
+GENERATE_LATEX         = YES
+LATEX_OUTPUT           = latex
+HTML_OUTPUT            = html
+
+# PDF-specific settings
+USE_PDFLATEX           = YES
+PDF_HYPERLINKS         = YES
+
+# Extraction settings
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = YES
+EXTRACT_STATIC         = YES
+
+# Diagram settings (if you have GraphViz installed)
+HAVE_DOT               = YES
+UML_LOOK               = YES
+CALL_GRAPH             = YES
+CALLER_GRAPH           = YES
+DOT_GRAPH_MAX_NODES    = 100
+
+# Enable preprocessing
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+
+# Define macros for documentation generation
+# Default profile: Full-featured desktop build
+PREDEFINED             = ZVIBE_ENABLE_SAVE_RESTORE=1 \
+                         ZVIBE_ENABLE_STATUS_LINE=1 \
+                         ZVIBE_MEMORY_BUFFER_SIZE=16384 \
+                         __DOXYGEN__=1
+
+# Source browsing
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = YES
+
+# Other settings
+OPTIMIZE_OUTPUT_FOR_C  = YES
+BUILTIN_STL_SUPPORT    = NO
+QUIET                  = NO
+WARNINGS               = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = NO

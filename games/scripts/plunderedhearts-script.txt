@@ -1,0 +1,234 @@
+
+verbose
+get up
+inventory
+look under bed
+take coffer
+examine coffer
+examine smelling salts
+read tag
+examine banknote
+look
+hit andy with coffer
+hit andy with coffer
+wait
+read missive
+yes
+wait
+
+get up
+inventory
+wait
+wait
+wait
+look
+examine window
+open curtain
+wait
+take coffer
+open coffer
+take invitation
+read invitation
+n
+d
+n
+examine cage
+n
+take bottle
+take mirror
+s
+look
+inventory
+s
+u
+open door
+enter bed
+take clothes
+n
+s
+examine window
+throw coffer through window
+undress
+wear breeches
+wear shirt
+grab ladder
+s
+grab ladder
+u
+u
+u
+u
+n
+n
+n
+examine winch
+read lever
+pull lever up
+enter shack
+take dagger
+out
+s
+look
+examine barrels
+open canvas
+examine frock
+cut frock
+put rag in water
+d
+throw rag at fuse
+u
+s
+enter cask
+cut line
+take slab of pork
+wait
+wait
+wait
+get out of cask
+w
+n
+e
+move bamboo slat
+tell jamison about crulley
+wait
+yes
+wait
+w
+w
+n
+e
+wait
+take garter
+w
+s
+ne
+u
+undress
+take gown
+wear gown
+n
+e
+d
+s
+show invitation to butler
+s
+wait
+wait
+wait
+wait
+open door
+s
+n
+yes
+wait
+examine ring
+e
+n
+n
+take hat
+examine books
+take treatise of power
+examine globe
+press st sinistra
+n
+close portrait
+d
+e
+e
+take horn and key
+w
+s
+open door
+e
+w
+close door
+n
+w
+s
+examine bottle
+read label
+put laudanum on pork
+give pork to crocodile
+wait
+wait
+s
+w
+unlock door with key
+open door
+n
+wait
+s
+e
+n
+n
+u
+open portrait
+s
+close portrait
+u
+w
+s
+wait
+n
+e
+e
+open door
+n
+drink wine
+fill blue goblet
+put laudanum in blue
+put mirror in beam
+wait
+yes
+drink wine
+wait
+wait
+wait
+take spices
+blow spices at Lafond
+s
+n
+take all
+s
+w
+d
+Cookie, follow me
+e
+n
+take hat
+take treatise of power
+push st sinistra
+n
+d
+s
+s
+take rapier
+fight crulley with rapier
+fight crulley with rapier
+close trapdoor
+give smelling salts to jamison
+unlock chains with brooch
+n
+n
+u
+s
+s
+w
+u
+e
+s
+untie rope
+take rope
+go down with rope
+take all
+s
+s
+s
+take stone
+examine stone
+yes
+take pistol
+load pistol
+wait
+shoot crulley
+quit

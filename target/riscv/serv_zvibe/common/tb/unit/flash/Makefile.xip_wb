@@ -1,0 +1,199 @@
+# Makefile for QSPI XIP Controller and Cache Tests
+# Supports both Verilator and Vivado xsim
+
+VERILATOR = verilator
+VERILATOR_FLAGS = --binary --trace --assert -Wall
+VERILATOR_FLAGS += -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-UNUSEDSIGNAL
+VERILATOR_FLAGS += -Wno-IMPLICITSTATIC -Wno-INITIALDLY -Wno-PROCASSINIT
+VERILATOR_FLAGS += -Wno-CASEINCOMPLETE -Wno-MULTIDRIVEN -Wno-UNUSEDPARAM -Wno-BLKSEQ
+
+VIVADO = vivado
+
+BUILD_DIR   = build_xip_wb
+BUILD_BURST = build_burst
+XSIM_DIR   = xsim_xip_wb
+RTL_DIR    = ../../../rtl
+MODELS_DIR = ../../models
+
+# Source files — XIP controller test
+TB_SRC    = s25fl_xip_wb_tb.sv
+FLASH_MODEL = $(MODELS_DIR)/s25fl_simple_rw.v
+DUT_RTL   = $(RTL_DIR)/qspi/s25fl_xip.sv
+TCL_SCRIPT = run_xip_wb_xsim.tcl
+
+# Source files — BRAM cache unit test
+BUILD_CACHE_BRAM  = build_cache_bram
+CACHE_BRAM_TB_SRC = qspi_cache_bram_tb.sv
+CACHE_BRAM_RTL    = $(RTL_DIR)/qspi/qspi_cache_bram.sv
+
+.PHONY: all build run cache-bram cache-bram-build cache-bram-run burst burst-build burst-run vsim-vendor-burst4 clean xsim xsim-clean all-sims clean-all
+
+# Default target
+all: run
+
+# Build testbench with Verilator
+build: $(BUILD_DIR)/Vs25fl_xip_wb_tb
+
+$(BUILD_DIR)/Vs25fl_xip_wb_tb: $(TB_SRC) $(FLASH_MODEL) $(DUT_RTL)
+	@echo "=========================================="
+	@echo "Building XIP Wishbone Test (Verilator)"
+	@echo "=========================================="
+	@mkdir -p $(BUILD_DIR)
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		-Mdir $(BUILD_DIR) \
+		--top-module s25fl_xip_wb_tb \
+		$(FLASH_MODEL) \
+		$(DUT_RTL) \
+		$(TB_SRC)
+	@echo "Build complete!"
+
+# Run Verilator simulation
+run: build
+	@echo ""
+	@echo "=========================================="
+	@echo "Running XIP Wishbone Test (Verilator)"
+	@echo "=========================================="
+	cd $(BUILD_DIR) && ./Vs25fl_xip_wb_tb
+	@echo ""
+	@echo "Waveform: $(BUILD_DIR)/dump.vcd"
+
+# ============================================================================
+# BRAM cache unit test
+# ============================================================================
+
+cache-bram: cache-bram-run
+
+cache-bram-build: $(BUILD_CACHE_BRAM)/Vqspi_cache_bram_tb
+
+$(BUILD_CACHE_BRAM)/Vqspi_cache_bram_tb: $(CACHE_BRAM_TB_SRC) $(CACHE_BRAM_RTL)
+	@echo "=========================================="
+	@echo "Building BRAM Cache Unit Test (Verilator)"
+	@echo "=========================================="
+	@mkdir -p $(BUILD_CACHE_BRAM)
+	$(VERILATOR) $(VERILATOR_FLAGS) -Wno-BLKSEQ \
+		-Mdir $(BUILD_CACHE_BRAM) \
+		--top-module qspi_cache_bram_tb \
+		$(CACHE_BRAM_RTL) \
+		$(CACHE_BRAM_TB_SRC)
+	@echo "BRAM cache test build complete!"
+
+cache-bram-run: cache-bram-build
+	@echo ""
+	@echo "=========================================="
+	@echo "Running BRAM Cache Unit Tests (Verilator)"
+	@echo "=========================================="
+	@cd $(BUILD_CACHE_BRAM) && ./Vqspi_cache_bram_tb | tee /tmp/qspi_cache_bram_out.txt; \
+	if grep -q "ALL TESTS PASSED" /tmp/qspi_cache_bram_out.txt; then \
+		echo "PASS: qspi_cache_bram_tb"; \
+	else \
+		echo "FAIL: qspi_cache_bram_tb"; \
+		exit 1; \
+	fi
+
+# ============================================================================
+# Burst unit test (BURST_WORDS=4, no flash model needed)
+# ============================================================================
+
+burst: burst-run
+
+burst-build: $(BUILD_BURST)/Vs25fl_xip_burst_tb
+
+$(BUILD_BURST)/Vs25fl_xip_burst_tb: s25fl_xip_burst_tb.sv $(DUT_RTL)
+	@echo "=========================================="
+	@echo "Building Burst Unit Test (Verilator)"
+	@echo "=========================================="
+	@mkdir -p $(BUILD_BURST)
+	$(VERILATOR) $(VERILATOR_FLAGS) -Wno-BLKSEQ \
+		-Mdir $(BUILD_BURST) \
+		--top-module s25fl_xip_burst_tb \
+		$(DUT_RTL) \
+		s25fl_xip_burst_tb.sv
+	@echo "Burst test build complete!"
+
+burst-run: burst-build
+	@echo ""
+	@echo "=========================================="
+	@echo "Running Burst Unit Test (Verilator)"
+	@echo "=========================================="
+	@cd $(BUILD_BURST) && ./Vs25fl_xip_burst_tb | tee /tmp/s25fl_xip_burst_out.txt; \
+	if grep -q "ALL TESTS PASSED" /tmp/s25fl_xip_burst_out.txt; then \
+		echo "PASS: s25fl_xip_burst_tb"; \
+	else \
+		echo "FAIL: s25fl_xip_burst_tb"; \
+		exit 1; \
+	fi
+
+# ============================================================================
+# Questa vendor model tests (require vsim on PATH and s25fl128s.v at ~/max10/)
+# ============================================================================
+
+vsim-vendor-burst4:
+	@echo ""
+	@echo "=========================================="
+	@echo "Running Vendor Model Test BURST_WORDS=4 (Questa)"
+	@echo "=========================================="
+	vsim -c -do run_vendor_burst4_vsim.tcl
+
+# ============================================================================
+# Full cache sweep (NUM_LINES=256, all lines + eviction + stride)
+# ============================================================================
+BUILD_SWEEP = build_cache_sweep
+CACHE_SWEEP_TB = qspi_cache_sweep_tb.sv
+
+cache-sweep: cache-sweep-run
+
+cache-sweep-build: $(BUILD_SWEEP)/Vqspi_cache_sweep_tb
+
+$(BUILD_SWEEP)/Vqspi_cache_sweep_tb: $(CACHE_SWEEP_TB) $(CACHE_BRAM_RTL)
+	@mkdir -p $(BUILD_SWEEP)
+	$(VERILATOR) $(VERILATOR_FLAGS) -Wno-BLKSEQ \
+		-Mdir $(BUILD_SWEEP) \
+		--top-module qspi_cache_sweep_tb \
+		$(CACHE_BRAM_RTL) \
+		$(CACHE_SWEEP_TB)
+
+cache-sweep-run: cache-sweep-build
+	@cd $(BUILD_SWEEP) && ./Vqspi_cache_sweep_tb | tee /tmp/cache_sweep_out.txt; \
+	if grep -q "PASS: cache_sweep_256" /tmp/cache_sweep_out.txt; then \
+		echo "PASS: cache_sweep_256"; \
+	else \
+		echo "FAIL: cache_sweep_256"; \
+		exit 1; \
+	fi
+
+# Clean Verilator build artifacts
+clean:
+	rm -rf $(BUILD_DIR) $(BUILD_CACHE_BRAM) $(BUILD_BURST) $(BUILD_SWEEP) *.vcd
+
+# ============================================================================
+# Vivado xsim targets
+# ============================================================================
+
+# Run simulation with Vivado xsim
+xsim:
+	@echo ""
+	@echo "=========================================="
+	@echo "Running XIP Wishbone Test (Vivado xsim)"
+	@echo "=========================================="
+	@if command -v $(VIVADO) >/dev/null 2>&1; then \
+		$(VIVADO) -mode batch -source $(TCL_SCRIPT); \
+	else \
+		echo "ERROR: Vivado not found in PATH"; \
+		exit 1; \
+	fi
+
+# Clean xsim artifacts
+xsim-clean:
+	rm -rf $(XSIM_DIR) vivado*.log vivado*.jou .Xil
+
+# Run tests with both simulators
+all-sims: run xsim
+	@echo ""
+	@echo "=========================================="
+	@echo "All Simulator Tests Complete"
+	@echo "=========================================="
+
+# Clean everything
+clean-all: clean xsim-clean
+
+# (All .PHONY targets declared at top)

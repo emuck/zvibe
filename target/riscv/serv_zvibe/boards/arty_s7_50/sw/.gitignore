@@ -1,0 +1,16 @@
+# Generated build artifacts
+*.elf
+*.bin
+*.dis
+*.hex
+*.o
+*.map
+src/
+
+# Generated flash layout files
+flash_layout.h
+flash_layout.ld
+arty_layout.json
+
+# Generated simulation files
+*.dat

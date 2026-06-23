@@ -1,0 +1,5 @@
+incremental_db/
+output_files/
+libraries/
+onchip_flash_0/
+vish_stacktrace.vstf

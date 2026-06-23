@@ -1,0 +1,14 @@
+# Verilator build output
+obj_dir/
+
+# Simulation artifacts
+*.vcd
+*.fst
+*.dat
+*.vstf
+wlft*
+vsim.wlf
+transcript
+work/
+libraries/
+uart_output.txt

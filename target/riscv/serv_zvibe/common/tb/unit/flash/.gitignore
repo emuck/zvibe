@@ -1,0 +1,11 @@
+modelsim.ini
+transcript
+vsim.wlf
+*.vstf
+build_*/
+xsim_*/
+.Xil/
+vivado*.log
+vivado*.jou
+vivado*.backup
+xvlog.pb

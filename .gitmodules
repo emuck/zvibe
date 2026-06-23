@@ -1,0 +1,3 @@
+[submodule "target/riscv/serv_zvibe/serv"]
+	path = target/riscv/serv_zvibe/serv
+	url = https://github.com/olofk/serv.git

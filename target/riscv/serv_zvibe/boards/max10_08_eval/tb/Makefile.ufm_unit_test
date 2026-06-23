@@ -1,0 +1,85 @@
+# Makefile for UFM Unit Tests
+# Progressive complexity: UFM model → UFM+Bridge → Full XIP
+
+.PHONY: all test-ufm test-bridge clean help
+
+#==============================================================================
+# Configuration
+#==============================================================================
+
+VERILATOR = verilator
+VFLAGS = --binary --trace --timing --build -Wall
+VFLAGS += -Wno-WIDTHTRUNC -Wno-WIDTHEXPAND -Wno-PINCONNECTEMPTY
+VFLAGS += -Wno-UNUSEDSIGNAL -Wno-TIMESCALEMOD -Wno-GENUNNAMED
+VFLAGS += -Wno-BLKSEQ -Wno-PROCASSINIT -Wno-CASEINCOMPLETE
+VFLAGS += -Wno-UNUSEDPARAM -Wno-UNDRIVEN -Wno-REDEFMACRO
+VFLAGS += -Wno-INITIALDLY -Wno-PINMISSING
+
+#==============================================================================
+# Test 1: UFM Model Only
+#==============================================================================
+
+test-ufm: obj_dir/Vufm_model_unit_tb
+	@echo "========================================="
+	@echo " Test 1: UFM Behavioral Model Unit Test"
+	@echo "========================================="
+	@./obj_dir/Vufm_model_unit_tb | tee /tmp/ufm_model_unit_out.txt; \
+	if grep -q "ALL TESTS PASSED" /tmp/ufm_model_unit_out.txt; then \
+		echo "PASS: ufm_model_unit_tb"; \
+	else \
+		echo "FAIL: ufm_model_unit_tb"; \
+		exit 1; \
+	fi
+	@echo ""
+
+obj_dir/Vufm_model_unit_tb: ufm_model_unit_tb.sv ufm_sim.sv
+	@echo "Building UFM unit test..."
+	$(VERILATOR) $(VFLAGS) --top ufm_model_unit_tb \
+		ufm_model_unit_tb.sv ufm_sim.sv
+
+#==============================================================================
+# Test 2: UFM + Bridge
+#==============================================================================
+
+test-bridge: obj_dir/Vmax10_ufm_unified_tb
+	@echo "================================="
+	@echo " Test 2: UFM Unified Controller"
+	@echo "================================="
+	@./obj_dir/Vmax10_ufm_unified_tb +verilator+rand+reset+0 | \
+		tee /tmp/ufm_unified_out.txt; \
+	if grep -q "^PASS:" /tmp/ufm_unified_out.txt; then \
+		echo "PASS: max10_ufm_unified_tb"; \
+	else \
+		echo "FAIL: max10_ufm_unified_tb"; \
+		exit 1; \
+	fi
+
+obj_dir/Vmax10_ufm_unified_tb: max10_ufm_unified_tb.sv ufm_sim.sv \
+		../../../common/rtl/ufm/max10_ufm_unified.sv
+	$(VERILATOR) $(VFLAGS) --top max10_ufm_unified_tb \
+		max10_ufm_unified_tb.sv \
+		../../../common/rtl/ufm/max10_ufm_unified.sv \
+		ufm_sim.sv
+
+#==============================================================================
+# Default and Utility Targets
+#==============================================================================
+
+all: test-ufm
+
+clean:
+	rm -rf obj_dir *.vcd
+
+help:
+	@echo "UFM Unit Test Makefile"
+	@echo "======================"
+	@echo ""
+	@echo "Targets:"
+	@echo "  test-ufm     - Test UFM behavioral model (basic Avalon-MM)"
+	@echo "  test-bridge  - Test UFM + Wishbone bridge (TODO)"
+	@echo "  clean        - Remove build artifacts"
+	@echo ""
+	@echo "Progressive testing approach:"
+	@echo "  1. UFM model only (Avalon-MM interface)"
+	@echo "  2. UFM + Bridge (Wishbone to Avalon-MM)"
+	@echo "  3. Full XIP system (CPU + SoC + UFM)"

@@ -1,0 +1,55 @@
+# Makefile for UART Wishbone Interface Tests
+# Tests uart_wb module with error flag handling
+
+VERILATOR = verilator
+VERILATOR_FLAGS = --binary --trace --assert -Wall
+VERILATOR_FLAGS += -Wno-WIDTHEXPAND -Wno-WIDTHTRUNC -Wno-UNUSEDSIGNAL
+VERILATOR_FLAGS += -Wno-IMPLICITSTATIC -Wno-INITIALDLY -Wno-PROCASSINIT
+VERILATOR_FLAGS += -Wno-CASEINCOMPLETE -Wno-MULTIDRIVEN -Wno-UNUSEDPARAM -Wno-BLKSEQ
+
+BUILD_DIR = build_uart
+RTL_DIR = ../../../rtl
+UART_RTL_DIR = $(RTL_DIR)/uart
+
+# Source files
+TB_SRC = uart_wb_tb.sv
+UART_RTL = $(UART_RTL_DIR)/uart_wb.sv \
+           $(UART_RTL_DIR)/uart_tx.sv \
+           $(UART_RTL_DIR)/uart_rx.sv \
+           $(UART_RTL_DIR)/fifo_sync.sv
+
+.PHONY: all build run clean
+
+# Default target
+all: run
+
+# Build testbench with Verilator
+build: $(BUILD_DIR)/Vuart_wb_tb
+
+$(BUILD_DIR)/Vuart_wb_tb: $(TB_SRC) $(UART_RTL)
+	@echo "=========================================="
+	@echo "Building UART WB Test (Verilator)"
+	@echo "=========================================="
+	@mkdir -p $(BUILD_DIR)
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		-Mdir $(BUILD_DIR) \
+		--top-module uart_wb_tb \
+		$(UART_RTL) \
+		$(TB_SRC)
+	@echo "Build complete!"
+
+# Run Verilator simulation
+run: build
+	@echo ""
+	@echo "=========================================="
+	@echo "Running UART WB Tests (Verilator)"
+	@echo "=========================================="
+	cd $(BUILD_DIR) && ./Vuart_wb_tb
+	@echo ""
+	@echo "Waveform: $(BUILD_DIR)/dump.vcd"
+
+# Clean build artifacts
+clean:
+	rm -rf $(BUILD_DIR) *.vcd
+
+.PHONY: all build run clean

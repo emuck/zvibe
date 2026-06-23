@@ -1,0 +1,26 @@
+# Simulation build artifacts
+obj_dir/
+work/
+work_tb/
+*.vcd
+*.wlf
+transcript
+vish_stacktrace.vstf
+
+# Test outputs
+uart_output.txt
+
+# Firmware build artifacts
+*.elf
+*.bin
+*.hex
+*.dis
+*.o
+*.dat
+
+# MAX10-specific generated files (now generated in boards/max10_08_eval/sw/)
+flash_layout.h
+flash_layout.ld
+max10_layout.json
+max10_flash_test.bin
+max10_flash.bin

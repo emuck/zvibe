@@ -1,0 +1,392 @@
+.
+wait
+.
+wait
+.
+wait
+.
+open satchel
+.
+get bundle
+.
+get filament
+.
+get guide
+.
+examine starship
+.
+examine ship
+.
+examine hatchway
+.
+examine panel
+.
+examine ford
+.
+examine zaphod
+.
+examine trillian
+.
+ask ford about earth
+.
+ask ford about me
+.
+ask ford about puzzle
+.
+consult guide about towel
+.
+consult guide about vogon
+.
+consult guide about babel
+.
+consult guide about betelgeuse
+.
+consult guide about norway
+.
+consult guide about 42
+.
+consult guide about marvin
+.
+consult guide about earth
+.
+consult guide about whale
+.
+consult guide about tea
+.
+smell
+.
+kiss ford
+.
+kiss me
+.
+yell
+.
+help
+.
+examine bundle
+.
+unfold towel
+.
+wrap towel
+.
+s
+.
+examine dust
+.
+examine wind
+.
+examine horizon
+.
+examine sky
+.
+se
+.
+examine whalebone
+.
+examine bone
+.
+examine meat
+.
+examine blubber
+.
+se
+.
+get fragment
+.
+examine fragment
+.
+nw
+.
+sw
+.
+get piece
+.
+examine piece
+.
+ne
+.
+s
+.
+examine slope
+.
+examine port mandible
+.
+examine starboard mandible
+.
+tie towel to mandible
+.
+tie filament to mandible
+.
+breathe through towel
+.
+s
+.
+examine debris
+.
+examine remains
+.
+w
+.
+examine residue
+.
+rub fragment with piece
+.
+e
+.
+s
+.
+open gown
+.
+take toothbrush
+.
+examine door
+.
+knock on door
+.
+show thing to door
+.
+unlock door with thing
+.
+show card to door
+.
+s
+.
+examine viewport
+.
+examine planet
+.
+examine model
+.
+examine coastline
+.
+examine fjord
+.
+examine workbench
+.
+examine device
+.
+ask slartibartfast about norway
+.
+ask slartibartfast about planet
+.
+ask slartibartfast about device
+.
+give card to slartibartfast
+.
+e
+.
+give device to zaphod
+.
+pry device with screwdriver
+.
+get device
+.
+examine device
+.
+w
+.
+examine device
+.
+examine zaphod
+.
+examine ford
+.
+give device to zaphod
+.
+clean device with toothbrush
+.
+examine device
+.
+give device to zaphod
+.
+n
+.
+n
+.
+n
+.
+n
+.
+nw
+.
+n
+.
+examine panel
+.
+enter 936
+.
+n
+.
+examine eddie
+.
+take fluff
+.
+examine ledger
+.
+pull ribbon
+.
+turn hourglass
+.
+show ledger to agrajag
+.
+hello eddie
+.
+smell
+.
+examine shadow
+.
+examine maitre
+.
+ask maitre about zarquon
+.
+ask maitre about menu
+.
+ask maitre about marvin
+.
+e
+.
+ask henry for gargle blaster
+.
+examine stool
+.
+examine barstool
+.
+examine henry
+.
+ask henry for gargle blaster
+.
+take glass
+.
+drink beer
+.
+give glass to henry
+.
+drink beer
+.
+give glass to henry
+.
+drink beer
+.
+give glass to henry
+.
+take beer
+.
+ask henry for sandwich
+.
+examine sandwich
+.
+smell sandwich
+.
+examine glass
+.
+w
+.
+w
+.
+examine marvin
+.
+examine car
+.
+look
+.
+give sandwich to marvin
+.
+give beer to marvin
+.
+give fluff to marvin
+.
+examine glass
+.
+smell glass
+.
+e
+.
+e
+.
+give glass to henry
+.
+taste gargle blaster
+.
+smell gargle blaster
+.
+examine gargle blaster
+.
+put gargle blaster in thing
+.
+take off towel
+.
+drop all
+.
+s
+.
+examine tablecloth
+.
+examine cloth
+.
+examine hotblack
+.
+examine luther
+.
+examine autograph
+.
+wait
+.
+get gargle blaster from thing
+.
+give gargle blaster to hotblack
+.
+give record to luther
+.
+n
+.
+w
+.
+w
+.
+ask marvin about ship
+.
+verbose
+.
+look
+.
+brief
+.
+look
+.
+xyzzy
+.
+frobozzle
+.
+se
+.
+look
+.
+examine ship
+.
+d
+.
+d
+.
+u
+.
+n
+.
+n
+.
+n
+.
+n
+.
+e
+.
+e
+.
+e
+.
+e
+.
+examine ship
+.
+enter ship
+.
+.

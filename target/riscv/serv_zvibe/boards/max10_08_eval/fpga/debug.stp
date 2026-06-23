@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session>
+  <instance entity_name="sld_signaltap" is_enabled="true" name="auto_signaltap_0" source_file="sld_signaltap.v">
+    <node_info>
+      <parameter name="CLOCK_SIGNAL" value="sys_clk" />
+      <parameter name="DATA_DEPTH" value="2048" />
+      <parameter name="ENABLE_TRIGGER_IN" value="0" />
+      <parameter name="RAM_TYPE" value="AUTO" />
+      <parameter name="SAMPLE_DEPTH" value="2048" />
+      <parameter name="TRIGGER_POSITION" value="128" />
+    </node_info>
+    <signal_set name="Signal Set 1" is_expanded="true">
+      <!-- Reset signals -->
+      <signal name="reset" />
+      <signal name="reset_n" />
+      <signal name="por_reset" />
+      <signal name="clk_locked" />
+
+      <!-- UFM signals -->
+      <signal name="ufm_address" tap_mode="classic" type="unknown" />
+      <signal name="ufm_read" />
+      <signal name="ufm_readdata" tap_mode="classic" type="unknown" />
+      <signal name="ufm_readdatavalid" />
+      <signal name="ufm_waitrequest" />
+
+      <!-- Wishbone CPU<->UFM -->
+      <signal name="wb_flash_cyc" />
+      <signal name="wb_flash_stb" />
+      <signal name="wb_flash_adr" tap_mode="classic" type="unknown" />
+      <signal name="wb_flash_rdt" tap_mode="classic" type="unknown" />
+      <signal name="wb_flash_ack" />
+      <signal name="wb_flash_stall" />
+
+      <!-- UART -->
+      <signal name="uart_txd" />
+      <signal name="uart_rxd" />
+
+      <!-- GPIO LEDs -->
+      <signal name="soc_gpio_led" tap_mode="classic" type="unknown" />
+    </signal_set>
+  </instance>
+</session>

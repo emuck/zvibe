@@ -1,0 +1,405 @@
+{
+  "version": "1.0",
+  "description": "ZVibe game registry - manages games for all targets",
+  "targets": {
+    "same51": {
+      "flash_available": 786432
+    },
+    "arty_s7_50": {
+      "flash_available": 8388608
+    },
+    "console": {}
+  },
+  "games": [
+    {
+      "id": "czech",
+      "name": "Czech Z-machine Test Suite",
+      "filename": "czech.z3",
+      "size": 10752,
+      "release": 1,
+      "serial": "250329",
+      "tags": [
+        "test"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "restaurant",
+      "name": "Restaurant",
+      "filename": "restaurant.z3",
+      "size": 121856,
+      "release": 3,
+      "serial": "260408",
+      "tags": [
+        "original"
+      ],
+      "default": true
+    },
+    {
+      "id": "amfv-first",
+      "name": "A Mind Forever Voyaging",
+      "filename": "amfv-first-r1-s841226.z3",
+      "size": 33536,
+      "release": 1,
+      "serial": "841226",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "ballyhoo",
+      "name": "Ballyhoo",
+      "filename": "ballyhoo-r97-s851218.z3",
+      "size": 128556,
+      "release": 97,
+      "serial": "851218",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "cutthroats",
+      "name": "Cutthroats",
+      "filename": "cutthroats-r23-s840809.z3",
+      "size": 112558,
+      "release": 23,
+      "serial": "840809",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "deadline",
+      "name": "Deadline",
+      "filename": "deadline-r27-s831005.z3",
+      "size": 108454,
+      "release": 27,
+      "serial": "831005",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "enchanter",
+      "name": "Enchanter",
+      "filename": "enchanter-r29-s860820.z3",
+      "size": 111126,
+      "release": 29,
+      "serial": "860820",
+      "tags": [
+        "infocom"
+      ]
+    },
+    {
+      "id": "generic",
+      "name": "Generic",
+      "filename": "generic-r5-s870612.z3",
+      "size": 30852,
+      "release": 5,
+      "serial": "870612",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "hitchhiker",
+      "name": "Hitchhiker's Guide",
+      "filename": "hitchhiker-r60-s861002.z3",
+      "size": 113330,
+      "release": 60,
+      "serial": "861002",
+      "tags": [
+        "infocom"
+      ]
+    },
+    {
+      "id": "hollywoodhijinx",
+      "name": "Hollywood Hijinx",
+      "filename": "hollywoodhijinx-r37-s861215.z3",
+      "size": 109650,
+      "release": 37,
+      "serial": "861215",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "hypochondriac",
+      "name": "Hypochondriac",
+      "filename": "hypochondriac-r2-s840505.z3",
+      "size": 123294,
+      "release": 2,
+      "serial": "840505",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "infidel",
+      "name": "Infidel",
+      "filename": "infidel-r22-s830916.z3",
+      "size": 93556,
+      "release": 22,
+      "serial": "830916",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "leathergoddesses",
+      "name": "Leather Goddesses of Phobos",
+      "filename": "leathergoddesses-r59-s860730.z3",
+      "size": 129022,
+      "release": 59,
+      "serial": "860730",
+      "tags": [
+        "infocom"
+      ]
+    },
+    {
+      "id": "lurkinghorror",
+      "name": "The Lurking Horror",
+      "filename": "lurkinghorror-r203-s870506.z3",
+      "size": 128986,
+      "release": 203,
+      "serial": "870506",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "minizork",
+      "name": "Mini-Zork 1",
+      "filename": "minizork-r34-s871124.z3",
+      "size": 52216,
+      "release": 34,
+      "serial": "871124",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "minizork2",
+      "name": "Mini-Zork 2",
+      "filename": "minizork2-r2-s871123.z3",
+      "size": 55690,
+      "release": 2,
+      "serial": "871123",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "moonmist",
+      "name": "Moonmist",
+      "filename": "moonmist-r9-s861022.z3",
+      "size": 128866,
+      "release": 9,
+      "serial": "861022",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "planetfall",
+      "name": "Planetfall",
+      "filename": "planetfall-r37-s851003.z3",
+      "size": 109398,
+      "release": 37,
+      "serial": "851003",
+      "tags": [
+        "infocom"
+      ]
+    },
+    {
+      "id": "plunderedhearts",
+      "name": "Plundered Hearts",
+      "filename": "plunderedhearts-r26-s870730.z3",
+      "size": 128962,
+      "release": 26,
+      "serial": "870730",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "sampler-4zpiw",
+      "name": "Infocom Sampler",
+      "filename": "sampler-4zpiw-r55-s850823.z3",
+      "size": 126902,
+      "release": 55,
+      "serial": "850823",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "seastalker-mac",
+      "name": "Seastalker",
+      "filename": "seastalker-mac-r15-s840522.z3",
+      "size": 117728,
+      "release": 15,
+      "serial": "840522",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "sorcerer",
+      "name": "Sorcerer",
+      "filename": "sorcerer-r15-s851108.z3",
+      "size": 109056,
+      "release": 15,
+      "serial": "851108",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "spellbreaker",
+      "name": "Spellbreaker",
+      "filename": "spellbreaker-r87-s860904.z3",
+      "size": 128916,
+      "release": 87,
+      "serial": "860904",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "starcross",
+      "name": "Starcross",
+      "filename": "starcross-r17-s821021.z3",
+      "size": 83968,
+      "release": 17,
+      "serial": "821021",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "stationfall",
+      "name": "Stationfall",
+      "filename": "stationfall-r107-s870430.z3",
+      "size": 128934,
+      "release": 107,
+      "serial": "870430",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "suspect",
+      "name": "Suspect",
+      "filename": "suspect-r14-s841005.z3",
+      "size": 118692,
+      "release": 14,
+      "serial": "841005",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "suspended-mac",
+      "name": "Suspended",
+      "filename": "suspended-mac-r8-s840521.z3",
+      "size": 105584,
+      "release": 8,
+      "serial": "840521",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "wishbringer",
+      "name": "Wishbringer",
+      "filename": "wishbringer-r68-s850501.z3",
+      "size": 129024,
+      "release": 68,
+      "serial": "850501",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "witness",
+      "name": "The Witness",
+      "filename": "witness-r22-s840924.z3",
+      "size": 104664,
+      "release": 22,
+      "serial": "840924",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "ziptest",
+      "name": "ZipTest",
+      "filename": "ziptest-r40-s840613.z3",
+      "size": 3998,
+      "release": 40,
+      "serial": "840613",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "zork1",
+      "name": "Zork 1",
+      "filename": "zork1-r88-s840726.z3",
+      "size": 84876,
+      "release": 88,
+      "serial": "840726",
+      "tags": [
+        "infocom"
+      ]
+    },
+    {
+      "id": "zork2",
+      "name": "Zork 2",
+      "filename": "zork2-r48-s840904.z3",
+      "size": 89912,
+      "release": 48,
+      "serial": "840904",
+      "tags": [
+        "infocom"
+      ]
+    },
+    {
+      "id": "zork3",
+      "name": "Zork 3",
+      "filename": "zork3-r17-s840727.z3",
+      "size": 82714,
+      "release": 17,
+      "serial": "840727",
+      "tags": [
+        "infocom"
+      ],
+      "exclude": true
+    }
+  ]
+}

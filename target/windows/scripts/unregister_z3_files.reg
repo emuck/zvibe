@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+; Remove ZVibe file associations for .z3 files
+; Double-click this file to remove the association
+
+[-HKEY_CLASSES_ROOT\.z3]
+
+[-HKEY_CLASSES_ROOT\ZMachineStory]
