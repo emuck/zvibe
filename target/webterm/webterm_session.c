@@ -72,19 +72,6 @@ struct webterm_session_t {
 static webterm_session_t *g_session = NULL;
 
 /* -------------------------------------------------------------------------
- * Stub input function
- *
- * zvibe_create() requires a non-NULL input_func. We use the
- * zvibe_run() → ZVIBE_WAIT_FOR_INPUT → zvibe_input() pattern exclusively,
- * so this stub should never be called. It returns 0 (empty input) as a
- * safe fallback.
- * ---------------------------------------------------------------------- */
-static size_t stub_input(char *buf, size_t max) {
-    (void)buf; (void)max;
-    return 0;
-}
-
-/* -------------------------------------------------------------------------
  * JSON helpers
  * ---------------------------------------------------------------------- */
 
@@ -274,7 +261,7 @@ static void status_cb(const zvibeStatus *st) {
  * ---------------------------------------------------------------------- */
 
 static zvibeContext *create_zvibe(void) {
-    zvibeContext *ctx = zvibe_create(output_cb, stub_input);
+    zvibeContext *ctx = zvibe_create(output_cb);
     if (!ctx) return NULL;
 
 #if ZVIBE_ENABLE_STATUS_LINE
