@@ -79,7 +79,7 @@ Exit code 0 on success.
 
 ```bash
 cd target/console/tests
-make test-unit          # 125+ unit tests (split memory architecture)
+make test-unit          # 119 unit tests (split memory architecture)
 make test-czech         # 368 Z-machine opcode tests (bundled game)
 make test               # All of the above + game walkthrough tests
 ```

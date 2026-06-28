@@ -6,13 +6,14 @@ Policy and guidance on Z-machine game files.
 
 ZVibe interprets Z-machine version 3 story files (`.z3` extension). These files contain the game data for interactive fiction titles.
 
-## Why Story Files Are Not Included
+## Why Most Story Files Are Not Included
 
-Story files are not included in this repository. Users provide their own game files.
+Most story files are not included in this repository. Users provide their own
+game files except for the bundled test assets listed below.
 
 ## Included Test Assets
 
-The repository includes one story file for testing:
+The repository includes these story files for testing:
 
 **Czech Z-machine Test Suite**
 - Location: `games/catalog/czech.z3`
@@ -20,6 +21,14 @@ The repository includes one story file for testing:
 - Purpose: Z-machine conformance testing
 
 This file tests interpreter correctness and is safe to distribute.
+
+**Restaurant**
+- Location: `games/catalog/restaurant.z3`
+- Purpose: Integrated interpreter regression testing
+
+Restaurant is used as a real-game workload for parser, object-tree,
+save/restore, randomized state, and long-session behavior. See
+[Restaurant as a ZVibe Test Engine](RESTAURANT_TEST_ENGINE.md).
 
 ## Obtaining Story Files
 
@@ -55,7 +64,9 @@ These tools can download files from various sources (see registry.json for confi
 
 ### Registry
 
-`games/registry.json` defines game metadata without including game data. Games are downloaded to `games/catalog/` (not tracked in git).
+`games/registry.json` defines game metadata without including game data.
+Downloaded non-bundled games are stored in `games/catalog/` and are not tracked
+in git.
 
 ### Building for Targets
 
@@ -87,4 +98,5 @@ ZVibe supports Z-machine version 3 only.
 
 ## Note
 
-This project provides Z-machine interpreter tools. Game files are not included and must be obtained separately.
+This project provides Z-machine interpreter tools. Except for bundled test
+assets, game files must be obtained separately.

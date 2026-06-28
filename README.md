@@ -4,7 +4,7 @@
 
 Z-machine version 3 interpreter for resource-constrained embedded systems.
 
-**[Development history and milestones &rarr;](docs/HISTORY.md)** — ten months of vibe coding, from first interpreter to dual-board FPGA hardware, with a Rust rewrite and web target in progress.
+**[Development history and milestones &rarr;](docs/HISTORY.md)** — from first interpreter to dual-board FPGA hardware, with a web terminal and ongoing Rust rewrite.
 
 ## Description
 
