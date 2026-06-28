@@ -42,6 +42,9 @@ Tests run complete games with scripted input.
 - Plundered Hearts: `make test-plundered` — downloads game file, then runs full playthrough
 - Seastalker: `make test-seastalker` — downloads game file, then runs full playthrough
 
+Restaurant is also documented as an integrated interpreter test engine in
+[Restaurant as a ZVibe Test Engine](RESTAURANT_TEST_ENGINE.md).
+
 **Run:**
 ```bash
 cd target/console/tests

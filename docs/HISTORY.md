@@ -2,7 +2,7 @@
 
 ZVibe is a Z-machine Version 3 interpreter targeting resource-constrained RISC-V FPGA platforms.
 This document covers the project's development from May 2025 through its public release in
-June 2026 — approximately thirteen months of work.
+June 2026.
 
 The name comes from "vibe coding": an experiment to see how far hardware and software engineering
 background, combined with AI-assisted development, could take a non-trivial embedded systems
@@ -10,43 +10,34 @@ project from scratch.
 
 ---
 
-## Branch Development Map
+## Target Development Timeline
 
-The chart below shows the major feature branches and when they merged back into `main`.
-Exploration branches that were never merged are shown below the main timeline.
+The chart shows when work began on each target and when it reached a stable
+state. `●` marks start and completion; `→` indicates ongoing or unshipped work.
 
 ```
-         May  Jun  Jul  Aug  Sep  Oct  Nov  Dec  Jan  Feb  Mar  Jun
-          │         │         │         │         │    │    │    │
-main  ────┼─────────●─────────●─────────────────────●──●──●─●───────────●──→
-          │         │ dualmem  │same51               │  │  │ │           │
-          │         ╰──────────╯         │           │  │  │ │           │
-          │                    ╰─────────╯ rtl       │  │  │ │           │
-          │                          ╰───────────────╯  │  │ │           │
-          │                              qspi_xip  ─────╯  │ │           │
-          │                              docs-refactor ─────╯ │           │
-          │                              max10 ────────────────╯           │
-          │                              max10-ufm-write ───────●          │
-          │                              feature/webterm ────────────────────╯
-          │
-          │  Not merged into main:
-          │    multi-instance-refactor  ──────────────────────────────────→
-          │    web                      ──────────────────────────────────→
-          │    rust-zvibe               ──────────────────────────────────→
-          │    explore/ice40up5k        ─────────────────────────────────→
-          │    explore/tang-nano        ─────────────────────────────────→
+              ←──────────────── 2025 ────────────────→←───── 2026 ─────→
+              May  Jun  Jul  Aug  Sep  Oct  Nov  Dec  Jan  Feb  Mar  Jun
+              │    │    │    │    │    │    │    │    │    │    │    │
+console       ╭──────────────────────────────────────────────────────────→
+sam-e51                      ╭─────╮
+arty s7-50                                       ╭─────────╮
+max10                                                 ╭────╮
+web                                                        ╭────────╮
+
+restaurant                                                      ╭───╮
 ```
 
-| Branch | Active | Merged | What it delivered |
-|---|---|---|---|
-| `dualmem` | Jul 20–30, 2025 | Jul 30, 2025 | Split memory architecture; 84% RAM reduction |
-| `same51` + `multi_game_menu` | Aug 10–Sep 27, 2025 | Sep 27, 2025 | SAM E51 port, multi-game flash menu |
-| `rtl` | Oct 18–Nov 16, 2025 | Nov 16, 2025 | RTL Z-machine FPGA implementation; BIOS @loadb fix; all 368 conformance tests passing |
-| `qspi_xip_controller` | Dec 12–Jan 21, 2026 | Jan 21, 2026 | SERV RISC-V SoC, QSPI XIP controller (TDD, 9 milestones), Arty hardware verification |
-| `docs-refactor` | Jan 22, 2026 | Jan 22, 2026 | Documentation overhaul |
-| `max10` | Jan 26–Feb 6, 2026 | Feb 6, 2026 | MAX10 board bring-up, UFM XIP, 100 MHz timing closure |
-| `max10-ufm-write` | Feb 6–15, 2026 | Feb 15, 2026 | UFM write HAL, save/restore, wear-leveling, dual-board cleanup |
-| `feature/webterm` | Feb–Jun, 2026 | Jun 19, 2026 | Platform-agnostic Z-machine web terminal; WebSocket session layer; 17/17 tests |
+`restaurant` = separate game repo; developed as a ZVibe test vehicle.
+
+| Target | Period | Key milestone |
+|--------|--------|---------------|
+| Console | May 2025+ | First working interpreter; Czech 368/368 |
+| SAM E51 | Aug–Sep 2025 | 25 KB RAM; multi-game flash layout |
+| Arty S7-50 (SERV) | Dec 2025–Feb 2026 | QSPI XIP controller; 2.7× cache speedup on hardware |
+| MAX10 | Jan–Feb 2026 | UFM XIP; save/restore with wear-leveling; 100 MHz timing |
+| Web terminal | Feb–Jun 2026 | WebSocket session layer; 17/17 tests; merged Jun 19 |
+| Restaurant game | Mar–Jun 2026 | 42-point game; 3 regression scripts (separate repo) |
 
 ---
 
@@ -59,7 +50,7 @@ the public-domain czech.z3 conformance suite before touching any hardware.
 Early work established a platform-abstraction API that would later allow the same core to run
 on microcontrollers and FPGAs without modification.
 
-## July 2025 — Split Memory Architecture (`dualmem` branch)
+## July 2025 — Split Memory Architecture
 
 The most significant algorithmic milestone of the project: a split memory architecture that
 reduced peak RAM usage from 160 KB to approximately 25 KB — an 84% reduction.
@@ -79,7 +70,7 @@ interpreter viable on microcontrollers and FPGAs with tens of kilobytes of SRAM.
 
 Czech conformance tests (368/368) passed at this stage.
 
-## August–September 2025 — First Embedded Target (`same51` branch)
+## August–September 2025 — First Embedded Target
 
 ZVibe was ported to the Microchip SAM E51 Curiosity Nano, a Cortex-M4F microcontroller. This
 was the first real hardware validation of the split memory design.
@@ -92,28 +83,11 @@ The port drove further optimization work:
 - A unified cross-platform build system (console + SAM E51 building from the same core)
 - Python bindings via a shared library for scripted testing
 
-## October–November 2025 — RTL Z-Machine FPGA Implementation (`rtl` branch)
+## December 2025 — RISC-V FPGA SoC
 
-A parallel effort ran a pure-RTL Z-machine interpreter directly in SystemVerilog on an Arty
-S7-50 FPGA — the interpreter itself implemented as hardware logic rather than as firmware
-running on a CPU. This was an architectural exploration: could the interpreter be built in
-RTL rather than as software on a RISC-V core?
-
-Work on this branch included:
-- A task-based FSM architecture (13.3× LUT reduction over the initial design)
-- Full opcode coverage: arithmetic, branching, object system, CALL/RET with stack, PRINT,
-  READ with UART RX, RESTART
-- ZSCII decoder for Z-machine text decompression
-- A critical `@loadb` BIOS fix that brought czech.z3 conformance from partial to 368/368
-
-This branch ultimately informed the decision to use SERV — a proven bit-serial RISC-V core —
-rather than a custom RTL interpreter, but the conformance work and opcode debugging carried
-directly into the firmware.
-
-## December 2025 — RISC-V FPGA SoC (`qspi_xip_controller` branch)
-
-The RISC-V target was built around SERV, a bit-serial RV32I CPU core that fits in approximately
-200 LUTs. A complete SoC was assembled using a TDD approach — each subsystem verified before
+An earlier attempt to implement the interpreter directly in RTL was tried and
+abandoned in favor of SERV, a proven bit-serial RV32I CPU core that fits in
+approximately 200 LUTs. A complete SoC was assembled using a TDD approach — each subsystem verified before
 integration:
 
 - Wishbone-based interconnect
@@ -125,7 +99,7 @@ integration:
 By Christmas 2025, ZVibe was running a complete Z-machine game end-to-end on real FPGA
 hardware (Digilent Arty S7-50) over UART.
 
-## January 2026 — Intel MAX10 Board + Timing Closure (`max10` branch)
+## January 2026 — Intel MAX10 Board + Timing Closure
 
 A second FPGA target was added: the Intel MAX10 08 Evaluation Board. Unlike the Arty, the
 MAX10 uses on-chip User Flash Memory (UFM) instead of external QSPI — a different flash
@@ -139,7 +113,7 @@ Key milestones:
 - Boot stub technique documented for bring-up debugging on new targets (if XIP hangs silently,
   a RAM-resident boot stub confirms the FPGA and SRAM are alive before touching flash)
 
-## February 2026 — Save System, Cache, and Production Hardening (`max10-ufm-write` branch)
+## February 2026 — Save System, Cache, and Production Hardening
 
 The most feature-dense month of the project.
 
@@ -197,6 +171,20 @@ SPRAM). Concluded: tight but possible with SERV + minimal peripherals.
 **`explore/tang-nano-20k`** — Feasibility study for the Sipeed Tang Nano 20K (20K LUTs,
 64 MB SDRAM). Concluded: ample resources; SDRAM controller would be the main new component.
 
+## March 2026 — Restaurant Game Development (Separate Repo)
+
+The Restaurant game was built in parallel with ZVibe firmware work during March
+2026, in a dedicated repository. Starting from a first working build on March 9,
+it went through major puzzle and narrative revisions before reaching release 3 by
+March 28: a 42-point, 15-milestone game playable end-to-end. Three regression
+scripts were written alongside the game content, each targeting a specific engine
+capability: save/restore round-trip, cold death handling, and daemon-driven
+timeout. Light polish and canon fixes continued through June 2026.
+
+The game was built as a purpose-made test vehicle for ZVibe. See
+[Restaurant as a ZVibe Test Engine](RESTAURANT_TEST_ENGINE.md) for the full
+coverage rationale.
+
 ## March–June 2026 — Firmware Optimization and Release Hardening
 
 Significant firmware work between the February production builds and public release:
@@ -224,8 +212,6 @@ Significant firmware work between the February production builds and public rele
 verified on all four targets. Dual simulator support. Automated end-to-end hardware
 testing with latency tracking and @capture directive support.
 
-Total project duration: ~13 months.
-
 ---
 
 ## By the Numbers
@@ -247,3 +233,4 @@ Total project duration: ~13 months.
 | Hardware-verified saves | Yes (wear-leveling, Feb 12, 2026) |
 | Feature branches merged | 10 |
 | Exploration branches | 5 |
+

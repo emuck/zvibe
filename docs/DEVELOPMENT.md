@@ -172,16 +172,34 @@ See `docs/groups.dox` for module organization.
 
 ### Building API Documentation
 
-Generate HTML and LaTeX documentation:
+Generate HTML documentation and LaTeX source:
+
+```bash
+make docs
+```
+
+Outputs:
+- `docs/html/index.html` - HTML documentation (browse with any browser)
+- `docs/latex/refman.tex` - LaTeX source
+
+The equivalent direct Doxygen command is:
 
 ```bash
 cd docs
 doxygen Doxyfile
 ```
 
-Outputs:
-- `docs/html/index.html` - HTML documentation (browse with any browser)
-- `docs/latex/refman.tex` - LaTeX source (build with `make` for PDF)
+Graph generation requires GraphViz's `dot` command on `PATH`.
+
+To build the optional PDF from the generated LaTeX source, install a TeX
+distribution that provides `pdflatex`, then run:
+
+```bash
+cd docs/latex
+make
+```
+
+The PDF output is `docs/latex/refman.pdf`.
 
 Configuration:
 - `docs/Doxyfile` - Doxygen configuration

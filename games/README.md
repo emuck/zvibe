@@ -34,7 +34,7 @@ source venv/bin/activate    # run once per terminal session
 
 ```
 games/
-├── catalog/          # Downloaded game files (.z3) — not tracked in git
+├── catalog/          # Bundled test assets plus downloaded .z3 files
 │   ├── czech.z3      # Public domain conformance test suite
 │   └── restaurant.z3 # Original work, ships with the repo
 ├── scripts/          # Recorded command scripts for automated testing
@@ -156,7 +156,7 @@ entry to `registry.json` without a `url` field.
 
 ## Copyright
 
-Game files are not included in the repository. Most Infocom games retain their
+Most game files are not included in the repository. Infocom games retain their
 copyright and must be obtained from legitimate sources. The Zork trilogy source
 was open-sourced by Activision/Xbox under MIT License in November 2025 — see
 `docs/STORY_FILES.md` for details.

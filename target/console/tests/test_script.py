@@ -339,35 +339,42 @@ def run_test(name, game, script, seed, markers, required_markers, forbidden_mark
 
 # --- Main -------------------------------------------------------------------
 
+def run_restaurant_suite():
+    passed = 0
+    for t in RESTAURANT_TESTS:
+        runner = run_test_interactive if script_has_captures(t["script"]) else run_test
+        if runner(
+            t["name"],
+            t["game"],
+            t["script"],
+            t["seed"],
+            t["markers"],
+            t["required_markers"],
+            t["forbidden_markers"],
+        ):
+            passed += 1
+    total = len(RESTAURANT_TESTS)
+    print(f"\n{'═'*60}")
+    if passed == total:
+        print(f"  ALL TESTS PASSED  ({passed}/{total})")
+        sys.exit(0)
+    else:
+        print(f"  {total - passed} FAILED  ({passed}/{total} passed)")
+        sys.exit(1)
+
+
 def main():
     check_binary()
 
     if len(sys.argv) == 1:
-        passed = 0
-        for t in RESTAURANT_TESTS:
-            runner = run_test_interactive if script_has_captures(t["script"]) else run_test
-            if runner(
-                t["name"],
-                t["game"],
-                t["script"],
-                t["seed"],
-                t["markers"],
-                t["required_markers"],
-                t["forbidden_markers"],
-            ):
-                passed += 1
-        total = len(RESTAURANT_TESTS)
-        print(f"\n{'═'*60}")
-        if passed == total:
-            print(f"  ALL TESTS PASSED  ({passed}/{total})")
-            sys.exit(0)
-        else:
-            print(f"  {total - passed} FAILED  ({passed}/{total} passed)")
-            sys.exit(1)
+        run_restaurant_suite()
 
     game_name = sys.argv[1].lower()
+    if game_name == "restaurant":
+        run_restaurant_suite()
+
     if game_name not in OPTIONAL_GAMES:
-        die(f"Unknown game '{game_name}'.\nAvailable: {', '.join(OPTIONAL_GAMES)}")
+        die(f"Unknown game '{game_name}'.\nAvailable: restaurant, {', '.join(OPTIONAL_GAMES)}")
 
     cfg = OPTIONAL_GAMES[game_name]
     game_file   = os.path.join(CATALOG_DIR, cfg["file"])

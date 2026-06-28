@@ -14,7 +14,8 @@ Dependencies and toolchains for each platform.
 
 - `requests` Python package (for game download tools)
 - Doxygen (for API documentation)
-- Graphviz (for call graphs in API docs)
+- GraphViz, including the `dot` command (for call graphs in API docs)
+- TeX distribution with `pdflatex` (only for building the optional Doxygen PDF)
 
 ```bash
 # Ubuntu/Debian
@@ -26,6 +27,9 @@ xcode-select --install
 brew install doxygen graphviz
 pip3 install requests
 ```
+
+For Doxygen PDF output, install a TeX distribution separately. On macOS, either
+MacTeX or BasicTeX works if `pdflatex` is available on `PATH`.
 
 ### Build
 
@@ -164,4 +168,4 @@ cd target/console/tests
 make test-unit test-integration
 ```
 
-Expected: 125 unit tests pass, integration tests complete.
+Expected: 119 unit tests pass, integration tests complete.

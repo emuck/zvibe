@@ -123,13 +123,15 @@ clean:
 
 # Clean build and documentation
 clean-all: clean
-	rm -rf docs/html docs/latex
+	rm -rf ../../docs/html ../../docs/latex
 
 # Documentation target
 docs:
 	@echo "Generating documentation with Doxygen..."
-	cd docs && doxygen Doxyfile
-	@echo "Documentation generated in docs/html/index.html"
+	@command -v doxygen >/dev/null || { echo "doxygen not found. Install doxygen first."; exit 1; }
+	@command -v dot >/dev/null || { echo "dot not found. Install GraphViz first."; exit 1; }
+	cd ../../docs && doxygen Doxyfile
+	@echo "Documentation generated in ../../docs/html/index.html"
 
 # Test status optimization
 STATUS_TEST_TARGET = $(BIN_DIR)/test_status_optimization
