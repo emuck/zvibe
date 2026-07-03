@@ -19,6 +19,7 @@ MAX10 and Xilinx Arty S7-50 FPGAs.
 The Z-machine core is a substantial embedded rewrite; attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ![ZVibe web terminal running The Restaurant at the End of the Universe](docs/assets/webterm-screenshot.png)
+*zVibe running in a webterm target*
 
 ## Goals
 
