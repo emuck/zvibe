@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ZVibe — Z-machine Interpreter for Embedded Systems</title>
+  <meta name="description" content="A Z-machine v3 interpreter running classic Infocom text adventures on FPGA soft-cores, ARM microcontrollers, and the browser. 200 LUTs. 32 KB RAM.">
+  <style>
+    :root {
+      --bg:         #0e0e0e;
+      --bg2:        #131313;
+      --bg3:        #181818;
+      --green:      #4af26a;
+      --green-dim:  #2a7a3c;
+      --text:       #c8c8c8;
+      --text-hi:    #f0f0f0;
+      --text-lo:    #5a5a5a;
+      --border:     #232323;
+      --mono:       'Courier New', Courier, monospace;
+      --sans:       system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      line-height: 1.65;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      background: rgba(14,14,14,.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 2rem; height: 52px;
+    }
+    .nav-logo { font-family: var(--mono); color: var(--green); font-size: 1.05rem; font-weight: bold; text-decoration: none; }
+    .nav-links { display: flex; gap: 1.75rem; list-style: none; }
+    .nav-links a { color: var(--text-lo); text-decoration: none; font-size: .875rem; transition: color .15s; }
+    .nav-links a:hover { color: var(--green); }
+    .nav-gh {
+      font-family: var(--mono); font-size: .8rem; color: var(--green);
+      text-decoration: none; border: 1px solid var(--green-dim);
+      padding: 4px 14px; border-radius: 3px; transition: background .15s;
+    }
+    .nav-gh:hover { background: rgba(74,242,106,.07); }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 120px 2rem 5rem; text-align: center;
+    }
+    .hero-prompt {
+      font-family: var(--mono); color: var(--green); font-size: .9rem;
+      margin-bottom: 1.75rem; opacity: .75;
+    }
+    .hero-prompt .ps { opacity: .45; }
+    h1 {
+      font-family: var(--mono);
+      font-size: clamp(1.9rem, 5vw, 3.5rem);
+      color: var(--text-hi); line-height: 1.18; max-width: 820px;
+      margin-bottom: 1.5rem;
+    }
+    h1 em { color: var(--green); font-style: normal; }
+    .hero-sub {
+      font-size: 1.1rem; color: var(--text-lo); max-width: 580px; margin-bottom: 2.5rem;
+    }
+    .ctas { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
+    .btn-p {
+      background: var(--green); color: #000; font-family: var(--mono); font-weight: bold;
+      padding: 10px 24px; border-radius: 3px; text-decoration: none; font-size: .9rem;
+      transition: opacity .15s;
+    }
+    .btn-p:hover { opacity: .82; }
+    .btn-s {
+      border: 1px solid var(--border); color: var(--text); font-family: var(--mono);
+      padding: 10px 24px; border-radius: 3px; text-decoration: none; font-size: .9rem;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-s:hover { border-color: var(--green-dim); color: var(--green); }
+
+    /* ── SCREENSHOT ── */
+    .ss-wrap {
+      padding: 0 2rem 7rem; display: flex; justify-content: center;
+    }
+    .ss-inner {
+      max-width: 1100px; width: 100%;
+      border: 1px solid var(--border); border-radius: 6px; overflow: hidden;
+      box-shadow: 0 0 80px rgba(74,242,106,.05);
+    }
+    .ss-inner img { display: block; width: 100%; }
+
+    /* ── SHARED SECTION STYLES ── */
+    section { padding: 6rem 2rem; border-top: 1px solid var(--border); }
+    .inner { max-width: 1000px; margin: 0 auto; }
+    .label {
+      font-family: var(--mono); font-size: .75rem; color: var(--green);
+      letter-spacing: .15em; text-transform: uppercase; margin-bottom: .6rem;
+    }
+    h2 {
+      font-family: var(--mono); font-size: clamp(1.5rem, 3vw, 2.2rem);
+      color: var(--text-hi); line-height: 1.2; margin-bottom: 1.5rem;
+    }
+    .body-p {
+      color: var(--text); max-width: 680px; margin-bottom: 1.1rem; font-size: .975rem;
+    }
+    .body-p a { color: var(--green); text-decoration: none; }
+    .body-p a:hover { text-decoration: underline; }
+
+    /* ── Z-MACHINE TIMELINE ── */
+    .timeline {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .t-card { border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem; }
+    .t-year { font-family: var(--mono); font-size: 2rem; color: var(--green); font-weight: bold; margin-bottom: .4rem; }
+    .t-card h3 { color: var(--text-hi); font-size: .95rem; margin-bottom: .4rem; }
+    .t-card p { font-size: .875rem; color: var(--text); margin: 0; }
+
+    /* ── HARDWARE TARGETS ── */
+    .targets {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 1.25rem; margin-top: 3rem;
+    }
+    .hw-card {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 4px;
+      padding: 1.4rem; transition: border-color .15s;
+    }
+    .hw-card:hover { border-color: var(--green-dim); }
+    .hw-icon { font-size: 1.4rem; color: var(--green); margin-bottom: .6rem; font-family: var(--mono); }
+    .hw-card h3 { color: var(--text-hi); font-size: .9rem; margin-bottom: .35rem; }
+    .hw-card p { font-size: .83rem; color: var(--text-lo); margin: 0; }
+    .hw-spec { font-family: var(--mono); font-size: .72rem; color: var(--green-dim); margin-top: .7rem; }
+
+    /* ── STATS ── */
+    #numbers { background: var(--bg2); }
+    .stats {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 2.5rem 2rem; margin-top: 3rem;
+    }
+    .stat { text-align: center; }
+    .stat-v {
+      display: block; font-family: var(--mono); font-size: 2.3rem;
+      color: var(--green); font-weight: bold; line-height: 1;
+    }
+    .stat-v sup { font-size: 1.1rem; vertical-align: super; }
+    .stat-l { font-size: .8rem; color: var(--text-lo); margin-top: .4rem; line-height: 1.4; }
+
+    /* ── GAME ── */
+    .game-grid {
+      display: grid; grid-template-columns: auto 1fr;
+      gap: 3rem; align-items: start; margin-top: 2.5rem;
+    }
+    .game-box img { width: 190px; border-radius: 4px; display: block; }
+    .excerpt {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+      padding: 1.2rem 1.5rem; font-family: var(--mono); font-size: .82rem;
+      line-height: 1.9; color: var(--text); margin: 1.25rem 0; white-space: pre-wrap;
+    }
+    .cmd { color: var(--green); }
+    .game-note { font-size: .85rem; color: var(--text-lo); margin: 0; max-width: 560px; }
+
+    /* ── QUICK START ── */
+    pre {
+      background: var(--bg3); border: 1px solid var(--border); border-radius: 4px;
+      padding: 1.5rem; font-family: var(--mono); font-size: .82rem;
+      color: var(--text); overflow-x: auto; margin-top: 2rem; line-height: 1.75;
+    }
+    .c { color: var(--text-lo); }
+    .g { color: var(--green); }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border); padding: 2rem;
+      text-align: center; font-family: var(--mono); font-size: .78rem; color: var(--text-lo);
+    }
+    footer a { color: var(--green-dim); text-decoration: none; }
+    footer a:hover { color: var(--green); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      .nav-links { display: none; }
+      .game-grid { grid-template-columns: 1fr; }
+      .game-box img { width: 140px; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="#">zVibe</a>
+  <ul class="nav-links">
+    <li><a href="#what">Z-machine</a></li>
+    <li><a href="#hardware">Hardware</a></li>
+    <li><a href="#numbers">Numbers</a></li>
+    <li><a href="#game">The game</a></li>
+    <li><a href="#start">Quick start</a></li>
+  </ul>
+  <a class="nav-gh" href="https://github.com/emuck/zvibe">GitHub →</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
+  <h1>A 1979 virtual machine.<br><em>Running on 200 logic elements.</em></h1>
+  <p class="hero-sub">ZVibe puts classic Infocom text adventures on FPGA soft-cores, ARM microcontrollers, and the browser — in as little as 32&thinsp;KB of RAM.</p>
+  <div class="ctas">
+    <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
+    <a class="btn-s" href="#what">What is a Z-machine? ↓</a>
+  </div>
+</div>
+
+<!-- SCREENSHOT -->
+<div class="ss-wrap">
+  <div class="ss-inner">
+    <img src="docs/assets/webterm-screenshot.png" alt="ZVibe web terminal running The Restaurant at the End of the Universe">
+  </div>
+</div>
+
+<!-- Z-MACHINE -->
+<section id="what">
+  <div class="inner">
+    <div class="label">Background</div>
+    <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
+    <p class="body-p">In 1979, a company called Infocom created a portable virtual machine for text adventure games. Write a game once; run it on every computer that existed. The same bytecode — a <em>.z3</em> file — played on Apple&nbsp;II, CP/M, DOS, and Atari, because a small interpreter layer on each platform handled the differences.</p>
+    <p class="body-p">The games were extraordinary. <em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Plundered Hearts</em>. They demanded more from a reader than any modern game asks of a player. Millions of people learned to type at one.</p>
+    <p class="body-p">ZVibe is a new Z-machine interpreter — not for 1980s home computers, but for the most constrained hardware we could find.</p>
+
+    <div class="timeline">
+      <div class="t-card">
+        <div class="t-year">1979</div>
+        <h3>Infocom creates the Z-machine</h3>
+        <p>A portable virtual machine that lets a single game run on every home computer of the era. Write once, play anywhere.</p>
+      </div>
+      <div class="t-card">
+        <div class="t-year">1984</div>
+        <h3>The Hitchhiker's Guide</h3>
+        <p>Douglas Adams and Steve Meretzky collaborate on one of the best-selling text adventures ever made. Same .z3 bytecode format.</p>
+      </div>
+      <div class="t-card">
+        <div class="t-year">2025</div>
+        <h3>ZVibe</h3>
+        <p>A C99 reimplementation purpose-built for embedded systems — custom FPGA SoCs, ARM microcontrollers, and a WebSocket-based web terminal.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HARDWARE -->
+<section id="hardware">
+  <div class="inner">
+    <div class="label">Targets</div>
+    <h2>One library.<br>Five platforms.</h2>
+    <p class="body-p">The same platform-agnostic C99 core builds for every target. HAL layers isolate the differences — flash reads, UART I/O, save slots — so the interpreter itself is never touched.</p>
+    <p class="body-p">The FPGA SoCs are custom-built: Wishbone interconnect, UART, XIP flash controller, and save-slot manager with wear leveling. Each subsystem was verified in simulation before any hardware was touched.</p>
+
+    <div class="targets">
+      <div class="hw-card">
+        <div class="hw-icon">▶</div>
+        <h3>Console</h3>
+        <p>Linux, macOS, Windows. The development baseline and primary CI target.</p>
+        <div class="hw-spec">Host RAM &nbsp;·&nbsp; Host storage</div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-icon">◈</div>
+        <h3>SAM E51</h3>
+        <p>ARM Cortex-M4F microcontroller. Two rounds of RAM optimization to reach 25&thinsp;KB.</p>
+        <div class="hw-spec">25 KB RAM &nbsp;·&nbsp; EEPROM save slots</div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-icon">⬡</div>
+        <h3>Intel MAX10</h3>
+        <p>SERV RISC-V soft-core on FPGA. UFM XIP flash; 100&thinsp;MHz timing closure. Save/restore on hardware.</p>
+        <div class="hw-spec">32 KB RAM &nbsp;·&nbsp; 172 KB UFM &nbsp;·&nbsp; ~200 LUTs</div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-icon">⬡</div>
+        <h3>Xilinx Arty S7-50</h3>
+        <p>SERV RISC-V soft-core. QSPI XIP flash with 4&thinsp;KB BRAM cache — 2.7× speedup measured on hardware.</p>
+        <div class="hw-spec">32 KB RAM &nbsp;·&nbsp; 16 MB QSPI</div>
+      </div>
+      <div class="hw-card">
+        <div class="hw-icon">⌁</div>
+        <h3>Web terminal</h3>
+        <p>Platform-agnostic WebSocket session layer. Any browser on any network-connected device.</p>
+        <div class="hw-spec">17/17 integration tests &nbsp;·&nbsp; JSON protocol</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<section id="numbers">
+  <div class="inner">
+    <div class="label">Metrics</div>
+    <h2>By the numbers.</h2>
+    <div class="stats">
+      <div class="stat">
+        <span class="stat-v">84%</span>
+        <div class="stat-l">RAM reduction<br>160 KB → 25 KB</div>
+      </div>
+      <div class="stat">
+        <span class="stat-v">~200</span>
+        <div class="stat-l">LUTs for the<br>RISC-V CPU (SERV)</div>
+      </div>
+      <div class="stat">
+        <span class="stat-v">2.7×</span>
+        <div class="stat-l">XIP cache speedup<br>on Arty S7-50 hardware</div>
+      </div>
+      <div class="stat">
+        <span class="stat-v">100<sup>MHz</sup></span>
+        <div class="stat-l">timing closure<br>MAX10 FPGA</div>
+      </div>
+      <div class="stat">
+        <span class="stat-v">368</span>
+        <div class="stat-l">Z-machine conformance<br>tests passing</div>
+      </div>
+      <div class="stat">
+        <span class="stat-v">119</span>
+        <div class="stat-l">unit tests<br>passing</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- GAME -->
+<section id="game">
+  <div class="inner">
+    <div class="label">Test vehicle</div>
+    <h2>The Restaurant at the<br>End of the Universe.</h2>
+    <p class="body-p">ZVibe ships with a bundled game that is both a playable story and a purpose-built regression target. Not a toy script — a complete 42-point interactive fiction set in Douglas Adams' universe, with NPCs, timed events, randomized puzzles, save/restore, and a navigable maze.</p>
+    <p class="body-p">Every feature that matters in production — parser edge cases, object-tree traversal, stack depth, I/O timing — gets exercised across hundreds of turns, on every target including FPGA hardware.</p>
+
+    <div class="game-grid">
+      <div class="game-box">
+        <img src="docs/assets/restaurant-box.png" alt="The Restaurant at the End of the Universe cover art">
+      </div>
+      <div>
+        <div class="excerpt"><span class="cmd">&gt; examine Zaphod</span>
+Zaphod looks completely normal, except for his two heads.
+
+<span class="cmd">&gt; kiss Trillian</span>
+She looks at you as if you were insane.
+
+<span class="cmd">&gt; hug Ford</span>
+He looks at you as if you were insane.</div>
+        <p class="game-note">A devoted fan-made sequel to Infocom's <em>Hitchhiker's Guide to the Galaxy</em> (1984), drawing on the original Infocom ZIL source for the unreleased sequel by Stu Galley. Built with Inform 6 and PunyInform. Three regression scripts covering save/restore, cold death, and timed daemon behavior.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICK START -->
+<section id="start">
+  <div class="inner">
+    <div class="label">Quick start</div>
+    <h2>Up and running<br>in five minutes.</h2>
+    <p class="body-p">The console target builds from standard C99 with no dependencies beyond a C compiler and Make. The bundled Czech conformance suite runs unattended — no game file required.</p>
+<pre><span class="c"># macOS</span>
+xcode-select --install
+
+<span class="c"># Ubuntu / Debian</span>
+sudo apt install build-essential
+
+<span class="c"># Build and run the Z-machine conformance suite</span>
+cd target/console
+make clean &amp;&amp; make
+<span class="g">echo quit | ./build/bin/zvibe_minimal ../../games/catalog/czech.z3</span>
+
+<span class="c"># Play the bundled game interactively</span>
+<span class="g">./build/bin/zvibe_console ../../games/catalog/restaurant.z3</span></pre>
+    <div class="ctas" style="margin-top:2.5rem; justify-content:flex-start;">
+      <a class="btn-p" href="https://github.com/emuck/zvibe">GitHub →</a>
+      <a class="btn-s" href="https://github.com/emuck/zvibe/blob/main/docs/BUILDING.md">Full build docs →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>ZVibe &nbsp;·&nbsp; BSD-3-Clause &nbsp;·&nbsp; <a href="https://github.com/emuck/zvibe">github.com/emuck/zvibe</a></p>
+</footer>
+
+</body>
+</html>
