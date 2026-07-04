@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ZVibe — Z-machine Interpreter for Embedded Systems</title>
-  <meta name="description" content="A Z-machine v3 interpreter for embedded systems. Static story content in flash, dynamic state in 32 KB of RAM. No heap allocation. One C library — ARM, FPGA soft-cores, and the browser.">
+  <meta name="description" content="A Z-machine v3 interpreter for embedded systems. Static story content in flash via XIP, dynamic state in a 16 KB buffer. No heap allocation. One C library — ARM, FPGA soft-cores, and desktop.">
   <style>
     :root {
       --bg:         #0e0e0e;
@@ -252,7 +252,7 @@
   <div class="inner">
     <div class="label">Background</div>
     <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
-    <p class="body-p">In 1979, Infocom built the Z-machine: one story file, many platforms. A platform-specific interpreter handled the rest. The same compiled bytecode ran on Apple&nbsp;II, CP/M, DOS, and Atari — on machines with 32&thinsp;KB of total system RAM. <a href="https://www.filfre.net/2012/01/zil-and-the-z-machine/" target="_blank" rel="noopener" class="src-link">↗</a></p>
+    <p class="body-p">In 1979, Infocom built the Z-machine: one story file, many platforms. A platform-specific interpreter handled the rest. The same compiled bytecode ran on Apple&nbsp;II, Atari, TRS-80, and IBM&nbsp;PC — on machines with 32&thinsp;KB of total system RAM. <a href="https://www.filfre.net/2012/01/zil-and-the-z-machine/" target="_blank" rel="noopener" class="src-link">↗</a></p>
     <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. Parser games at their peak.</p>
     <p class="body-p">ZVibe applies the same architecture to bare-metal embedded hardware. Static content in flash instead of on disk. Dynamic state in 16&thinsp;KB of BRAM. No OS overhead. Same split — different storage.</p>
 
@@ -260,7 +260,7 @@
       <div class="t-card">
         <div class="t-year">1979</div>
         <h3>Infocom creates the Z-machine</h3>
-        <p>A portable virtual machine that ran a single game on every home computer of the era.</p>
+        <p>A portable virtual machine that ran a single story file on many home computers of the era.</p>
       </div>
       <div class="t-card">
         <div class="t-year">1984</div>
@@ -287,7 +287,7 @@
       <div class="mem-card">
         <div class="mem-tag">RAM</div>
         <h3>Split static/dynamic memory</h3>
-        <p>The story file is partitioned at load time. Bytes below the static-memory boundary are copied to RAM. Bytes above it are read in place from flash via XIP — strings, grammar, and object definitions never touch RAM.</p>
+        <p>The story file is partitioned at load time. Bytes below the static-memory boundary are copied to RAM. Bytes above it are read in place from flash via XIP.</p>
         <div class="mem-result">16 KB dynamic buffer &nbsp;·&nbsp; static content stays in flash</div>
       </div>
       <div class="mem-card">
