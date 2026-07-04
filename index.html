@@ -281,7 +281,7 @@
   <div class="inner">
     <div class="label">Architecture</div>
     <h2>Every byte earns its place.</h2>
-    <p class="body-p">Infocom's split-memory design kept mutable story state in RAM while reading read-only content from external storage as needed. The storage was the bottleneck. ZVibe replaces the disk with flash — reads in place over XIP, no seek latency — and pushes the same principle further.</p>
+    <p class="body-p">Infocom's split-memory design kept mutable story state in RAM while reading read-only content from external storage as needed. The storage was the bottleneck. ZVibe replaces the disk with flash: reads in place over XIP, no seek latency, and pushes the same principle further.</p>
     <div style="display:flex;flex-wrap:wrap;gap:.6rem;margin:1.75rem 0 2rem;">
       <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">no heap at runtime</span>
       <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">static footprint known at build time</span>
@@ -409,7 +409,7 @@
       </div>
     </div>
 
-    <p class="body-p" style="margin-top:2rem;color:var(--text-lo);font-size:.9rem;"><strong style="color:var(--text);">v3 only.</strong> Z-machine v3 is the last version where the full spec fits a static-allocation model. Later versions add undo stacks, sound, and variable-length encodings that undermine the static-allocation model this design depends on. v4 support is possible in the future — <em>Bureaucracy</em> and <em>Trinity</em> are good reasons to revisit.</p>
+    <p class="body-p" style="margin-top:2rem;color:var(--text-lo);font-size:.9rem;"><strong style="color:var(--text);">v3 only.</strong> Z-machine v3 is the last version where the full spec fits a static-allocation model. Later versions add undo stacks, sound, and variable-length encodings that undermine the static-allocation model this design depends on. v4 support is possible in the future. <em>Bureaucracy</em> and <em>Trinity</em> are good reasons to revisit.</p>
     <p style="margin-top:1.5rem;font-size:.9rem;">
       <a href="https://github.com/emuck/zvibe/blob/main/docs/ARCHITECTURE.md" style="color:var(--green);">Read the full design walkthrough →</a>
     </p>
@@ -560,11 +560,11 @@ make clean &amp;&amp; make
   <div class="inner">
     <div class="label">Contributing</div>
     <h2>Good places to start.</h2>
-    <p class="body-p">The console target builds with a C compiler and Make — no hardware required. Core interpreter work, test coverage, and game scripts are fully accessible from a laptop. Core work can be done entirely from the console target and test suite; no FPGA toolchain required.</p>
+    <p class="body-p">The console target builds with a C compiler and Make. No hardware required. Core interpreter work, test coverage, and game scripts are fully accessible from a laptop. Core work can be done entirely from the console target and test suite; no FPGA toolchain required.</p>
     <ul style="margin:1.5rem 0 2rem;padding-left:1.25rem;line-height:2;color:var(--text);">
       <li><strong>New game walkthrough script</strong> — add a <a href="https://github.com/emuck/zvibe/blob/main/target/riscv/serv_zvibe/test_uart.py" style="color:var(--green);"><code>test_uart.py</code></a>-compatible replay for any v3 story file; extends hardware regression coverage across all targets</li>
       <li><strong>Unit test coverage</strong> — <a href="https://github.com/emuck/zvibe/blob/main/target/console/tests/test_split_memory.c" style="color:var(--green);"><code>test_split_memory.c</code></a> covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet</li>
-      <li><strong>Console target improvements</strong> — <a href="https://github.com/emuck/zvibe/tree/main/target/console" style="color:var(--green);"><code>target/console/</code></a> — status line rendering, save file compatibility, platform edge cases</li>
+      <li><strong>Console target improvements</strong> — <a href="https://github.com/emuck/zvibe/tree/main/target/console" style="color:var(--green);"><code>target/console/</code></a>: status line rendering, save file compatibility, platform edge cases</li>
       <li><strong>New board port</strong> — <a href="https://github.com/emuck/zvibe/blob/main/docs/TARGETS.md" style="color:var(--green);">TARGETS.md</a> has a porting checklist; any target with 32&thinsp;KB RAM and XIP-accessible flash is a candidate</li>
       <li><strong>v4 groundwork</strong> — <em>Bureaucracy</em> and <em>Trinity</em> are the motivation; starts with undo stack design and extended object model</li>
     </ul>
