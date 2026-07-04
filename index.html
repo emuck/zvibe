@@ -232,8 +232,8 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
-  <h1>32&thinsp;KB in 1979.<br><em>25&thinsp;KB now.</em></h1>
-  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation. One C library, ARM to FPGA to browser.</p>
+  <h1>32&thinsp;KB in 1979.<br><em>16&thinsp;KB now.</em></h1>
+  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 16&thinsp;KB. Saves are delta-compressed. No heap allocation. One C library, ARM to FPGA to browser.</p>
   <div class="ctas">
     <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
     <a class="btn-s" href="#what">What is a Z-machine? ↓</a>
@@ -288,7 +288,7 @@
         <div class="mem-tag">RAM</div>
         <h3>Split static/dynamic memory</h3>
         <p>The story file is partitioned at load time. Static content (strings, object tables, grammar) stays in flash, read in-place via XIP. Only mutable state (globals, object properties, call stack) is copied to RAM.</p>
-        <div class="mem-result">160 KB → 25 KB working set &nbsp;·&nbsp; 84% reduction</div>
+        <div class="mem-result">160 KB → 16 KB working set &nbsp;·&nbsp; 90% reduction</div>
       </div>
       <div class="mem-card">
         <div class="mem-tag">Heap</div>
@@ -374,8 +374,8 @@
     <h2>By the numbers.</h2>
     <div class="stats">
       <div class="stat">
-        <span class="stat-v">84%</span>
-        <div class="stat-l">RAM reduction<br>160 KB → 25 KB</div>
+        <span class="stat-v">90%</span>
+        <div class="stat-l">RAM reduction<br>160 KB → 16 KB</div>
       </div>
       <div class="stat">
         <span class="stat-v">~200</span>
