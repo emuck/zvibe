@@ -231,7 +231,7 @@
 <div class="hero">
   <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
   <h1>The Z-machine didn't need<br>much in 1979.<br><em>It still doesn't.</em></h1>
-  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation — one C library running on ARM, FPGA soft-cores, and the browser.</p>
+  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation — one C library, ARM to FPGA to browser.</p>
   <div class="ctas">
     <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
     <a class="btn-s" href="#what">What is a Z-machine? ↓</a>
@@ -250,25 +250,25 @@
   <div class="inner">
     <div class="label">Background</div>
     <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
-    <p class="body-p">In 1979, a company called Infocom created a portable virtual machine for text adventure games. Write a game once; run it on every computer that existed. The same bytecode — a <em>.z3</em> file — played on Apple&nbsp;II, CP/M, DOS, and Atari, because a small interpreter layer on each platform handled the differences.</p>
-    <p class="body-p">The games were extraordinary. <em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. They demanded more from a reader than any modern game asks of a player. Millions of people learned to type at one.</p>
+    <p class="body-p">In 1979, Infocom created a portable virtual machine for text adventure games. Write a game once; run it on every computer that existed. The same bytecode — a <em>.z3</em> file — played on Apple&nbsp;II, CP/M, DOS, and Atari.</p>
+    <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. They demanded more from a reader than any modern game asks of a player. Millions of people learned to type at one.</p>
     <p class="body-p">ZVibe is a new Z-machine interpreter — not for 1980s home computers, but for the most constrained hardware we could find.</p>
 
     <div class="timeline">
       <div class="t-card">
         <div class="t-year">1979</div>
         <h3>Infocom creates the Z-machine</h3>
-        <p>A portable virtual machine that lets a single game run on every home computer of the era. Write once, play anywhere.</p>
+        <p>A portable virtual machine that ran a single game on every home computer of the era.</p>
       </div>
       <div class="t-card">
         <div class="t-year">1984</div>
         <h3>The Hitchhiker's Guide</h3>
-        <p>Douglas Adams and Steve Meretzky collaborate on one of the best-selling text adventures ever made. Same .z3 bytecode format.</p>
+        <p>Douglas Adams and Steve Meretzky. One of the best-selling text adventures ever made. Same .z3 bytecode.</p>
       </div>
       <div class="t-card">
         <div class="t-year">2025</div>
         <h3>ZVibe</h3>
-        <p>A C99 reimplementation purpose-built for embedded systems — custom FPGA SoCs, ARM microcontrollers, and a WebSocket-based web terminal.</p>
+        <p>A C99 reimplementation for embedded systems — custom FPGA SoCs, ARM microcontrollers, and a web terminal.</p>
       </div>
     </div>
   </div>
@@ -279,13 +279,13 @@
   <div class="inner">
     <div class="label">Architecture</div>
     <h2>Every byte earns its place.</h2>
-    <p class="body-p">Infocom's original interpreters faced the same problem on 1980s home computers: story files were bigger than available RAM. Their solution was to treat the story as a read-only resource and page in only what the interpreter needed at runtime. ZVibe applies the same principle — then keeps going.</p>
+    <p class="body-p">On 1980s home computers, story files were bigger than available RAM. Infocom's solution: treat the story as read-only, page in only what the interpreter needs. ZVibe applies the same principle — then keeps going.</p>
 
     <div class="mem-grid">
       <div class="mem-card">
         <div class="mem-tag">RAM</div>
         <h3>Split static/dynamic memory</h3>
-        <p>The story file is partitioned at load time. Static content — strings, object tables, grammar — stays in flash and is read in-place via XIP. Only truly mutable state (globals, object properties, call stack) is copied to RAM.</p>
+        <p>The story file is partitioned at load time. Static content — strings, object tables, grammar — stays in flash and is read in-place via XIP. Only mutable state (globals, object properties, call stack) is copied to RAM.</p>
         <div class="mem-result">160 KB → 25 KB working set &nbsp;·&nbsp; 84% reduction</div>
       </div>
       <div class="mem-card">
@@ -303,19 +303,19 @@
       <div class="mem-card">
         <div class="mem-tag">Flash layout</div>
         <h3>Packed flash image</h3>
-        <p>A build-time layout calculator packs firmware, a game index, story files, and save slots into available flash with no dead space. Story capacity recovered on MAX10 by eliminating static padding in the original layout.</p>
+        <p>A build-time layout calculator packs firmware, game index, story files, and save slots into available flash with no dead space.</p>
         <div class="mem-result">52 KB → 126 KB usable game capacity on MAX10</div>
       </div>
       <div class="mem-card">
         <div class="mem-tag">XIP read patterns</div>
         <h3>BRAM read cache</h3>
-        <p>The Z-machine text engine reads sequentially through large string tables. A 4&thinsp;KB BRAM cache on the Arty QSPI XIP controller exploits this pattern, amortizing flash command overhead across burst reads.</p>
+        <p>The Z-machine text engine is sequential. A 4&thinsp;KB BRAM cache exploits that — amortizing QSPI command overhead across burst reads.</p>
         <div class="mem-result">2.7× median speedup &nbsp;·&nbsp; measured on Arty S7-50 hardware</div>
       </div>
       <div class="mem-card">
         <div class="mem-tag">Stack</div>
         <h3>Streaming text decode</h3>
-        <p>ZSCII text is decoded and emitted character-by-character rather than into a staging buffer. Eliminated a 512-byte stack allocation — and a truncation bug that only appeared on long room descriptions.</p>
+        <p>ZSCII text is streamed rather than staged. Eliminated a 512-byte stack allocation — and a truncation bug that only appeared on long room descriptions.</p>
         <div class="mem-result">−512 B stack pressure &nbsp;·&nbsp; fixes a class of output bugs</div>
       </div>
     </div>
@@ -327,14 +327,14 @@
   <div class="inner">
     <div class="label">Targets</div>
     <h2>One library.<br>Five platforms.</h2>
-    <p class="body-p">The same platform-agnostic C99 core builds for every target. HAL layers isolate the differences — flash reads, UART I/O, save slots — so the interpreter itself is never touched.</p>
-    <p class="body-p">The FPGA SoCs are custom-built: Wishbone interconnect, UART, XIP flash controller, and save-slot manager with wear leveling. Each subsystem was verified in simulation before any hardware was touched.</p>
+    <p class="body-p">The same C99 core builds for every target. HAL layers isolate the differences — flash reads, UART I/O, save slots — so the interpreter is never touched.</p>
+    <p class="body-p">The FPGA SoCs: Wishbone interconnect, UART, XIP flash controller, save-slot manager with wear leveling. Each subsystem verified in simulation before hardware.</p>
 
     <div class="targets">
       <div class="hw-card">
         <div class="hw-icon">▶</div>
         <h3>Console</h3>
-        <p>Linux, macOS, Windows. The development baseline and primary CI target.</p>
+        <p>Linux, macOS, Windows. The development baseline.</p>
         <div class="hw-spec">Host RAM &nbsp;·&nbsp; Host storage</div>
       </div>
       <div class="hw-card">
@@ -358,7 +358,7 @@
       <div class="hw-card">
         <div class="hw-icon">⌁</div>
         <h3>Web terminal</h3>
-        <p>Platform-agnostic WebSocket session layer. Any browser on any network-connected device.</p>
+        <p>WebSocket session layer. Any browser, any network-connected device.</p>
         <div class="hw-spec">17/17 integration tests &nbsp;·&nbsp; JSON protocol</div>
       </div>
     </div>
@@ -404,7 +404,7 @@
   <div class="inner">
     <div class="label">Test vehicle</div>
     <h2>The Restaurant at the<br>End of the Universe.</h2>
-    <p class="body-p">ZVibe ships with a bundled game that is both a playable story and a purpose-built regression target. Not a toy script — a complete 42-point interactive fiction set in Douglas Adams' universe, with NPCs, timed events, randomized puzzles, save/restore, and a navigable maze.</p>
+    <p class="body-p">ZVibe ships with a bundled game that is a playable story and a regression target. Not a toy script — a complete 42-point interactive fiction set in Douglas Adams' universe, with NPCs, timed events, randomized puzzles, save/restore, and a navigable maze.</p>
     <p class="body-p">Every feature that matters in production — parser edge cases, object-tree traversal, stack depth, I/O timing — gets exercised across hundreds of turns, on every target including FPGA hardware.</p>
 
     <div class="game-grid">
@@ -431,7 +431,7 @@ He looks at you as if you were insane.</div>
   <div class="inner">
     <div class="label">Quick start</div>
     <h2>Up and running<br>in five minutes.</h2>
-    <p class="body-p">The console target builds from standard C99 with no dependencies beyond a C compiler and Make. The bundled Czech conformance suite runs unattended — no game file required.</p>
+    <p class="body-p">The console target builds with nothing beyond a C compiler and Make. The bundled Czech conformance suite runs unattended — no game file needed.</p>
 <pre><span class="c"># macOS</span>
 xcode-select --install
 
