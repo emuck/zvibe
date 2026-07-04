@@ -231,7 +231,7 @@
 <div class="hero">
   <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
   <h1>The Z-machine didn't need<br>much in 1979.<br><em>It still doesn't.</em></h1>
-  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation — one C library, ARM to FPGA to browser.</p>
+  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation. One C library, ARM to FPGA to browser.</p>
   <div class="ctas">
     <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
     <a class="btn-s" href="#what">What is a Z-machine? ↓</a>
@@ -250,9 +250,9 @@
   <div class="inner">
     <div class="label">Background</div>
     <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
-    <p class="body-p">In 1979, Infocom created a portable virtual machine for text adventure games. Write a game once; run it on every computer that existed. The same compiled bytecode played on Apple&nbsp;II, CP/M, DOS, and Atari.</p>
+    <p class="body-p">In 1979, Infocom created a portable virtual machine for text adventure games. Write a game once. Run it on every computer that existed. The same compiled bytecode played on Apple&nbsp;II, CP/M, DOS, and Atari.</p>
     <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. They demanded more from a reader than any modern game asks of a player. Millions of people learned to type at one.</p>
-    <p class="body-p">ZVibe is a new Z-machine interpreter — not for 1980s home computers, but for the most constrained hardware we could find.</p>
+    <p class="body-p">ZVibe is a new Z-machine interpreter. Not for 1980s home computers. For the most constrained hardware we could find.</p>
 
     <div class="timeline">
       <div class="t-card">
@@ -268,7 +268,7 @@
       <div class="t-card">
         <div class="t-year">2025</div>
         <h3>ZVibe</h3>
-        <p>A C99 reimplementation for embedded systems — custom FPGA SoCs, ARM microcontrollers, and a web terminal.</p>
+        <p>A C99 reimplementation for embedded systems: custom FPGA SoCs, ARM microcontrollers, and a web terminal.</p>
       </div>
     </div>
   </div>
@@ -285,19 +285,19 @@
       <div class="mem-card">
         <div class="mem-tag">RAM</div>
         <h3>Split static/dynamic memory</h3>
-        <p>The story file is partitioned at load time. Static content — strings, object tables, grammar — stays in flash and is read in-place via XIP. Only mutable state (globals, object properties, call stack) is copied to RAM.</p>
+        <p>The story file is partitioned at load time. Static content (strings, object tables, grammar) stays in flash, read in-place via XIP. Only mutable state (globals, object properties, call stack) is copied to RAM.</p>
         <div class="mem-result">160 KB → 25 KB working set &nbsp;·&nbsp; 84% reduction</div>
       </div>
       <div class="mem-card">
         <div class="mem-tag">Heap</div>
         <h3>No dynamic allocation</h3>
-        <p>All state is statically sized at compile time. No malloc, no free, no fragmentation. Memory layout is fully auditable before the first instruction executes — a hard requirement for bare-metal targets with no MMU.</p>
+        <p>All state is statically sized at compile time. No malloc, no free, no fragmentation. Memory layout is fully auditable before the first instruction executes. Required for bare-metal targets with no MMU.</p>
         <div class="mem-result">Zero heap &nbsp;·&nbsp; deterministic footprint &nbsp;·&nbsp; no runtime surprises</div>
       </div>
       <div class="mem-card">
         <div class="mem-tag">Flash storage</div>
         <h3>Delta-compressed saves</h3>
-        <p>Save slots store only the bytes that changed since load — not a full snapshot. Slots rotate to distribute write wear across UFM/EEPROM pages. CRC32 validates every restore.</p>
+        <p>Save slots store only the bytes that changed since load. Not a full snapshot. Slots rotate to distribute write wear across UFM/EEPROM pages. CRC32 validates every restore.</p>
         <div class="mem-result">Minimal write wear &nbsp;·&nbsp; hardware-verified on MAX10 &amp; SAM E51</div>
       </div>
       <div class="mem-card">
@@ -309,7 +309,7 @@
       <div class="mem-card">
         <div class="mem-tag">XIP read patterns</div>
         <h3>BRAM read cache</h3>
-        <p>The Z-machine text engine is sequential. A 4&thinsp;KB BRAM cache exploits that — amortizing QSPI command overhead across burst reads.</p>
+        <p>The Z-machine text engine is sequential. A 4&thinsp;KB BRAM cache exploits that, amortizing QSPI command overhead across burst reads.</p>
         <div class="mem-result">2.7× median speedup &nbsp;·&nbsp; measured on Arty S7-50 hardware</div>
       </div>
       <div class="mem-card">
@@ -327,7 +327,7 @@
   <div class="inner">
     <div class="label">Targets</div>
     <h2>One library.<br>Five platforms.</h2>
-    <p class="body-p">The same C99 core builds for every target. HAL layers isolate the differences — flash reads, UART I/O, save slots — so the interpreter is never touched.</p>
+    <p class="body-p">The same C99 core builds for every target. HAL layers isolate the differences: flash reads, UART I/O, save slots. The interpreter is never touched.</p>
     <p class="body-p">The FPGA SoCs: Wishbone interconnect, UART, XIP flash controller, save-slot manager with wear leveling. Each subsystem verified in simulation before hardware.</p>
 
     <div class="targets">
@@ -346,13 +346,13 @@
       <div class="hw-card">
         <div class="hw-icon">⬡</div>
         <h3>Intel MAX10</h3>
-        <p>SERV RISC-V soft-core on FPGA. UFM XIP flash; 100&thinsp;MHz timing closure. Save/restore on hardware.</p>
+        <p>SERV RISC-V soft-core on FPGA. UFM XIP flash, 100&thinsp;MHz timing closure. Save/restore on hardware.</p>
         <div class="hw-spec">32 KB RAM &nbsp;·&nbsp; 172 KB UFM &nbsp;·&nbsp; ~200 LUTs</div>
       </div>
       <div class="hw-card">
         <div class="hw-icon">⬡</div>
         <h3>Xilinx Arty S7-50</h3>
-        <p>SERV RISC-V soft-core. QSPI XIP flash with 4&thinsp;KB BRAM cache — 2.7× speedup measured on hardware.</p>
+        <p>SERV RISC-V soft-core. QSPI XIP flash with 4&thinsp;KB BRAM cache. 2.7× speedup measured on hardware.</p>
         <div class="hw-spec">32 KB RAM &nbsp;·&nbsp; 16 MB QSPI</div>
       </div>
       <div class="hw-card">
@@ -405,7 +405,7 @@
     <div class="label">Test vehicle</div>
     <h2>The Restaurant at the<br>End of the Universe.</h2>
     <p class="body-p">ZVibe ships with a bundled game that is a playable story and a regression target. Not a toy script — a complete 42-point interactive fiction set in Douglas Adams' universe, with NPCs, timed events, randomized puzzles, save/restore, and a navigable maze.</p>
-    <p class="body-p">Every feature that matters in production — parser edge cases, object-tree traversal, stack depth, I/O timing — gets exercised across hundreds of turns, on every target including FPGA hardware.</p>
+    <p class="body-p">Every feature that matters in production gets exercised: parser edge cases, object-tree traversal, stack depth, I/O timing. Hundreds of turns, on every target including FPGA hardware.</p>
 
     <div class="game-grid">
       <div class="game-box">
@@ -431,7 +431,7 @@ He looks at you as if you were insane.</div>
   <div class="inner">
     <div class="label">Quick start</div>
     <h2>Up and running<br>in five minutes.</h2>
-    <p class="body-p">The console target builds with nothing beyond a C compiler and Make. The bundled Czech conformance suite runs unattended — no game file needed.</p>
+    <p class="body-p">The console target builds with nothing beyond a C compiler and Make. The bundled Czech conformance suite runs unattended. No game file needed.</p>
 <pre><span class="c"># macOS</span>
 xcode-select --install
 
