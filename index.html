@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ZVibe — Z-machine Interpreter for Embedded Systems</title>
-  <meta name="description" content="A Z-machine v3 interpreter running classic Infocom text adventures on FPGA soft-cores, ARM microcontrollers, and the browser. 200 LUTs. 32 KB RAM.">
+  <meta name="description" content="A Z-machine v3 interpreter for embedded systems. Static story content in flash, dynamic state in 32 KB of RAM. No heap allocation. One C library — ARM, FPGA soft-cores, and the browser.">
   <style>
     :root {
       --bg:         #0e0e0e;
@@ -123,6 +123,27 @@
     .t-card h3 { color: var(--text-hi); font-size: .95rem; margin-bottom: .4rem; }
     .t-card p { font-size: .875rem; color: var(--text); margin: 0; }
 
+    /* ── MEMORY TECHNIQUES ── */
+    #memory { background: var(--bg2); }
+    .mem-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem; margin-top: 3rem;
+    }
+    .mem-card {
+      border: 1px solid var(--border); border-radius: 4px; padding: 1.5rem;
+      background: var(--bg);
+    }
+    .mem-tag {
+      font-family: var(--mono); font-size: .7rem; color: var(--green);
+      letter-spacing: .1em; text-transform: uppercase; margin-bottom: .5rem;
+    }
+    .mem-card h3 { color: var(--text-hi); font-size: .95rem; margin-bottom: .5rem; }
+    .mem-card p { font-size: .875rem; color: var(--text); margin: 0; line-height: 1.6; }
+    .mem-result {
+      font-family: var(--mono); font-size: .78rem; color: var(--green-dim);
+      margin-top: .85rem; padding-top: .75rem; border-top: 1px solid var(--border);
+    }
+
     /* ── HARDWARE TARGETS ── */
     .targets {
       display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -197,6 +218,7 @@
   <a class="nav-logo" href="#">zVibe</a>
   <ul class="nav-links">
     <li><a href="#what">Z-machine</a></li>
+    <li><a href="#memory">Memory</a></li>
     <li><a href="#hardware">Hardware</a></li>
     <li><a href="#numbers">Numbers</a></li>
     <li><a href="#game">The game</a></li>
@@ -208,8 +230,8 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
-  <h1>A 1979 virtual machine.<br><em>Running on 200 logic elements.</em></h1>
-  <p class="hero-sub">ZVibe puts classic Infocom text adventures on FPGA soft-cores, ARM microcontrollers, and the browser — in as little as 32&thinsp;KB of RAM.</p>
+  <h1>The Z-machine didn't need<br>much in 1979.<br><em>It still doesn't.</em></h1>
+  <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation — one C library running on ARM, FPGA soft-cores, and the browser.</p>
   <div class="ctas">
     <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
     <a class="btn-s" href="#what">What is a Z-machine? ↓</a>
@@ -247,6 +269,54 @@
         <div class="t-year">2025</div>
         <h3>ZVibe</h3>
         <p>A C99 reimplementation purpose-built for embedded systems — custom FPGA SoCs, ARM microcontrollers, and a WebSocket-based web terminal.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MEMORY -->
+<section id="memory">
+  <div class="inner">
+    <div class="label">Architecture</div>
+    <h2>Every byte earns its place.</h2>
+    <p class="body-p">Infocom's original interpreters faced the same problem on 1980s home computers: story files were bigger than available RAM. Their solution was to treat the story as a read-only resource and page in only what the interpreter needed at runtime. ZVibe applies the same principle — then keeps going.</p>
+
+    <div class="mem-grid">
+      <div class="mem-card">
+        <div class="mem-tag">RAM</div>
+        <h3>Split static/dynamic memory</h3>
+        <p>The story file is partitioned at load time. Static content — strings, object tables, grammar — stays in flash and is read in-place via XIP. Only truly mutable state (globals, object properties, call stack) is copied to RAM.</p>
+        <div class="mem-result">160 KB → 25 KB working set &nbsp;·&nbsp; 84% reduction</div>
+      </div>
+      <div class="mem-card">
+        <div class="mem-tag">Heap</div>
+        <h3>No dynamic allocation</h3>
+        <p>All state is statically sized at compile time. No malloc, no free, no fragmentation. Memory layout is fully auditable before the first instruction executes — a hard requirement for bare-metal targets with no MMU.</p>
+        <div class="mem-result">Zero heap &nbsp;·&nbsp; deterministic footprint &nbsp;·&nbsp; no runtime surprises</div>
+      </div>
+      <div class="mem-card">
+        <div class="mem-tag">Flash storage</div>
+        <h3>Delta-compressed saves</h3>
+        <p>Save slots store only the bytes that changed since load — not a full snapshot. Slots rotate to distribute write wear across UFM/EEPROM pages. CRC32 validates every restore.</p>
+        <div class="mem-result">Minimal write wear &nbsp;·&nbsp; hardware-verified on MAX10 &amp; SAM E51</div>
+      </div>
+      <div class="mem-card">
+        <div class="mem-tag">Flash layout</div>
+        <h3>Packed flash image</h3>
+        <p>A build-time layout calculator packs firmware, a game index, story files, and save slots into available flash with no dead space. Story capacity recovered on MAX10 by eliminating static padding in the original layout.</p>
+        <div class="mem-result">52 KB → 126 KB usable game capacity on MAX10</div>
+      </div>
+      <div class="mem-card">
+        <div class="mem-tag">XIP read patterns</div>
+        <h3>BRAM read cache</h3>
+        <p>The Z-machine text engine reads sequentially through large string tables. A 4&thinsp;KB BRAM cache on the Arty QSPI XIP controller exploits this pattern, amortizing flash command overhead across burst reads.</p>
+        <div class="mem-result">2.7× median speedup &nbsp;·&nbsp; measured on Arty S7-50 hardware</div>
+      </div>
+      <div class="mem-card">
+        <div class="mem-tag">Stack</div>
+        <h3>Streaming text decode</h3>
+        <p>ZSCII text is decoded and emitted character-by-character rather than into a staging buffer. Eliminated a 512-byte stack allocation — and a truncation bug that only appeared on long room descriptions.</p>
+        <div class="mem-result">−512 B stack pressure &nbsp;·&nbsp; fixes a class of output bugs</div>
       </div>
     </div>
   </div>
@@ -307,7 +377,7 @@
       </div>
       <div class="stat">
         <span class="stat-v">~200</span>
-        <div class="stat-l">LUTs for the<br>RISC-V CPU (SERV)</div>
+        <div class="stat-l">LUTs for the<br>SERV RISC-V CPU core</div>
       </div>
       <div class="stat">
         <span class="stat-v">2.7×</span>
