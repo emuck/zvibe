@@ -18,10 +18,10 @@ moved inside this directory.
 
 ## Supported Boards
 
-| Board | Status | FPGA | Clock | Flash | Notes |
-|-------|--------|------|-------|-------|-------|
-| MAX10 08 Eval | Primary | 10M08SAU169C8G | 100 MHz | 172KB UFM | XIP direct boot, save/restore verified |
-| Arty S7-50 | Supported | XC7S50-CSGA324 | 166.66 MHz | 16MB QSPI | Multi-game (24 games), save/restore verified |
+| Board | FPGA | Clock | Flash | Notes |
+|-------|------|-------|-------|-------|
+| MAX10 08 Eval | 10M08SAU169C8G | 100 MHz | 172KB UFM | XIP direct boot, save/restore verified |
+| Arty S7-50 | XC7S50-CSGA324 | 166.66 MHz | 16MB QSPI | Multi-game (24 games), save/restore verified |
 
 See `boards/` for board-specific implementations.
 
@@ -131,7 +131,7 @@ See [`docs/build.md`](docs/build.md) for installation hints and troubleshooting.
 
 ## Quick Start
 
-### MAX10 08 Eval Board (Primary)
+### MAX10 08 Eval Board
 
 ```bash
 # Build FPGA bitstream (one-time, ~10-20 min)
