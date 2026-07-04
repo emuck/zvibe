@@ -11,12 +11,12 @@ Z-machine version 3 interpreter for resource-constrained embedded systems.
 zVibe is a Z-machine v3 interpreter written in C targeting microcontrollers
 and FPGA soft-cores with as little as 32KB RAM. It uses a split memory model
 that keeps only the dynamic portion of a story file in RAM while reading static
-content directly from flash, reducing working-set memory by 85–95% compared to
+content directly from flash, reducing working-set memory by ~90% compared to
 a conventional full-image interpreter. The same core library builds for desktop
 (Linux, macOS, Windows), ARM Cortex-M4, and a SERV RISC-V soft-core on Intel
 MAX10 and Xilinx Arty S7-50 FPGAs.
 
-The Z-machine core is a substantial embedded rewrite; attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The Z-machine core is derived from prior work; attribution in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ![ZVibe web terminal running The Restaurant at the End of the Universe](docs/assets/webterm-screenshot.png)
 *zVibe running in a webterm target*

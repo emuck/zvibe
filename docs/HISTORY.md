@@ -219,8 +219,8 @@ testing with latency tracking and @capture directive support.
 | Metric | Result |
 |--------|--------|
 | RAM (initial design) | 160 KB |
-| RAM (final) | ~25 KB |
-| RAM reduction | 84% |
+| RAM buffer (engine) | 16 KB |
+| RAM reduction | 90% |
 | FPGA platforms | 2 (Arty S7-50, MAX10 08 Eval) |
 | MCU platforms | 1 (SAM E51 Curiosity Nano) |
 | FPGA clock speed | 100 MHz (MAX10: +0.946 ns setup slack) |

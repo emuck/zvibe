@@ -43,7 +43,7 @@ SAM E51 Curiosity Nano microcontroller.
 
 ### riscv
 
-RISC-V SoC on Intel MAX10 08 Eval Board (primary) or Digilent Arty S7-50.
+RISC-V SoC on Intel MAX10 08 Eval Board or Digilent Arty S7-50.
 
 - **Location:** `target/riscv/serv_zvibe/`
 - **Build:** See [FPGA.md](FPGA.md)
