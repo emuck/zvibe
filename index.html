@@ -112,6 +112,8 @@
     }
     .body-p a { color: var(--green); text-decoration: none; }
     .body-p a:hover { text-decoration: underline; }
+    .src-link { font-size: .75em; color: var(--text-lo) !important; vertical-align: super; }
+    .src-link:hover { color: var(--green) !important; text-decoration: none !important; }
 
     /* ── Z-MACHINE TIMELINE ── */
     .timeline {
@@ -230,7 +232,7 @@
 <!-- HERO -->
 <div class="hero">
   <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
-  <h1>The Z-machine didn't need<br>much in 1979.<br><em>It still doesn't.</em></h1>
+  <h1>32&thinsp;KB in 1979.<br><em>25&thinsp;KB now.</em></h1>
   <p class="hero-sub">Static story content lives in flash, read in-place. Dynamic game state fits in 32&thinsp;KB. Saves are delta-compressed. No heap allocation. One C library, ARM to FPGA to browser.</p>
   <div class="ctas">
     <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
@@ -250,7 +252,7 @@
   <div class="inner">
     <div class="label">Background</div>
     <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
-    <p class="body-p">In 1979, Infocom created a portable virtual machine for text adventure games. Write a game once. Run it on every computer that existed. The same compiled bytecode played on Apple&nbsp;II, CP/M, DOS, and Atari.</p>
+    <p class="body-p">In 1979, Infocom created a portable virtual machine for text adventure games. Write a game once. Run it on every computer that existed. The same compiled bytecode played on Apple&nbsp;II, CP/M, DOS, and Atari — minimum 32&thinsp;KB RAM. <a href="https://www.filfre.net/2012/01/zil-and-the-z-machine/" target="_blank" rel="noopener" class="src-link">↗</a></p>
     <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. They demanded more from a reader than any modern game asks of a player. Millions of people learned to type at one.</p>
     <p class="body-p">ZVibe is a new Z-machine interpreter. Not for 1980s home computers. For the most constrained hardware we could find.</p>
 
