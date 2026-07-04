@@ -54,6 +54,22 @@ The boundary is determined by the `staticmem` field in the story file header.
 Everything below the boundary is copied to RAM at load time; everything above
 is read on demand from the flash address space.
 
+Runtime data flow:
+
+```
+story.z3
+    |
+    +-- dynamic (mutable)  --> RAM (16 KB buffer)
+    +-- static (read-only) --> Flash / XIP
+    |
+interpreter (C99, zvibe_api.h, no heap)
+    |
+    +-- ARM Cortex-M4  (SAM E51)
+    +-- FPGA SERV      (MAX10, Arty S7-50)
+    +-- desktop        (Linux, macOS, Windows)
+    +-- web terminal   (WebSocket)
+```
+
 For RISC-V targets, the SoC is built around the
 [SERV](https://github.com/olofk/serv) bit-serial RV32I CPU with a custom
 Wishbone-attached UART, UFM/QSPI XIP controller, and save-slot manager.

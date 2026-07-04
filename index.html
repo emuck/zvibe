@@ -283,6 +283,86 @@
     <h2>Every byte earns its place.</h2>
     <p class="body-p">Infocom's split-memory design kept mutable story state in RAM while reading read-only content from external storage as needed. The storage was the bottleneck. ZVibe replaces the disk with flash — reads in place over XIP, no seek latency — and pushes the same principle further.</p>
 
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" role="img" aria-label="ZVibe architecture: story file split at staticmem boundary into dynamic RAM buffer and static flash, both feeding a C99 interpreter targeting ARM, FPGA, desktop, and web" style="width:100%;max-width:660px;display:block;margin:2rem auto 2.5rem;">
+      <defs>
+        <marker id="arrowG" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#2a7a3c"/>
+        </marker>
+        <marker id="arrowD" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+          <polygon points="0 0, 9 3.5, 0 7" fill="#2e2e2e"/>
+        </marker>
+      </defs>
+
+      <!-- story.z3 -->
+      <rect x="250" y="16" width="160" height="44" rx="5" fill="#181818" stroke="#2a7a3c" stroke-width="1.5"/>
+      <text x="330" y="34" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="14" font-weight="bold" fill="#4af26a">story.z3</text>
+      <text x="330" y="52" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">Z-machine story file</text>
+
+      <!-- down to split -->
+      <line x1="330" y1="60" x2="330" y2="100" stroke="#2e2e2e" stroke-width="1.5"/>
+      <text x="340" y="84" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#3c3c3c">staticmem split</text>
+
+      <!-- horizontal branch -->
+      <line x1="230" y1="100" x2="430" y2="100" stroke="#2e2e2e" stroke-width="1"/>
+      <circle cx="230" cy="100" r="3" fill="#2a7a3c"/>
+      <circle cx="430" cy="100" r="3" fill="#2e2e2e"/>
+
+      <!-- branch drops -->
+      <line x1="230" y1="103" x2="230" y2="142" stroke="#4af26a" stroke-width="1.5" marker-end="url(#arrowG)"/>
+      <line x1="430" y1="103" x2="430" y2="142" stroke="#2e2e2e" stroke-width="1.5" marker-end="url(#arrowD)"/>
+
+      <!-- dynamic box -->
+      <rect x="148" y="144" width="164" height="84" rx="5" fill="#131313" stroke="#2a7a3c" stroke-width="1.5"/>
+      <text x="230" y="164" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#4af26a">dynamic</text>
+      <text x="230" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#c8c8c8">mutable state</text>
+      <text x="230" y="196" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="11" fill="#4af26a">&#x2192; RAM &nbsp;&middot;&nbsp; 16 KB</text>
+      <text x="230" y="213" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">globals &nbsp;&middot;&nbsp; props &nbsp;&middot;&nbsp; stack</text>
+
+      <!-- static box -->
+      <rect x="348" y="144" width="164" height="84" rx="5" fill="#131313" stroke="#232323" stroke-width="1.5"/>
+      <text x="430" y="164" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#c8c8c8">static</text>
+      <text x="430" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#c8c8c8">read-only content</text>
+      <text x="430" y="196" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="11" fill="#5a5a5a">&#x2192; Flash / XIP</text>
+      <text x="430" y="213" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">no writes at runtime</text>
+
+      <!-- arrows into interpreter -->
+      <line x1="230" y1="228" x2="230" y2="251" stroke="#4af26a" stroke-width="1.5" marker-end="url(#arrowG)"/>
+      <line x1="430" y1="228" x2="430" y2="251" stroke="#2e2e2e" stroke-width="1.5" marker-end="url(#arrowD)"/>
+
+      <!-- interpreter box -->
+      <rect x="178" y="253" width="304" height="52" rx="5" fill="#181818" stroke="#2a7a3c" stroke-width="1.5"/>
+      <text x="330" y="274" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="600" fill="#f0f0f0">Z-machine interpreter</text>
+      <text x="330" y="291" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="11" fill="#5a5a5a">C99 &nbsp;&middot;&nbsp; zvibe_api.h &nbsp;&middot;&nbsp; no heap</text>
+
+      <!-- down to target bus -->
+      <line x1="330" y1="305" x2="330" y2="324" stroke="#2e2e2e" stroke-width="1.5"/>
+      <line x1="114" y1="324" x2="546" y2="324" stroke="#2e2e2e" stroke-width="1"/>
+      <circle cx="330" cy="324" r="3" fill="#2e2e2e"/>
+
+      <!-- drops to targets -->
+      <line x1="114" y1="324" x2="114" y2="340" stroke="#2e2e2e" stroke-width="1" marker-end="url(#arrowD)"/>
+      <line x1="258" y1="324" x2="258" y2="340" stroke="#2e2e2e" stroke-width="1" marker-end="url(#arrowD)"/>
+      <line x1="402" y1="324" x2="402" y2="340" stroke="#2e2e2e" stroke-width="1" marker-end="url(#arrowD)"/>
+      <line x1="546" y1="324" x2="546" y2="340" stroke="#2e2e2e" stroke-width="1" marker-end="url(#arrowD)"/>
+
+      <!-- target boxes -->
+      <rect x="49"  y="342" width="130" height="48" rx="4" fill="#131313" stroke="#232323" stroke-width="1"/>
+      <text x="114" y="362" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#c8c8c8">ARM Cortex-M4</text>
+      <text x="114" y="378" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">SAM E51</text>
+
+      <rect x="193" y="342" width="130" height="48" rx="4" fill="#131313" stroke="#232323" stroke-width="1"/>
+      <text x="258" y="362" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#c8c8c8">FPGA SERV</text>
+      <text x="258" y="378" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">MAX10 &nbsp;&middot;&nbsp; Arty S7-50</text>
+
+      <rect x="337" y="342" width="130" height="48" rx="4" fill="#131313" stroke="#232323" stroke-width="1"/>
+      <text x="402" y="362" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#c8c8c8">desktop</text>
+      <text x="402" y="378" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">Linux &nbsp;&middot;&nbsp; macOS &nbsp;&middot;&nbsp; Windows</text>
+
+      <rect x="481" y="342" width="130" height="48" rx="4" fill="#131313" stroke="#232323" stroke-width="1"/>
+      <text x="546" y="362" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="600" fill="#c8c8c8">web terminal</text>
+      <text x="546" y="378" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">WebSocket &nbsp;&middot;&nbsp; browser</text>
+    </svg>
+
     <div class="mem-grid">
       <div class="mem-card">
         <div class="mem-tag">RAM</div>
