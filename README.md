@@ -24,7 +24,7 @@ The Z-machine core is derived from prior work; attribution in [THIRD_PARTY_NOTIC
 
 ## Goals
 
-- **Z-machine v3 only.** Scope is intentionally narrow; later versions are out of scope.
+- **Z-machine v3 only.** v3 is the last version where the full spec fits a static-allocation model. Later versions add undo stacks, sound, and variable-length encodings that require heap allocation and break the memory guarantees this design depends on. v4 is a possible future direction — *Bureaucracy* and *Trinity* are good reasons to revisit.
 - **Minimal RAM.** The interpreter must run on targets with 32KB of working memory.
 - **No heap allocation.** All state is statically sized; no `malloc` at runtime.
 - **Single C library.** Platform-specific code is isolated to thin HAL layers.
