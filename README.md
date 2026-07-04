@@ -100,7 +100,7 @@ and embedded target build procedures.
 ## Testing
 
 ```bash
-# Unit tests (memory subsystem, 119 assertions)
+# Unit tests (memory subsystem, 133 assertions)
 cd target/console/tests && make test-unit
 
 # Z-machine opcode conformance (368 tests, bundled game)

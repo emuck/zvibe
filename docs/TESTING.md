@@ -26,7 +26,7 @@ cd target/console/tests
 make test-unit
 ```
 
-**Expected:** 119 tests pass.
+**Expected:** 133 tests pass.
 
 ### Integration Tests
 

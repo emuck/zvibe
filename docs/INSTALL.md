@@ -168,4 +168,4 @@ cd target/console/tests
 make test-unit test-integration
 ```
 
-Expected: 119 unit tests pass, integration tests complete.
+Expected: 133 unit tests pass, integration tests complete.

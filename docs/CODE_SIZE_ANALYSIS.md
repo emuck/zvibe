@@ -57,5 +57,5 @@ Raw latency CSVs: `boards/arty_s7_50/tests/` and `boards/max10_08_eval/tests/`.
 | Suite | Count | Status |
 |-------|-------|--------|
 | Czech Z-machine conformance | 368/368 | Pass |
-| Memory unit tests | 119/119 | Pass |
+| Memory unit tests | 133/133 | Pass |
 | Verilator RTL regression (Tier 1) | 13/13 | Pass |

@@ -208,7 +208,7 @@ Significant firmware work between the February production builds and public rele
 
 ## June 2026 — Public Release
 
-119 unit tests passing. Z-machine V3 conformance (368/368). Three game walkthroughs
+133 unit tests passing. Z-machine V3 conformance (368/368). Three game walkthroughs
 verified on all four targets. Dual simulator support. Automated end-to-end hardware
 testing with latency tracking and @capture directive support.
 
@@ -227,7 +227,7 @@ testing with latency tracking and @capture directive support.
 | SERV CPU size | ~200 LUTs |
 | XIP cache speedup | 2.7× median (Arty S7-50) |
 | Game capacity (MAX10) | up to 126 KB |
-| Unit tests | 119 / 119 passing |
+| Unit tests | 133 / 133 passing |
 | Z3 conformance tests | 368 / 368 passing |
 | Game walkthroughs verified | 3 (Restaurant, Plundered Hearts, Seastalker) × 4 targets |
 | Hardware-verified saves | Yes (wear-leveling, Feb 12, 2026) |

@@ -440,6 +440,73 @@ static void test_flash_access(void) {
     zmem_cleanup(&state);
 }
 
+static void test_boundary_edges(void) {
+    TEST_SECTION("Boundary Edge Tests");
+
+    zmem_state_t state;
+    zmem_config_t config = {
+        .staticmem_addr = 128,
+        .story_size = 256
+    };
+
+    int result = zmem_init(&state, &config, full_story_data, sizeof(full_story_data));
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+
+    zmem_byte_t byte_val;
+    zmem_word_t word_val;
+
+    /* Last RAM byte (staticmem_addr - 1) must be writable */
+    result = zmem_write_byte(&state, 127, 0xFE);
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+    result = zmem_read_byte(&state, 127, &byte_val);
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+    TEST_ASSERT(byte_val == 0xFE);
+
+    /* Last full word in RAM (staticmem_addr - 2) must be writable */
+    result = zmem_write_word(&state, 126, 0xCAFE);
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+    result = zmem_read_word(&state, 126, &word_val);
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+    TEST_ASSERT(word_val == 0xCAFE);
+
+    /* Cross-boundary word read: byte from RAM then byte from flash */
+    zmem_write_byte(&state, 127, 127);  /* restore pattern */
+    result = zmem_read_word(&state, 127, &word_val);
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+    TEST_ASSERT(word_val == ((127 << 8) | (0xFF - 128)));
+
+    /* Word read where second byte is OOB must fail */
+    result = zmem_read_word(&state, 255, &word_val);
+    TEST_ASSERT(result == ZMEM_ERROR_OUT_OF_BOUNDS);
+
+    /* staticmem_addr equal to story_size: no static region — invalid */
+    zmem_state_t edge_state;
+    zmem_config_t edge_config = { .staticmem_addr = 256, .story_size = 256 };
+    result = zmem_init(&edge_state, &edge_config, full_story_data, sizeof(full_story_data));
+    TEST_ASSERT(result == ZMEM_ERROR_BAD_SIZE);
+
+    zmem_cleanup(&state);
+}
+
+static void test_double_cleanup(void) {
+    TEST_SECTION("Double Cleanup Safety Test");
+
+    zmem_state_t state;
+    zmem_config_t config = {
+        .staticmem_addr = 128,
+        .story_size = 256
+    };
+
+    int result = zmem_init(&state, &config, full_story_data, sizeof(full_story_data));
+    TEST_ASSERT(result == ZMEM_SUCCESS);
+
+    zmem_cleanup(&state);
+    TEST_ASSERT(state.ram_buffer == NULL);
+
+    zmem_cleanup(&state);  /* must not crash or double-free */
+    TEST_ASSERT(state.ram_buffer == NULL);
+}
+
 /* Main test runner */
 int main(void) {
     printf("Split Memory Architecture Unit Tests\n");
@@ -459,6 +526,8 @@ int main(void) {
     test_embedded_cleanup();
     test_embedded_init_validation();
     test_flash_access();
+    test_boundary_edges();
+    test_double_cleanup();
 
     /* Print results */
     printf("\n====================================\n");
