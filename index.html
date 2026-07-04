@@ -233,7 +233,7 @@
 <div class="hero">
   <div class="hero-prompt"><span class="ps">$ </span>./zvibe restaurant.z3</div>
   <h1>Infocom's memory model.<br><em>Flash instead of disk.</em></h1>
-  <p class="hero-sub">Static story content in flash, read in-place at memory speed. Dynamic state in a 16&thinsp;KB buffer. Delta-compressed saves. No OS. No heap. One C library, ARM to FPGA to browser.</p>
+  <p class="hero-sub">Static story content in flash, read in-place via XIP. Dynamic state in a 16&thinsp;KB buffer. Delta-compressed saves. No heap. Same C core from bare-metal FPGA to desktop, with a browser-based terminal.</p>
   <div class="ctas">
     <a class="btn-p" href="https://github.com/emuck/zvibe">View on GitHub</a>
     <a class="btn-s" href="#what">What is a Z-machine? ↓</a>
@@ -252,8 +252,8 @@
   <div class="inner">
     <div class="label">Background</div>
     <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
-    <p class="body-p">In 1979, Infocom created a portable virtual machine for text adventure games. Write a game once. Run it on every computer that existed. The same compiled bytecode played on Apple&nbsp;II, CP/M, DOS, and Atari — minimum 32&thinsp;KB RAM. <a href="https://www.filfre.net/2012/01/zil-and-the-z-machine/" target="_blank" rel="noopener" class="src-link">↗</a></p>
-    <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. They demanded more from a reader than any modern game asks of a player. Millions of people learned to type at one.</p>
+    <p class="body-p">In 1979, Infocom built the Z-machine: one story file, many platforms. A platform-specific interpreter handled the rest. The same compiled bytecode ran on Apple&nbsp;II, CP/M, DOS, and Atari — on machines with 32&thinsp;KB of total system RAM. <a href="https://www.filfre.net/2012/01/zil-and-the-z-machine/" target="_blank" rel="noopener" class="src-link">↗</a></p>
+    <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. Parser games at their peak.</p>
     <p class="body-p">ZVibe applies the same architecture to bare-metal embedded hardware. Static content in flash instead of on disk. Dynamic state in 16&thinsp;KB of BRAM. No OS overhead. Same split — different storage.</p>
 
     <div class="timeline">
@@ -281,19 +281,19 @@
   <div class="inner">
     <div class="label">Architecture</div>
     <h2>Every byte earns its place.</h2>
-    <p class="body-p">Infocom's interpreters kept only the dynamic portion of a story in RAM and paged static content from disk. The insight was right. The storage was the bottleneck. ZVibe replaces the disk with flash — reads at memory speed, no seek latency — and pushes the same principle further.</p>
+    <p class="body-p">Infocom's split-memory design kept mutable story state in RAM while reading read-only content from external storage as needed. The storage was the bottleneck. ZVibe replaces the disk with flash — reads in place over XIP, no seek latency — and pushes the same principle further.</p>
 
     <div class="mem-grid">
       <div class="mem-card">
         <div class="mem-tag">RAM</div>
         <h3>Split static/dynamic memory</h3>
-        <p>The story file is partitioned at load time. Static content (strings, object tables, grammar) stays in flash, read in-place via XIP. Only mutable state (globals, object properties, call stack) is copied to RAM.</p>
-        <div class="mem-result">16 KB dynamic buffer &nbsp;·&nbsp; static content reads from flash at memory speed</div>
+        <p>The story file is partitioned at load time. Bytes below the static-memory boundary are copied to RAM. Bytes above it are read in place from flash via XIP — strings, grammar, and object definitions never touch RAM.</p>
+        <div class="mem-result">16 KB dynamic buffer &nbsp;·&nbsp; static content stays in flash</div>
       </div>
       <div class="mem-card">
         <div class="mem-tag">Heap</div>
         <h3>No dynamic allocation</h3>
-        <p>All state is statically sized at compile time. No malloc, no free, no fragmentation. Memory layout is fully auditable before the first instruction executes. Required for bare-metal targets with no MMU.</p>
+        <p>All state is statically sized at compile time. No malloc, no free, no fragmentation. Memory layout is fully auditable before the first instruction executes. Execution is deterministic and the worst-case footprint is known at build time.</p>
         <div class="mem-result">Zero heap &nbsp;·&nbsp; deterministic footprint &nbsp;·&nbsp; no runtime surprises</div>
       </div>
       <div class="mem-card">
