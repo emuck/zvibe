@@ -282,6 +282,13 @@
     <div class="label">Architecture</div>
     <h2>Every byte earns its place.</h2>
     <p class="body-p">Infocom's split-memory design kept mutable story state in RAM while reading read-only content from external storage as needed. The storage was the bottleneck. ZVibe replaces the disk with flash — reads in place over XIP, no seek latency — and pushes the same principle further.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:.6rem;margin:1.75rem 0 2rem;">
+      <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">no heap at runtime</span>
+      <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">static footprint known at build time</span>
+      <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">measure on physical hardware</span>
+      <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">v3 spec only — scope is a constraint, not a gap</span>
+      <span style="font-family:var(--mono);font-size:.8rem;padding:.35rem .75rem;border:1px solid var(--border);border-radius:3px;color:var(--text-lo);">one C core across all targets</span>
+    </div>
 
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" role="img" aria-label="ZVibe architecture: story file split at staticmem boundary into dynamic RAM buffer and static flash, both feeding a C99 interpreter targeting ARM, FPGA, desktop, and web" style="width:100%;max-width:660px;display:block;margin:2rem auto 2.5rem;">
       <defs>
@@ -454,6 +461,7 @@
   <div class="inner">
     <div class="label">Metrics</div>
     <h2>By the numbers.</h2>
+    <p class="body-p" style="margin-bottom:2rem;font-size:.9rem;color:var(--text-lo);">Response times measured on physical hardware via automated 232-command game replays. Median across full playthrough. Cache speedup measured with and without the 4&thinsp;KB BRAM XIP cache on Arty S7-50.</p>
     <div class="stats">
       <div class="stat">
         <span class="stat-v">16&thinsp;KB</span>
