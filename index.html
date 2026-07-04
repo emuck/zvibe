@@ -251,7 +251,7 @@
 <section id="what">
   <div class="inner">
     <div class="label">Background</div>
-    <h2>Before iOS. Before Windows.<br>Before the graphical screen.</h2>
+    <h2>The 1979 VM trick<br>still works.</h2>
     <p class="body-p">In 1979, Infocom built the Z-machine: one story file, many platforms. A platform-specific interpreter handled the rest. The same compiled bytecode ran on Apple&nbsp;II, Atari, TRS-80, and IBM&nbsp;PC — on machines with 32&thinsp;KB of total system RAM. <a href="https://www.filfre.net/2012/01/zil-and-the-z-machine/" target="_blank" rel="noopener" class="src-link">↗</a></p>
     <p class="body-p"><em>Zork</em>. <em>The Hitchhiker's Guide to the Galaxy</em>. <em>Planetfall</em>. Parser games at their peak.</p>
     <p class="body-p">ZVibe applies the same architecture to bare-metal embedded hardware. Static content in flash instead of on disk. Dynamic state in RAM. No OS overhead. Same split — different storage.</p>
@@ -323,7 +323,7 @@
       <text x="230" y="164" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="12" font-weight="600" fill="#4af26a">dynamic</text>
       <text x="230" y="180" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#c8c8c8">mutable state</text>
       <text x="230" y="196" text-anchor="middle" font-family="'Courier New',Courier,monospace" font-size="11" fill="#4af26a">&#x2192; RAM &nbsp;&middot;&nbsp; 16 KB</text>
-      <text x="230" y="213" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">globals &nbsp;&middot;&nbsp; props &nbsp;&middot;&nbsp; stack</text>
+      <text x="230" y="213" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#5a5a5a">below staticmem boundary</text>
 
       <!-- static box -->
       <rect x="348" y="144" width="164" height="84" rx="5" fill="#131313" stroke="#232323" stroke-width="1.5"/>
@@ -409,7 +409,7 @@
       </div>
     </div>
 
-    <p class="body-p" style="margin-top:2rem;color:var(--text-lo);font-size:.9rem;"><strong style="color:var(--text);">v3 only.</strong> Z-machine v3 is the last version where the full spec fits a static-allocation model. Later versions add undo stacks, sound, and variable-length encodings that require heap allocation and break the memory guarantees this design depends on. v4 support is possible in the future — <em>Bureaucracy</em> and <em>Trinity</em> are good reasons to revisit.</p>
+    <p class="body-p" style="margin-top:2rem;color:var(--text-lo);font-size:.9rem;"><strong style="color:var(--text);">v3 only.</strong> Z-machine v3 is the last version where the full spec fits a static-allocation model. Later versions add undo stacks, sound, and variable-length encodings that undermine the static-allocation model this design depends on. v4 support is possible in the future — <em>Bureaucracy</em> and <em>Trinity</em> are good reasons to revisit.</p>
   </div>
 </section>
 
@@ -557,7 +557,7 @@ make clean &amp;&amp; make
   <div class="inner">
     <div class="label">Contributing</div>
     <h2>Good places to start.</h2>
-    <p class="body-p">The console target builds with a C compiler and Make — no hardware required. Core interpreter work, test coverage, and game scripts are fully accessible from a laptop.</p>
+    <p class="body-p">The console target builds with a C compiler and Make — no hardware required. Core interpreter work, test coverage, and game scripts are fully accessible from a laptop. Core work can be done entirely from the console target and test suite; no FPGA toolchain required.</p>
     <ul style="margin:1.5rem 0 2rem;padding-left:1.25rem;line-height:2;color:var(--text);">
       <li><strong>New game walkthrough script</strong> — add a <code>test_uart.py</code>-compatible replay for any v3 story file; extends hardware regression coverage across all targets</li>
       <li><strong>Unit test coverage</strong> — <code>test_split_memory.c</code> covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet</li>
