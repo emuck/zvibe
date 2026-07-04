@@ -544,6 +544,26 @@ make clean &amp;&amp; make
   </div>
 </section>
 
+<!-- CONTRIBUTING -->
+<section id="contribute">
+  <div class="inner">
+    <div class="label">Contributing</div>
+    <h2>Good places to start.</h2>
+    <p class="body-p">The console target builds with a C compiler and Make — no hardware required. Core interpreter work, test coverage, and game scripts are fully accessible from a laptop.</p>
+    <ul style="margin:1.5rem 0 2rem;padding-left:1.25rem;line-height:2;color:var(--text);">
+      <li><strong>New game walkthrough script</strong> — add a <code>test_uart.py</code>-compatible replay for any v3 story file; extends hardware regression coverage across all targets</li>
+      <li><strong>Unit test coverage</strong> — <code>test_split_memory.c</code> covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet</li>
+      <li><strong>Console target improvements</strong> — status line rendering, save file compatibility, platform edge cases</li>
+      <li><strong>New board port</strong> — <a href="https://github.com/emuck/zvibe/blob/main/docs/TARGETS.md" style="color:var(--green);">TARGETS.md</a> has a porting checklist; any target with 32&thinsp;KB RAM and XIP-accessible flash is a candidate</li>
+      <li><strong>v4 groundwork</strong> — <em>Bureaucracy</em> and <em>Trinity</em> are the motivation; starts with undo stack design and extended object model</li>
+    </ul>
+    <div class="ctas" style="justify-content:flex-start;">
+      <a class="btn-s" href="https://github.com/emuck/zvibe/blob/main/CONTRIBUTING.md">CONTRIBUTING.md →</a>
+      <a class="btn-s" href="https://github.com/emuck/zvibe/issues">GitHub Issues →</a>
+    </div>
+  </div>
+</section>
+
 <footer>
   <p>ZVibe &nbsp;·&nbsp; BSD-3-Clause &nbsp;·&nbsp; <a href="https://github.com/emuck/zvibe">github.com/emuck/zvibe</a></p>
 </footer>

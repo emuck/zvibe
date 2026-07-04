@@ -156,5 +156,13 @@ See [NOTICE](NOTICE) for full texts.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Good starting points — no embedded hardware required for most:
+
+- **New game walkthrough script** — add a `test_uart.py`-compatible replay for any v3 story file; extends hardware regression coverage across all targets
+- **Unit test coverage** — `test_split_memory.c` covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet
+- **Console target improvements** — status line rendering, save file compatibility, platform edge cases
+- **New board port** — `docs/TARGETS.md` has a porting checklist; any target with 32 KB RAM and XIP-accessible flash is a candidate
+- **v4 groundwork** — *Bureaucracy* and *Trinity* are the motivation; starts with undo stack design and extended object model
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and PR checklist.
 Bugs and feature requests: [GitHub Issues](https://github.com/emuck/zvibe/issues).
