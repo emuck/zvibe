@@ -23,6 +23,7 @@ INCLUDES := \
 SRCS := \
     main.c \
     $(WEBTERM)/webterm_session.c \
+    $(WEBTERM)/cartographer.c \
     $(ZVIBE_ROOT)/src/api/zvibe_api.c \
     $(ZVIBE_ROOT)/src/core/zvibe_core.c \
     $(ZVIBE_ROOT)/src/core/zvibe_memory.c \

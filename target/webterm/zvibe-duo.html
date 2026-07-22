@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>zVibe — Webterm + Cartographer</title>
+<style>
+  :root {
+    --field:      #10131d;
+    --field-deep: #0a0c14;
+    --grid-line:  rgba(122,138,180,0.07);
+    --ink:        #e9e3d0;
+    --ink-dim:    #8d8a79;
+    --ink-faint:  #55534a;
+    --lantern:    #f5b04c;
+    --lantern-hi: #ffd9a0;
+    --rule:       rgba(233,227,208,0.08);
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+    --serif: Iowan Old Style, Palatino, Georgia, serif;
+    --mapw: 42%;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--field-deep); color: var(--ink);
+    font-family: var(--mono);
+    display: flex; flex-direction: column;
+  }
+
+  /* ── header ─────────────────────────────────────────── */
+  header {
+    display: flex; align-items: baseline; gap: 20px;
+    padding: 13px 20px 11px; border-bottom: 1px solid var(--rule);
+    flex-wrap: wrap;
+  }
+  header h1 {
+    font-family: var(--serif); font-size: 15px; font-weight: 600;
+    letter-spacing: 0.22em; text-transform: uppercase;
+  }
+  header h1 span { color: var(--lantern); }
+  header .sub { font-size: 11px; color: var(--ink-dim); }
+  header .stats {
+    margin-left: auto; font-size: 11px; color: var(--ink-dim);
+    display: flex; gap: 16px;
+  }
+  header .stats b { color: var(--ink); font-weight: 500; }
+
+  /* ── main split ─────────────────────────────────────── */
+  main { flex: 1; display: flex; min-height: 0; position: relative; }
+
+  /* terminal pane */
+  #term {
+    flex: 1; min-width: 0; display: flex; flex-direction: column;
+    background: var(--field-deep);
+  }
+  #scroll {
+    flex: 1; overflow-y: auto; padding: 18px 22px 8px;
+    font-size: 13.5px; line-height: 1.62;
+    scrollbar-width: thin; scrollbar-color: var(--ink-faint) transparent;
+  }
+  #scroll .room  { color: var(--ink); font-weight: 600; margin-top: 10px; }
+  #scroll .desc  { color: var(--ink-dim); max-width: 62ch; }
+  #scroll .echo  { color: var(--lantern); margin-top: 10px; }
+  #promptline {
+    padding: 4px 22px 10px; font-size: 13.5px;
+    border-bottom: 1px solid var(--rule);
+  }
+  #promptline .prompt { color: var(--lantern); }
+  #promptline .cursor {
+    display: inline-block; width: 8px; height: 15px;
+    background: var(--lantern); vertical-align: -2px;
+    animation: blink 1.1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .controls { display: flex; gap: 8px; padding: 10px 22px 12px; }
+  .controls button {
+    font-family: var(--mono); font-size: 12px;
+    background: transparent; color: var(--ink);
+    border: 1px solid rgba(233,227,208,0.22); border-radius: 5px;
+    padding: 6px 14px; cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .controls button:hover { border-color: var(--lantern); color: var(--lantern-hi); }
+  .controls button:focus-visible, nav button:focus-visible,
+  #fitbtn:focus-visible, #maptoggle:focus-visible {
+    outline: 2px solid var(--lantern); outline-offset: 2px;
+  }
+  .controls button#play { min-width: 76px; }
+
+  /* gutter */
+  #gutter {
+    width: 7px; cursor: col-resize; flex: none;
+    background: linear-gradient(90deg, transparent 2px, var(--rule) 3px,
+                var(--rule) 4px, transparent 5px);
+  }
+  #gutter:hover { background: linear-gradient(90deg, transparent 2px,
+                var(--lantern) 3px, var(--lantern) 4px, transparent 5px); }
+
+  /* map pane */
+  #stage {
+    flex: none; width: var(--mapw); min-width: 260px;
+    position: relative; background: var(--field); cursor: grab;
+    transition: box-shadow .3s;
+  }
+  #stage.dragging { cursor: grabbing; }
+  #stage svg { display: block; width: 100%; height: 100%; }
+  #vignette {
+    position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse 75% 70% at 50% 46%,
+      transparent 55%, rgba(6,7,12,0.55) 88%, rgba(4,5,9,0.85) 100%);
+  }
+  nav#tabs {
+    display: flex; gap: 6px; position: absolute; top: 12px; left: 14px; z-index: 5;
+  }
+  nav button {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    background: rgba(16,19,29,0.85); color: var(--ink-dim);
+    border: 1px solid rgba(233,227,208,0.14); border-radius: 4px;
+    padding: 5px 12px; cursor: pointer; backdrop-filter: blur(4px);
+    transition: color .2s, border-color .2s;
+  }
+  nav button:hover { color: var(--ink); }
+  nav button.active { color: var(--lantern); border-color: rgba(245,176,76,0.5); }
+
+  #legend {
+    position: absolute; right: 14px; bottom: 12px; z-index: 5;
+    font-size: 10px; color: var(--ink-dim);
+    display: flex; flex-direction: column; gap: 5px;
+    background: rgba(10,12,20,0.7); backdrop-filter: blur(4px);
+    border: 1px solid var(--rule); border-radius: 6px; padding: 9px 11px;
+  }
+  #legend .row { display: flex; align-items: center; gap: 8px; }
+  #legend svg { width: 30px; height: 10px; overflow: visible; }
+
+  #fitbtn {
+    position: absolute; top: 12px; right: 12px; z-index: 6;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em;
+    background: rgba(16,19,29,0.85); color: var(--ink-dim);
+    border: 1px solid rgba(233,227,208,0.14); border-radius: 4px;
+    padding: 5px 12px; cursor: pointer; backdrop-filter: blur(4px);
+    transition: color .2s, border-color .2s;
+  }
+  #stage[data-fit="false"] #fitbtn {
+    color: var(--lantern); border-color: rgba(245,176,76,0.5);
+  }
+
+  /* map toggle chip in header */
+  #maptoggle {
+    font-family: var(--mono); font-size: 11px;
+    background: transparent; color: var(--ink-dim);
+    border: 1px solid rgba(233,227,208,0.2); border-radius: 4px;
+    padding: 4px 10px; cursor: pointer;
+    transition: color .2s, border-color .2s;
+  }
+  #maptoggle:hover { color: var(--ink); }
+  #maptoggle.attn { color: var(--lantern-hi); border-color: var(--lantern); }
+  body.map-hidden #stage, body.map-hidden #gutter { display: none; }
+
+  /* ── narrow: horizontal split, map band on top ──────── */
+  @media (max-width: 880px) {
+    main { flex-direction: column-reverse; }
+    #gutter {
+      width: auto; height: 7px; cursor: row-resize;
+      background: linear-gradient(180deg, transparent 2px, var(--rule) 3px,
+                  var(--rule) 4px, transparent 5px);
+    }
+    #gutter:hover { background: linear-gradient(180deg, transparent 2px,
+                  var(--lantern) 3px, var(--lantern) 4px, transparent 5px); }
+    #stage {
+      width: auto; min-width: 0;
+      height: var(--maph, 32vh); min-height: 130px;
+    }
+    #legend { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    #promptline .cursor { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>zVibe <span>Cartographer</span></h1>
+  <div class="sub">webterm + live auto-map · synthetic walkthrough</div>
+  <div class="stats">
+    <div>turn <b id="stat-turn">0</b></div>
+    <div>rooms <b id="stat-rooms">0</b></div>
+    <div>passages <b id="stat-edges">0</b></div>
+    <button id="maptoggle">Hide map</button>
+  </div>
+</header>
+
+<main>
+  <div id="term">
+    <div id="scroll"></div>
+    <div id="promptline"><span class="prompt">&gt;&nbsp;</span><span id="cmd"></span><span class="cursor"></span></div>
+    <div class="controls">
+      <button id="play">▶ Play</button>
+      <button id="step">Step</button>
+      <button id="speed">1×</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+  <div id="gutter" aria-hidden="true"></div>
+
+  <div id="stage">
+    <nav id="tabs"></nav>
+    <svg id="map" aria-label="Auto-generated game map"></svg>
+    <div id="vignette"></div>
+    <button id="fitbtn" title="Fit explored level in view (f)">⌖ Fit</button>
+    <div id="legend">
+      <div class="row"><svg><line x1="0" y1="5" x2="30" y2="5" stroke="#8d8a79" stroke-width="1.5"/></svg>two-way passage</div>
+      <div class="row"><svg><line x1="0" y1="5" x2="24" y2="5" stroke="#8d8a79" stroke-width="1.5"/><path d="M24 1 30 5 24 9z" fill="#8d8a79"/></svg>one-way passage</div>
+      <div class="row"><svg><line x1="0" y1="5" x2="30" y2="5" stroke="#8d8a79" stroke-width="1.5" stroke-dasharray="3 4"/></svg>uncharted move</div>
+      <div class="row"><svg><text x="10" y="9" fill="#f5b04c" font-size="10">▲▼</text></svg>level link</div>
+    </div>
+  </div>
+</main>
+
+<script>
+"use strict";
+
+/* ══════════════════════════════════════════════════════════
+   ENGINE — pure logic, no DOM. Mirrors the real integration:
+   the interpreter core emits room-change events {cmd, id, name};
+   everything below lives frontend-side.
+   ══════════════════════════════════════════════════════════ */
+// ENGINE-BEGIN
+
+const DIR = {
+  n:[0,-1], s:[0,1], e:[1,0], w:[-1,0],
+  ne:[1,-1], nw:[-1,-1], se:[1,1], sw:[-1,1],
+};
+const ALIAS = {
+  north:"n", south:"s", east:"e", west:"w",
+  northeast:"ne", northwest:"nw", southeast:"se", southwest:"sw",
+  u:"up", d:"down", up:"up", down:"down", in:"in", out:"out",
+  enter:"in", exit:"out", climb:"up",
+};
+const OPP = { n:"s", s:"n", e:"w", w:"e", ne:"sw", sw:"ne", nw:"se", se:"nw",
+              up:"down", down:"up", in:"out", out:"in" };
+
+function normalizeDir(cmd) {
+  const w = cmd.trim().toLowerCase().split(/\s+/)[0];
+  if (DIR[w] || w === "up" || w === "down" || w === "in" || w === "out") return ALIAS[w] || w;
+  return ALIAS[w] || null;
+}
+
+/* Mapper: consumes room-change events, owns the graph. */
+class Mapper {
+  constructor() {
+    this.nodes = new Map();       // id → {id, name, level, x, y, displaced, crossLinks:[]}
+    this.edges = [];              // {from, to, dir|null, oneWay, dashed, level}
+    this.current = null;
+  }
+
+  /* One event = the player's location global changed after `cmd`. */
+  observe(cmd, id, name) {
+    const prev = this.current ? this.nodes.get(this.current) : null;
+    const dir = cmd == null ? null : normalizeDir(cmd);
+    let node = this.nodes.get(id);
+    const added = [];
+
+    if (!node) {
+      node = this.place(id, name, prev, dir);
+      this.nodes.set(id, node);
+      added.push({ type: "node", node });
+    }
+    if (prev && prev.id !== id) {
+      const e = this.link(prev, node, dir);
+      if (e) added.push({ type: e.cross ? "cross" : "edge", edge: e });
+    }
+    this.current = id;
+    return added;
+  }
+
+  /* Grid placement with spiral fallback on conflict. */
+  place(id, name, prev, dir) {
+    if (!prev) return { id, name, level: 0, x: 0, y: 0, crossLinks: [] };
+
+    const level = dir === "up"   ? prev.level + 1
+                : dir === "down" ? prev.level - 1
+                : prev.level;
+
+    let ideal;
+    if (dir === "up" || dir === "down") {
+      ideal = [prev.x, prev.y];                       // same footprint, new level
+    } else if (DIR[dir]) {
+      ideal = [prev.x + DIR[dir][0], prev.y + DIR[dir][1]];
+    } else {                                          // in/out/unclassified
+      ideal = this.firstFreeNeighbor(prev, level) || [prev.x + 1, prev.y];
+    }
+
+    const [x, y, displaced] = this.resolve(ideal[0], ideal[1], level);
+    return { id, name, level, x, y, displaced, crossLinks: [] };
+  }
+
+  firstFreeNeighbor(prev, level) {
+    for (const d of ["e", "w", "s", "n"]) {
+      const p = [prev.x + DIR[d][0], prev.y + DIR[d][1]];
+      if (!this.occupied(p[0], p[1], level)) return p;
+    }
+    return null;
+  }
+
+  occupied(x, y, level) {
+    for (const n of this.nodes.values())
+      if (n.level === level && n.x === x && n.y === y) return true;
+    return false;
+  }
+
+  /* Ring-search outward from the ideal cell for the nearest free one. */
+  resolve(x, y, level) {
+    if (!this.occupied(x, y, level)) return [x, y, false];
+    for (let r = 1; r <= 8; r++) {
+      const ring = [];
+      for (let dx = -r; dx <= r; dx++)
+        for (let dy = -r; dy <= r; dy++)
+          if (Math.max(Math.abs(dx), Math.abs(dy)) === r)
+            ring.push([x + dx, y + dy, dx*dx + dy*dy]);
+      ring.sort((a, b) => a[2] - b[2]);
+      for (const [cx, cy] of ring)
+        if (!this.occupied(cx, cy, level)) return [cx, cy, true];
+    }
+    return [x, y, true];  // pathological; overlap rather than lose the room
+  }
+
+  /* Record an observed passage. Merges reciprocal pairs into two-way. */
+  link(a, b, dir) {
+    if (a.level !== b.level) {                        // level link → badges
+      if (!a.crossLinks.some(c => c.to === b.id)) {
+        a.crossLinks.push({ to: b.id, dir: dir || "?" });
+        b.crossLinks.push({ to: a.id, dir: dir ? OPP[dir] : "?" });
+        return { from: a.id, to: b.id, cross: true };
+      }
+      return null;
+    }
+    // Reciprocal of an existing one-way? Upgrade it.
+    const rev = this.edges.find(e =>
+      e.from === b.id && e.to === a.id && e.oneWay &&
+      dir && e.dir && e.dir === OPP[dir]);
+    if (rev) { rev.oneWay = false; rev.upgraded = true; return null; }
+
+    // Exact duplicate observation?
+    if (this.edges.some(e => e.from === a.id && e.to === b.id &&
+        (e.dir === dir || (!e.dir && !dir)))) return null;
+
+    const e = { from: a.id, to: b.id, dir, oneWay: !!dir, dashed: !dir,
+                level: a.level };
+    if (!dir) e.oneWay = false;                       // dashed = undirected
+    this.edges.push(e);
+    return e;
+  }
+
+  levels() {
+    const s = new Set([...this.nodes.values()].map(n => n.level));
+    return [...s].sort((a, b) => b - a);
+  }
+}
+// ENGINE-END
+
+/* ══════════════════════════════════════════════════════════
+   WALKTHROUGH — synthetic Zork-ish event stream with transcript.
+   [cmd, roomId, roomName, transcriptText]; roomId null ⇒ no move.
+   ══════════════════════════════════════════════════════════ */
+const SCRIPT = [
+  [null, "WHOUSE", "West of House",
+   "An open field on the west side of a white house. The front door is boarded over."],
+  ["north", "NHOUSE", "North of House",
+   "The north face of the house. Every window here is barred."],
+  ["north", "FPATH", "Forest Path",
+   "A winding path through dim forest. One large tree has branches low enough to climb."],
+  ["climb tree", "UPTREE", "Up a Tree",
+   "You cling to a wide branch beside a small bird's nest. The forest floor is ten feet down."],
+  ["down", "FPATH", "Forest Path",
+   "Back on the forest path."],
+  ["east", "CLEAR", "Clearing",
+   "A quiet clearing. A metal grating is set into the ground here, locked from beneath."],
+  ["west", "FPATH", "Forest Path",
+   "The winding forest path."],
+  ["south", "NHOUSE", "North of House",
+   "The barred north side of the house."],
+  ["east", "BEHIND", "Behind House",
+   "Behind the house. A small window is open a crack."],
+  ["south", "SHOUSE", "South of House",
+   "The south side of the house. No door, and the windows are boarded."],
+  ["west", "WHOUSE", "West of House",
+   "The open field west of the house."],
+  ["north", "NHOUSE", "North of House",
+   "The barred north side of the house."],
+  ["east", "BEHIND", "Behind House",
+   "Behind the house, by the window."],
+  ["open window", null, null,
+   "With some effort, the window opens wide enough to enter."],
+  ["enter window", "KITCH", "Kitchen",
+   "The kitchen. A table holds a sack and a glass bottle. A staircase leads upward."],
+  ["up", "ATTIC", "Attic",
+   "A dusty attic. A coil of rope lies in the corner."],
+  ["down", "KITCH", "Kitchen",
+   "The kitchen again."],
+  ["west", "LIVING", "Living Room",
+   "A living room with a trophy case, an oriental rug — and a brass lantern on a hook."],
+  ["take lantern", null, null,
+   "Taken. Its flame throws long shadows."],
+  ["move rug", null, null,
+   "Moving the rug reveals the outline of a trap door."],
+  ["open trap door", null, null,
+   "The trap door creaks open over a staircase descending into darkness."],
+  ["down", "CELLAR", "Cellar",
+   "A damp cellar. Behind you, the trap door slams shut."],
+  ["north", "TROLL", "The Troll Room",
+   "A squarish chamber. A nasty troll guards the western passage, axe in hand."],
+  ["east", "EWPASS", "East-West Passage",
+   "A narrow east–west passage, its walls slick with condensation."],
+  ["east", "ROUND", "Round Room",
+   "A circular chamber where several passages converge."],
+  ["south", "MIRR1", "Mirror Room",
+   "A cold room dominated by an enormous mirror in a wooden frame."],
+  ["touch mirror", "MIRR2", "Mirror Room",
+   "There is a low rumble, and your surroundings shift — the same room, yet everything is reversed."],
+  ["touch mirror", "MIRR1", "Mirror Room",
+   "The rumble again. You are back where you began. Probably."],
+  ["north", "ROUND", "Round Room",
+   "The circular chamber."],
+  ["west", "EWPASS", "East-West Passage",
+   "The slick east–west passage."],
+  ["west", "TROLL", "The Troll Room",
+   "The troll bars the way west, grinning unpleasantly."],
+  ["kill troll with sword", null, null,
+   "You swing; the troll parries once, staggers, and dissolves into black mist. The way west is clear."],
+  ["west", "MAZE1", "Maze",
+   "Twisting passages of rough stone, each indistinguishable from the last."],
+  ["west", "MAZE2", "Maze",
+   "More twisting passages. This could be anywhere."],
+  ["west", "MAZE1", "Maze",
+   "Twisting passages. Wait — haven't you been here?"],
+  ["south", "MAZE3", "Maze",
+   "Still more passages. Your footprints in the dust are the only landmarks."],
+  ["northeast", "GRATE", "Grating Room",
+   "A dead end below a metal grating. Daylight filters through from above."],
+  ["open grating", null, null,
+   "The lock yields. The grating swings open."],
+  ["up", "CLEAR", "Clearing",
+   "You climb out of the grating and into the clearing. Sunlight. You know exactly where you are."],
+];
+
+/* ══════════════════════════════════════════════════════════
+   RENDERER — SVG, grid-paper field, lantern-lit current room.
+   ══════════════════════════════════════════════════════════ */
+const CW = 156, CH = 112;          // grid cell
+const RW = 118, RH = 62, RX = 9;   // room rect
+const NS = "http://www.w3.org/2000/svg";
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const el = (tag, attrs = {}, parent) => {
+  const n = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+  if (parent) parent.appendChild(n);
+  return n;
+};
+const cx = n => n.x * CW, cy = n => n.y * CH;
+
+class Renderer {
+  constructor(svg, mapper) {
+    this.svg = svg; this.m = mapper;
+    this.levelGroups = new Map();
+    this.activeLevel = 0;
+    this.buildDefs();
+    el("rect", { fill: "url(#grid)", x: -6000, y: -6000,
+                 width: 12000, height: 12000 }, svg);
+    this.world = el("g", {}, svg);
+    this.lamp = el("circle", { r: 130, fill: "url(#lamp)",
+                               style: "pointer-events:none" });
+    this.marker = null;
+  }
+
+  buildDefs() {
+    const defs = el("defs", {}, this.svg);
+    const pat = el("pattern", { id: "grid", width: CW/2, height: CH/2,
+                                patternUnits: "userSpaceOnUse" }, defs);
+    el("path", { d: `M ${CW/2} 0 L 0 0 0 ${CH/2}`, fill: "none",
+                 stroke: "var(--grid-line)", "stroke-width": 1 }, pat);
+    const lamp = el("radialGradient", { id: "lamp" }, defs);
+    el("stop", { offset: "0%",  "stop-color": "rgba(245,176,76,0.16)" }, lamp);
+    el("stop", { offset: "55%", "stop-color": "rgba(245,176,76,0.05)" }, lamp);
+    el("stop", { offset: "100%","stop-color": "rgba(245,176,76,0)"   }, lamp);
+    const glow = el("filter", { id: "glow", x: "-60%", y: "-60%",
+                                width: "220%", height: "220%" }, defs);
+    el("feGaussianBlur", { stdDeviation: 5, result: "b" }, glow);
+    const mg = el("feMerge", {}, glow);
+    el("feMergeNode", { in: "b" }, mg);
+    el("feMergeNode", { in: "SourceGraphic" }, mg);
+    const mk = el("marker", { id: "arrow", viewBox: "0 0 10 10",
+      refX: 8, refY: 5, markerWidth: 6.5, markerHeight: 6.5,
+      orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M 0 0 L 10 5 L 0 10 z", fill: "var(--ink-dim)" }, mk);
+  }
+
+  group(level) {
+    if (!this.levelGroups.has(level)) {
+      const g = el("g", { opacity: level === this.activeLevel ? 1 : 0,
+                          style: "transition: opacity .35s" }, this.world);
+      g.style.pointerEvents = level === this.activeLevel ? "auto" : "none";
+      this.levelGroups.set(level, { g,
+        edges: el("g", {}, g), nodes: el("g", {}, g) });
+    }
+    return this.levelGroups.get(level);
+  }
+
+  setLevel(level) {
+    this.activeLevel = level;
+    for (const [lv, { g }] of this.levelGroups) {
+      g.setAttribute("opacity", lv === level ? 1 : 0);
+      g.style.pointerEvents = lv === level ? "auto" : "none";
+    }
+  }
+
+  /* ── nodes ── */
+  drawNode(n) {
+    const { nodes } = this.group(n.level);
+    const g = el("g", { transform: `translate(${cx(n)},${cy(n)})`,
+                        "data-id": n.id }, nodes);
+    el("rect", { x: -RW/2, y: -RH/2, width: RW, height: RH, rx: RX,
+                 fill: "rgba(20,24,38,0.92)", stroke: "var(--ink-dim)",
+                 "stroke-width": 1.25 }, g);
+    const lines = this.wrap(n.name, 15);
+    const t = el("text", { "text-anchor": "middle", fill: "var(--ink)",
+                 "font-size": 11.5, "font-family": "var(--mono)",
+                 y: lines.length > 1 ? -3 : 4 }, g);
+    lines.forEach((ln, i) =>
+      el("tspan", { x: 0, dy: i ? 14 : 0 }, t).textContent = ln);
+    if (!REDUCED) {
+      g.animate([{ opacity: 0, transform:
+        `translate(${cx(n)}px,${cy(n)}px) scale(.6)` },
+        { opacity: 1, transform:
+        `translate(${cx(n)}px,${cy(n)}px) scale(1)` }],
+        { duration: 420, easing: "cubic-bezier(.2,1.4,.4,1)" });
+    }
+    return g;
+  }
+
+  drawCrossBadges(n) {
+    const g = this.group(n.level).nodes
+      .querySelector(`g[data-id="${n.id}"]`);
+    if (!g) return;
+    g.querySelectorAll(".badge").forEach(b => b.remove());
+    n.crossLinks.forEach((c, i) => {
+      const up = c.dir === "up";
+      const b = el("text", { class: "badge", x: RW/2 - 12 - i * 14,
+        y: -RH/2 + 13, "font-size": 11, fill: "var(--lantern)",
+        "text-anchor": "middle", style: "cursor:pointer" }, g);
+      b.textContent = up ? "▲" : c.dir === "down" ? "▼" : "◆";
+      b.addEventListener("click", ev => {
+        ev.stopPropagation();
+        app.jumpTo(c.to);
+      });
+      el("title", {}, b).textContent =
+        (up ? "Up to " : c.dir === "down" ? "Down to " : "Leads to ") +
+        (this.m.nodes.get(c.to)?.name ?? "?");
+    });
+  }
+
+  /* ── edges ── */
+  drawEdge(e) {
+    const a = this.m.nodes.get(e.from), b = this.m.nodes.get(e.to);
+    const { edges } = this.group(e.level);
+
+    // Parallel edges between the same pair get opposite bows.
+    const twin = this.m.edges.some(o => o !== e &&
+      o.from === e.to && o.to === e.from && o.level === e.level);
+    const straightAligned = e.dir && DIR[e.dir] &&
+      b.x - a.x === DIR[e.dir][0] && b.y - a.y === DIR[e.dir][1];
+    const bow = twin ? 20 : (straightAligned && !e.dashed ? 0 : 16);
+
+    const p1 = this.trim(a, b), p2 = this.trim(b, a);
+    let d;
+    if (bow === 0) {
+      d = `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`;
+    } else {
+      const mx = (p1.x + p2.x)/2, my = (p1.y + p2.y)/2;
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ox = -dy/len * bow, oy = dx/len * bow;
+      d = `M ${p1.x} ${p1.y} Q ${mx+ox} ${my+oy} ${p2.x} ${p2.y}`;
+    }
+    const path = el("path", { d, fill: "none", stroke: "var(--ink-dim)",
+      "stroke-width": 1.5,
+      "marker-end": e.oneWay ? "url(#arrow)" : "none" }, edges);
+    if (e.dashed) path.setAttribute("stroke-dasharray", "4 6");
+
+    if (e.oneWay && e.dir) {                          // tiny direction tag
+      const mx = (p1.x + p2.x)/2, my = (p1.y + p2.y)/2;
+      const dx = p2.x-p1.x, dy = p2.y-p1.y, len = Math.hypot(dx,dy)||1;
+      const off = bow ? bow + 9 : 10;
+      el("text", { x: mx - dy/len*off, y: my + dx/len*off + 3,
+        "font-size": 9, fill: "var(--ink-faint)", "text-anchor": "middle",
+        "font-family": "var(--mono)" }, edges)
+        .textContent = e.dir.toUpperCase();
+    }
+    if (!REDUCED && !e.dashed) {                      // ink-in animation
+      const L = path.getTotalLength();
+      path.style.strokeDasharray = L;
+      path.style.strokeDashoffset = L;
+      path.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }],
+        { duration: 380, easing: "ease-out" })
+        .finished.then(() => {
+          path.style.strokeDasharray = "none";
+          path.style.strokeDashoffset = 0;
+        });
+    }
+    e.el = path;
+    return path;
+  }
+
+  /* Upgraded one-way → two-way: drop the arrowhead. */
+  refreshUpgraded() {
+    for (const e of this.m.edges)
+      if (e.upgraded && e.el) {
+        e.el.setAttribute("marker-end", "none");
+        e.upgraded = false;
+      }
+  }
+
+  /* Shorten segment endpoint to the border of room rect at node n. */
+  trim(n, toward) {
+    const dx = cx(toward) - cx(n), dy = cy(toward) - cy(n);
+    const sx = dx === 0 ? Infinity : (RW/2 + 4) / Math.abs(dx);
+    const sy = dy === 0 ? Infinity : (RH/2 + 4) / Math.abs(dy);
+    const s = Math.min(sx, sy, 0.5);
+    return { x: cx(n) + dx * s, y: cy(n) + dy * s };
+  }
+
+  /* ── current-room lantern ── */
+  highlight(id) {
+    const n = this.m.nodes.get(id);
+    if (!n) return;
+    const grp = this.group(n.level);
+    if (this.marker) this.marker.remove();
+    if (this.lamp.parentNode) this.lamp.remove();
+    grp.edges.before(this.lamp);
+    this.lamp.setAttribute("cx", cx(n));
+    this.lamp.setAttribute("cy", cy(n));
+    this.marker = el("rect", { x: cx(n)-RW/2-4, y: cy(n)-RH/2-4,
+      width: RW+8, height: RH+8, rx: RX+3, fill: "none",
+      stroke: "var(--lantern)", "stroke-width": 1.75,
+      filter: "url(#glow)", style: "pointer-events:none" }, grp.nodes);
+  }
+
+  pulse(id) {
+    const n = this.m.nodes.get(id);
+    const g = this.group(n.level).nodes.querySelector(`g[data-id="${id}"]`);
+    if (g && !REDUCED)
+      g.animate([{ opacity: 1 }, { opacity: 0.25 }, { opacity: 1 },
+                 { opacity: 0.25 }, { opacity: 1 }], { duration: 900 });
+  }
+
+  wrap(text, width) {
+    if (text.length <= width) return [text];
+    const words = text.split(" "), lines = [""];
+    for (const w of words) {
+      const cur = lines[lines.length-1];
+      if ((cur + " " + w).trim().length > width && cur) lines.push(w);
+      else lines[lines.length-1] = (cur + " " + w).trim();
+    }
+    return lines.slice(0, 2);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   CAMERA — auto-fit frames the explored level; wheel/drag take
+   manual control; fit() restores. Zoom and position both lerp.
+   ══════════════════════════════════════════════════════════ */
+class Camera {
+  constructor(svg, stage, fitFn) {
+    this.svg = svg; this.stage = stage; this.fitFn = fitFn;
+    this.x = 0; this.y = 0; this.zoom = 1;
+    this.tx = 0; this.ty = 0; this.tzoom = 1;
+    this.fitMode = true;      // default: frame everything explored
+    this.manual = false;      // true while user is panning
+    this.bindInput();
+    const tick = () => {
+      if (this.fitMode) {
+        const t = this.fitFn();
+        if (t) { this.tx = t.x; this.ty = t.y; this.tzoom = t.zoom; }
+      }
+      if (!this.manual) {
+        if (REDUCED) { this.x = this.tx; this.y = this.ty; this.zoom = this.tzoom; }
+        else {
+          this.x += (this.tx - this.x) * 0.08;
+          this.y += (this.ty - this.y) * 0.08;
+          this.zoom += (this.tzoom - this.zoom) * 0.08;
+        }
+      }
+      this.stage.dataset.fit = this.fitMode;
+      this.apply();
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  follow(px, py) {            // new room: resume auto motion
+    this.manual = false;
+    if (!this.fitMode) { this.tx = px; this.ty = py; }
+  }
+  fit() { this.fitMode = true; this.manual = false; }
+  apply() {
+    const w = Math.max(1, this.stage.clientWidth) / this.zoom;
+    const h = Math.max(1, this.stage.clientHeight) / this.zoom;
+    this.svg.setAttribute("viewBox",
+      `${this.x - w/2} ${this.y - h/2} ${w} ${h}`);
+  }
+  bindInput() {
+    let drag = null;
+    this.stage.addEventListener("pointerdown", e => {
+      if (e.target.closest("button")) return;
+      drag = { x: e.clientX, y: e.clientY };
+      this.stage.classList.add("dragging");
+      this.manual = true; this.fitMode = false;
+    });
+    window.addEventListener("pointermove", e => {
+      if (!drag) return;
+      this.x -= (e.clientX - drag.x) / this.zoom;
+      this.y -= (e.clientY - drag.y) / this.zoom;
+      drag = { x: e.clientX, y: e.clientY };
+    });
+    window.addEventListener("pointerup", () => {
+      drag = null; this.stage.classList.remove("dragging");
+    });
+    this.stage.addEventListener("wheel", e => {
+      e.preventDefault();
+      if (this.fitMode) {     // leave fit from wherever fit put us
+        this.tx = this.x; this.ty = this.y;
+        this.fitMode = false;
+      }
+      const f = e.deltaY < 0 ? 1.12 : 1/1.12;
+      this.tzoom = Math.min(2.4, Math.max(0.2, this.tzoom * f));
+    }, { passive: false });
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   APP — walkthrough player, terminal, tabs, split, wiring.
+   ══════════════════════════════════════════════════════════ */
+const LEVEL_NAME = lv => lv === 0 ? "Surface"
+  : lv > 0 ? `Above${lv > 1 ? " +" + lv : ""}` : `Below${lv < -1 ? " " + lv : ""}`;
+
+const app = {
+  init() {
+    this.mapper = new Mapper();
+    this.stage = document.getElementById("stage");
+    this.r = new Renderer(document.getElementById("map"), this.mapper);
+    this.cam = new Camera(this.r.svg, this.stage, () => this.fitTarget());
+    this.i = 0; this.playing = false; this.speed = 1; this.busy = false;
+    this.speeds = [1, 2, 4, 0.5];
+    document.getElementById("play").onclick = () => this.toggle();
+    document.getElementById("step").onclick = () => this.step();
+    document.getElementById("reset").onclick = () => this.reset();
+    document.getElementById("speed").onclick = () => this.cycleSpeed();
+    document.getElementById("fitbtn").onclick = () => this.cam.fit();
+    document.getElementById("maptoggle").onclick = () => this.toggleMap();
+    addEventListener("keydown", e => {
+      if (e.target.tagName === "BUTTON") return;
+      if (e.key === " ") { e.preventDefault(); this.toggle(); }
+      if (e.key === "ArrowRight") this.step();
+      if (e.key.toLowerCase() === "r") this.reset();
+      if (e.key.toLowerCase() === "m") this.toggleMap();
+      if (e.key.toLowerCase() === "f") this.cam.fit();
+    });
+    this.bindGutter();
+    this.step();          // place the starting room
+    this.renderTabs();
+  },
+
+  /* Bounding box of the active level → camera target, padded and
+     clamped so a lone room never fills the pane. */
+  fitTarget() {
+    const nodes = [...this.mapper.nodes.values()]
+      .filter(n => n.level === this.r.activeLevel);
+    if (!nodes.length) return null;
+    const PAD = 70;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const n of nodes) {
+      x0 = Math.min(x0, cx(n) - RW/2); x1 = Math.max(x1, cx(n) + RW/2);
+      y0 = Math.min(y0, cy(n) - RH/2); y1 = Math.max(y1, cy(n) + RH/2);
+    }
+    const bw = x1 - x0 + PAD*2, bh = y1 - y0 + PAD*2;
+    const zoom = Math.max(0.2, Math.min(
+      this.stage.clientWidth / bw, this.stage.clientHeight / bh, 1.0));
+    return { x: (x0 + x1)/2, y: (y0 + y1)/2, zoom };
+  },
+
+  toggleMap() {
+    const hidden = document.body.classList.toggle("map-hidden");
+    document.getElementById("maptoggle").textContent =
+      hidden ? "Show map" : "Hide map";
+  },
+
+  /* ── split ── */
+  bindGutter() {
+    const gutter = document.getElementById("gutter");
+    let dragging = false;
+    gutter.addEventListener("pointerdown", e => {
+      dragging = true; e.preventDefault();
+      gutter.setPointerCapture(e.pointerId);
+    });
+    gutter.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      const root = document.documentElement.style;
+      if (matchMedia("(max-width: 880px)").matches) {
+        const main = document.querySelector("main").getBoundingClientRect();
+        const h = Math.min(Math.max(e.clientY - main.top, 130),
+                           main.height * 0.7);
+        root.setProperty("--maph", h + "px");
+      } else {
+        const w = Math.min(Math.max(innerWidth - e.clientX, 260),
+                           innerWidth * 0.7);
+        root.setProperty("--mapw", w + "px");
+      }
+    });
+    gutter.addEventListener("pointerup", () => dragging = false);
+  },
+
+  attention() {          // map updated while hidden → pulse the chip
+    if (!document.body.classList.contains("map-hidden")) return;
+    const chip = document.getElementById("maptoggle");
+    chip.classList.add("attn");
+    setTimeout(() => chip.classList.remove("attn"), 700);
+  },
+
+  /* ── playback ── */
+  toggle() {
+    this.playing = !this.playing;
+    document.getElementById("play").textContent =
+      this.playing ? "⏸ Pause" : "▶ Play";
+    if (this.playing) this.loop();
+  },
+
+  async loop() {
+    while (this.playing && this.i < SCRIPT.length) {
+      await this.step();
+      await sleep(900 / this.speed);
+    }
+    if (this.i >= SCRIPT.length && this.playing) this.toggle();
+  },
+
+  async step() {
+    if (this.busy || this.i >= SCRIPT.length) return;
+    this.busy = true;
+    const [cmd, id, name, text] = SCRIPT[this.i++];
+    if (cmd) { await this.type(cmd); this.commit(cmd); }
+
+    if (id) {
+      const changes = this.mapper.observe(cmd, id, name);
+      const node = this.mapper.nodes.get(id);
+      for (const c of changes) {
+        if (c.type === "node") this.r.drawNode(c.node);
+        else if (c.type === "edge") this.r.drawEdge(c.edge);
+        else if (c.type === "cross") {
+          this.r.drawCrossBadges(this.mapper.nodes.get(c.edge.from));
+          this.r.drawCrossBadges(this.mapper.nodes.get(c.edge.to));
+        }
+      }
+      this.r.refreshUpgraded();
+      if (node.level !== this.r.activeLevel) this.r.setLevel(node.level);
+      this.r.highlight(id);
+      this.cam.follow(cx(node), cy(node));
+      this.print(name, text);
+      if (changes.length) this.attention();
+      if (changes.some(c => c.type === "cross")) this.r.pulse(id);
+    } else if (text) {
+      this.print(null, text);
+    }
+    this.renderTabs(); this.renderStats();
+    this.busy = false;
+  },
+
+  jumpTo(id) {
+    const n = this.mapper.nodes.get(id);
+    if (!n) return;
+    this.r.setLevel(n.level);
+    this.cam.follow(cx(n), cy(n));
+    this.r.pulse(id);
+    this.renderTabs();
+  },
+
+  /* ── terminal ── */
+  async type(cmd) {
+    const elC = document.getElementById("cmd");
+    elC.textContent = "";
+    if (REDUCED) { elC.textContent = cmd; await sleep(80); return; }
+    for (const ch of cmd) {
+      elC.textContent += ch;
+      await sleep(26 / this.speed);
+    }
+    await sleep(150 / this.speed);
+  },
+
+  commit(cmd) {
+    const s = document.getElementById("scroll");
+    const echo = document.createElement("div");
+    echo.className = "echo";
+    echo.textContent = "> " + cmd;
+    s.appendChild(echo);
+    document.getElementById("cmd").textContent = "";
+    s.scrollTop = s.scrollHeight;
+  },
+
+  print(roomName, text) {
+    const s = document.getElementById("scroll");
+    if (roomName) {
+      const r = document.createElement("div");
+      r.className = "room";
+      r.textContent = roomName;
+      s.appendChild(r);
+    }
+    if (text) {
+      const d = document.createElement("div");
+      d.className = "desc";
+      d.textContent = text;
+      s.appendChild(d);
+    }
+    s.scrollTop = s.scrollHeight;
+  },
+
+  /* ── chrome ── */
+  cycleSpeed() {
+    this.speeds.push(this.speeds.shift());
+    this.speed = this.speeds[0];
+    document.getElementById("speed").textContent =
+      String(this.speed).replace("0.5", "½") + "×";
+  },
+
+  reset() {
+    this.playing = false; this.busy = false;
+    document.getElementById("play").textContent = "▶ Play";
+    document.getElementById("cmd").textContent = "";
+    document.getElementById("scroll").innerHTML = "";
+    this.r.svg.innerHTML = "";
+    this.mapper = new Mapper();
+    this.r = new Renderer(document.getElementById("map"), this.mapper);
+    this.i = 0;
+    this.step();
+    this.renderTabs(); this.renderStats();
+  },
+
+  renderTabs() {
+    const nav = document.getElementById("tabs");
+    nav.innerHTML = "";
+    for (const lv of this.mapper.levels()) {
+      const b = document.createElement("button");
+      b.textContent = LEVEL_NAME(lv);
+      if (lv === this.r.activeLevel) b.classList.add("active");
+      b.onclick = () => {
+        this.r.setLevel(lv);
+        const cur = this.mapper.nodes.get(this.mapper.current);
+        const target = cur && cur.level === lv ? cur :
+          [...this.mapper.nodes.values()].find(n => n.level === lv);
+        if (target) this.cam.follow(cx(target), cy(target));
+        this.renderTabs();
+      };
+      nav.appendChild(b);
+    }
+  },
+
+  renderStats() {
+    document.getElementById("stat-turn").textContent = this.i;
+    document.getElementById("stat-rooms").textContent = this.mapper.nodes.size;
+    document.getElementById("stat-edges").textContent =
+      this.mapper.edges.length +
+      [...this.mapper.nodes.values()]
+        .reduce((s, n) => s + n.crossLinks.length, 0) / 2;
+  },
+};
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+app.init();
+</script>
+</body>
+</html>

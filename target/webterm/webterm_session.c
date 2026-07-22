@@ -9,6 +9,7 @@
 
 #include "webterm_session.h"
 #include "zvibe_api.h"
+#include "cartographer.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -65,6 +66,13 @@ struct webterm_session_t {
 
     /* Reusable JSON encoding buffer (avoids per-call stack allocation) */
     char json_buf[WEBTERM_JSON_BUF_SIZE];
+
+    /* Cartographer — turn-boundary room-change detection.
+     * cart_room is the last location reported to cart_room_changed();
+     * 0 means "no room reported yet" (no valid Z-machine object is 0). */
+    uint16_t cart_room;
+    char     cart_cmd[WEBTERM_INPUT_MAX + 1];
+    int      cart_cmd_valid;   /* 1 if cart_cmd holds this turn's input */
 };
 
 /* Single global session pointer used by the output callback.
@@ -377,6 +385,8 @@ webterm_result_t webterm_session_load(webterm_session_t *s,
     s->history_head  = 0;
     s->history_count = 0;
     s->input_pending = 0;
+    s->cart_room     = 0;
+    s->cart_cmd_valid = 0;
     memset(s->history_prompt, 0, sizeof(s->history_prompt));
 
     g_session = s;
@@ -387,6 +397,29 @@ webterm_result_t webterm_session_load(webterm_session_t *s,
 
     s->state = WEBTERM_STATE_RUNNING;
     return WEBTERM_OK;
+}
+
+/* -------------------------------------------------------------------------
+ * Cartographer
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Compare the player's location against the last one reported and, if it
+ * changed, emit a cart_room_changed() event. Called at each turn boundary
+ * (WAIT_FOR_INPUT / GAME_FINISHED) — see CARTOGRAPHER.md for why hooking
+ * here, rather than the shared interpreter core, is sufficient.
+ */
+static void cart_check_room_change(webterm_session_t *s) {
+    uint16_t room_id = 0;
+    char name[80];
+
+    if (zvibe_get_room(s->zvibe, &room_id, name, sizeof(name)) != ZVIBE_OK) return;
+    if (room_id == s->cart_room) return;
+
+    s->cart_room = room_id;
+    cart_room_changed(s->platform, s->cart_cmd_valid ? s->cart_cmd : NULL,
+                       room_id, name);
+    s->cart_cmd_valid = 0;
 }
 
 /* -------------------------------------------------------------------------
@@ -419,11 +452,16 @@ webterm_result_t webterm_session_run(webterm_session_t *s) {
 
     switch (r) {
         case ZVIBE_WAIT_FOR_INPUT:
+            /* Cartographer's "room" event is ephemeral, like "status" — sent
+             * before the output frame so output remains the last (and
+             * prompt-bearing) frame of the turn. */
+            cart_check_room_change(s);
             flush_output(s, 1 /* prompt */);
             s->state = WEBTERM_STATE_WAITING;
             return WEBTERM_WAIT;
 
         case ZVIBE_GAME_FINISHED:
+            cart_check_room_change(s);
             flush_output(s, 0);
             s->state = WEBTERM_STATE_DONE;
             return WEBTERM_DONE;
@@ -496,6 +534,9 @@ void webterm_session_on_input(webterm_session_t *s,
     memcpy(buf, text, len);
     buf[len] = '\0';
 
+    memcpy(s->cart_cmd, buf, len + 1);
+    s->cart_cmd_valid = 1;
+
     zvibe_input(s->zvibe, buf);
     s->input_pending = 1;
     s->state = WEBTERM_STATE_RUNNING;
@@ -517,6 +558,8 @@ void webterm_session_on_reset(webterm_session_t *s) {
     s->history_head  = 0;
     s->history_count = 0;
     s->input_pending = 0;
+    s->cart_room     = 0;
+    s->cart_cmd_valid = 0;
     s->state         = WEBTERM_STATE_IDLE;
 
     zvibe_destroy(s->zvibe);

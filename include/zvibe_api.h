@@ -272,6 +272,25 @@ zvibeResult zvibe_run(zvibeContext *ctx);
 zvibeResult zvibe_input(zvibeContext *ctx, const char *input);
 
 /**
+ * @brief Get the player's current location
+ *
+ * Reads global variable 0 — the Z-machine V3 convention for the player's
+ * current room object — and optionally decodes its short name. Intended
+ * for host code that needs to track room changes turn-by-turn (e.g. the
+ * webterm target's Cartographer map engine); safe to call any time a
+ * story is loaded.
+ *
+ * @param[in]  ctx           Context (must not be NULL)
+ * @param[out] room_id       Receives the raw object number of global[0] (may be NULL)
+ * @param[out] name_buf      Receives the decoded short name, null-terminated (may be NULL)
+ * @param[in]  name_buf_size Size of @p name_buf in bytes (ignored if name_buf is NULL)
+ *
+ * @return ZVIBE_OK on success, ZVIBE_ERROR if ctx is NULL
+ */
+zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,
+                           char *name_buf, size_t name_buf_size);
+
+/**
  * @brief Seed the random number generator
  *
  * Seeds the Z-machine's LCG before story execution begins.

@@ -307,16 +307,17 @@ static int ws_recv(int fd, char *buf, size_t buf_max, size_t *out_len) {
  * HTTP file serving
  * ========================================================================= */
 
-static void http_serve_html(int fd, const char *html, size_t html_len) {
+static void http_serve(int fd, const char *content_type,
+                        const char *body, size_t body_len) {
     char hdr[256];
     int n = snprintf(hdr, sizeof(hdr),
         "HTTP/1.1 200 OK\r\n"
-        "Content-Type: text/html; charset=utf-8\r\n"
+        "Content-Type: %s\r\n"
         "Content-Length: %zu\r\n"
         "Connection: close\r\n"
-        "\r\n", html_len);
+        "\r\n", content_type, body_len);
     write_all(fd, hdr, (size_t)n);
-    write_all(fd, html, html_len);
+    write_all(fd, body, body_len);
 }
 
 static void http_serve_404(int fd) __attribute__((unused));
@@ -556,31 +557,51 @@ static void handle_ws(int fd, webterm_session_t *s, const char *game_dir) {
 }
 
 /* =========================================================================
- * HTML loading
+ * Static asset loading
  * ========================================================================= */
 
 static char *g_html;
 static size_t g_html_len;
 
-static void load_html(const char *path) {
+static char *g_cart_js;
+static size_t g_cart_js_len;
+
+/* Read an entire file into a malloc'd, null-terminated buffer.
+ * Exits the process on failure — both assets are required to serve. */
+static void load_file(const char *path, const char *what,
+                       char **out_buf, size_t *out_len) {
     FILE *f = fopen(path, "rb");
     if (!f) {
-        fprintf(stderr, "Cannot open HTML file: %s\n", path);
+        fprintf(stderr, "Cannot open %s: %s\n", what, path);
         fprintf(stderr, "Run the server from the platform/posix/ directory, "
-                        "or pass -w PATH to specify the HTML file.\n");
+                        "or pass the appropriate flag to specify the path.\n");
         exit(1);
     }
     fseek(f, 0, SEEK_END);
     long len = ftell(f);
     fseek(f, 0, SEEK_SET);
-    g_html = malloc((size_t)len + 1);
-    if (!g_html) { perror("malloc"); exit(1); }
-    if (fread(g_html, 1, (size_t)len, f) != (size_t)len) {
+    char *buf = malloc((size_t)len + 1);
+    if (!buf) { perror("malloc"); exit(1); }
+    if (fread(buf, 1, (size_t)len, f) != (size_t)len) {
         perror("fread"); exit(1);
     }
-    g_html[len] = '\0';
-    g_html_len  = (size_t)len;
+    buf[len] = '\0';
     fclose(f);
+    *out_buf = buf;
+    *out_len = (size_t)len;
+}
+
+/* Extract the request path (second token of the request line) into out.
+ * Returns 1 on success, 0 if the request line couldn't be parsed. */
+static int http_request_path(const char *req, char *out, size_t max) {
+    const char *p = strchr(req, ' ');
+    if (!p) return 0;
+    p++;
+    size_t i = 0;
+    while (*p && *p != ' ' && *p != '\r' && *p != '\n' && i + 1 < max)
+        out[i++] = *p++;
+    out[i] = '\0';
+    return i > 0;
 }
 
 /* =========================================================================
@@ -613,17 +634,19 @@ static int create_server(int port) {
 
 static void usage(const char *prog) {
     fprintf(stderr,
-        "Usage: %s [-p PORT] [-w HTML] [-s SAVE] [GAME_DIR]\n"
+        "Usage: %s [-p PORT] [-w HTML] [-c CARTJS] [-s SAVE] [GAME_DIR]\n"
         "  -p PORT     port (default 8080)\n"
-        "  -w HTML     path to zmachine.html (default www/zmachine.html)\n"
+        "  -w HTML     path to zvibe.html (default www/zvibe.html)\n"
+        "  -c CARTJS   path to cartographer.js (default ../../cartographer.js)\n"
         "  -s SAVE     save file path (default /tmp/zvibe.sav)\n"
         "  GAME_DIR    .z3 game files (default ../../../../games/catalog)\n",
         prog);
 }
 
 int main(int argc, char *argv[]) {
-    int         port     = 8080;
+    int         port      = 8080;
     const char *html_path = "www/zvibe.html";
+    const char *cart_path = "../../cartographer.js";
     const char *game_dir  = "../../../../games/catalog";
 
     signal(SIGPIPE, SIG_IGN);   /* ignore broken pipe on ws_send */
@@ -634,6 +657,8 @@ int main(int argc, char *argv[]) {
             port = atoi(argv[++i]);
         } else if (strcmp(argv[i], "-w") == 0 && i + 1 < argc) {
             html_path = argv[++i];
+        } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
+            cart_path = argv[++i];
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             snprintf(g_platform.save_path, sizeof(g_platform.save_path),
                      "%s", argv[++i]);
@@ -646,7 +671,8 @@ int main(int argc, char *argv[]) {
     }
 
     sha1_selftest();
-    load_html(html_path);
+    load_file(html_path, "HTML file", &g_html, &g_html_len);
+    load_file(cart_path, "cartographer.js", &g_cart_js, &g_cart_js_len);
 
     webterm_session_t *session = webterm_session_create(&g_platform.base);
     if (!session) { fprintf(stderr, "Failed to create session\n"); return 1; }
@@ -683,8 +709,16 @@ int main(int argc, char *argv[]) {
                 handle_ws(client, session, game_dir);
             }
         } else {
-            /* Serve HTML for any non-WS GET */
-            http_serve_html(client, g_html, g_html_len);
+            char path[256];
+            if (http_request_path(req, path, sizeof(path)) &&
+                strcmp(path, "/cartographer.js") == 0) {
+                http_serve(client, "text/javascript; charset=utf-8",
+                           g_cart_js, g_cart_js_len);
+            } else {
+                /* Serve HTML for any other non-WS GET */
+                http_serve(client, "text/html; charset=utf-8",
+                           g_html, g_html_len);
+            }
         }
 
         close(client);
@@ -692,6 +726,7 @@ int main(int argc, char *argv[]) {
 
     webterm_session_destroy(session);
     free(g_html);
+    free(g_cart_js);
     close(server_fd);
     return 0;
 }

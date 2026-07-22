@@ -230,6 +230,34 @@ zvibeResult zvibe_input(zvibeContext *ctx, const char *input) {
     return ZVIBE_OK;
 }
 
+zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,
+                           char *name_buf, size_t name_buf_size) {
+    if (!ctx) return ZVIBE_ERROR;
+
+    zState *G = &ctx->z_state;
+    const zByte *globals = zmem_get_ptr(&G->memory_state, G->header.globals_addr, 0);
+    if (!globals) return ZVIBE_ERROR;
+
+    /* Global variable 0 (the first global) holds the player's current
+     * location object number, per the Z-machine V3 convention. */
+    zWord loc = (zWord)((globals[0] << 8) | globals[1]);
+    if (room_id) *room_id = loc;
+
+    if (name_buf && name_buf_size > 0) {
+        name_buf[0] = '\0';
+        if (loc > 0 && loc <= 255) {
+            const zByte *obj_name = z_get_obj_name(loc);
+            if (obj_name) {
+                zSize len = name_buf_size - 1;
+                z_decode_zscii(obj_name, 0, name_buf, &len);
+                name_buf[len < name_buf_size - 1 ? len : name_buf_size - 1] = '\0';
+            }
+        }
+    }
+
+    return ZVIBE_OK;
+}
+
 void zvibe_set_random_seed(zvibeContext *ctx, int seed) {
     (void)ctx;  /* seed is global state; ctx kept for API consistency */
     z_random_set_seed((zSDWord)seed);

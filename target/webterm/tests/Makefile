@@ -25,7 +25,7 @@ OBJ_DIR   = $(BUILD_DIR)/obj
 CORE_SRCS = $(wildcard $(CORE_DIR)/*.c) $(API_DIR)/zvibe_api.c
 
 # webterm session sources
-SESSION_SRC = ../webterm_session.c
+SESSION_SRC = ../webterm_session.c ../cartographer.c
 
 # test sources
 TEST_SRCS = test_session.c mock_platform.c

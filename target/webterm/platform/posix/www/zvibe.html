@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>zvibe</title>
 <style>
+:root { --mapw: 42%; --maph: 32vh; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
     background: #0e0e0e;
@@ -34,6 +35,19 @@ body {
     flex-shrink: 0;
     min-height: 22px;
 }
+#main {
+    flex: 1;
+    display: flex;
+    min-height: 0;
+    position: relative;
+}
+#term {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
 #output {
     flex: 1;
     overflow-y: auto;
@@ -48,6 +62,40 @@ body {
     align-items: center;
     gap: 6px;
     flex-shrink: 0;
+}
+
+/* ── map split ── */
+#gutter {
+    width: 7px; cursor: col-resize; flex: none;
+    background: linear-gradient(90deg, transparent 2px, #2a2a2a 3px,
+                #2a2a2a 4px, transparent 5px);
+}
+#gutter:hover {
+    background: linear-gradient(90deg, transparent 2px, #3a3 3px,
+                #3a3 4px, transparent 5px);
+}
+#cart-stage {
+    flex: none; width: var(--mapw); min-width: 260px;
+}
+body.map-hidden #cart-stage, body.map-hidden #gutter { display: none; }
+
+#maptoggle.attn { color: #3a3; border-color: #3a3; }
+
+@media (max-width: 880px) {
+    #main { flex-direction: column-reverse; }
+    #gutter {
+        width: auto; height: 7px; cursor: row-resize;
+        background: linear-gradient(180deg, transparent 2px, #2a2a2a 3px,
+                    #2a2a2a 4px, transparent 5px);
+    }
+    #gutter:hover {
+        background: linear-gradient(180deg, transparent 2px, #3a3 3px,
+                    #3a3 4px, transparent 5px);
+    }
+    #cart-stage {
+        width: auto; min-width: 0;
+        height: var(--maph, 32vh); min-height: 130px;
+    }
 }
 #prompt-char { color: #3a3; user-select: none; }
 #input-field {
@@ -83,27 +131,74 @@ select:focus, button:hover { border-color: #666; outline: none; background: #2e2
     <button id="btn-load">Load</button>
     <button id="btn-save">Save</button>
     <button id="btn-restore">Restore</button>
+    <button id="maptoggle">Hide map</button>
     <button id="btn-reset">Reset</button>
 </div>
 <div id="status-bar"></div>
-<div id="output"></div>
-<div id="input-bar">
-    <span id="prompt-char">&gt;</span>
-    <input id="input-field" type="text" autocomplete="off"
-           spellcheck="false" disabled placeholder="waiting...">
+<div id="main">
+    <div id="term">
+        <div id="output"></div>
+        <div id="input-bar">
+            <span id="prompt-char">&gt;</span>
+            <input id="input-field" type="text" autocomplete="off"
+                   spellcheck="false" disabled placeholder="waiting...">
+        </div>
+    </div>
+    <div id="gutter" aria-hidden="true"></div>
+    <div id="cart-stage"></div>
 </div>
 
+<script src="cartographer.js"></script>
 <script>
 (function () {
 'use strict';
 
-const output   = document.getElementById('output');
-const inputEl  = document.getElementById('input-field');
-const promptEl = document.getElementById('prompt-char');
-const statusEl = document.getElementById('status-bar');
-const picker   = document.getElementById('game-select');
+const output    = document.getElementById('output');
+const inputEl   = document.getElementById('input-field');
+const promptEl  = document.getElementById('prompt-char');
+const statusEl  = document.getElementById('status-bar');
+const picker    = document.getElementById('game-select');
+const cartStage = document.getElementById('cart-stage');
+const mapToggle = document.getElementById('maptoggle');
+
+const cart = new Cartographer(cartStage);
 
 let ws = null;
+
+/* ── map pane: toggle, resize gutter, hidden-update pulse ── */
+mapToggle.addEventListener('click', () => {
+    const hidden = document.body.classList.toggle('map-hidden');
+    mapToggle.textContent = hidden ? 'Show map' : 'Hide map';
+    if (hidden) cart.hide(); else cart.show();
+});
+
+cartStage.addEventListener('cart:update', e => {
+    if (!e.detail.hidden) return;
+    mapToggle.classList.add('attn');
+    setTimeout(() => mapToggle.classList.remove('attn'), 700);
+});
+
+(function bindGutter() {
+    const gutter = document.getElementById('gutter');
+    let dragging = false;
+    gutter.addEventListener('pointerdown', e => {
+        dragging = true; e.preventDefault();
+        gutter.setPointerCapture(e.pointerId);
+    });
+    gutter.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        const root = document.documentElement.style;
+        if (matchMedia('(max-width: 880px)').matches) {
+            const main = document.getElementById('main').getBoundingClientRect();
+            const h = Math.min(Math.max(e.clientY - main.top, 130), main.height * 0.7);
+            root.setProperty('--maph', h + 'px');
+        } else {
+            const w = Math.min(Math.max(innerWidth - e.clientX, 260), innerWidth * 0.7);
+            root.setProperty('--mapw', w + 'px');
+        }
+    });
+    gutter.addEventListener('pointerup', () => dragging = false);
+})();
 
 function print(text, cls) {
     const el = document.createElement('span');
@@ -148,6 +243,10 @@ function connect() {
             case 'output':
                 print(msg.text);
                 setInput(!!msg.prompt);
+                break;
+
+            case 'room':
+                cart.observe(msg.cmd, msg.id, msg.name);
                 break;
 
             case 'status': {
@@ -204,6 +303,7 @@ document.getElementById('btn-load').addEventListener('click', () => {
     output.textContent = '';
     statusEl.textContent = '';
     setInput(false);
+    cart.reset();
     send({ type: 'load', game: g });
 });
 
@@ -216,6 +316,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     output.textContent = '';
     statusEl.textContent = '';
     setInput(false);
+    cart.reset();
     send({ type: 'reset' });
     send({ type: 'games' });
 });
