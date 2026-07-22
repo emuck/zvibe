@@ -83,6 +83,31 @@ For time-mode games:
 {"type": "status", "location": "The Orient Express", "hours": 9, "minutes": 47}
 ```
 
+### Story identity
+```json
+{"type": "story", "release": 88, "serial": "840726", "checksum": 32587}
+```
+Sent once right after a game is loaded, and again right after a client
+resumes a paused/waiting session (before history replay). `(release,
+serial, checksum)` together identify the exact story file build — a
+Cartographer client uses this as a stable key to persist and restore its
+map (e.g. in `localStorage`) across page reloads, since map state is not
+otherwise part of the session's output history. See CARTOGRAPHER.md.
+
+### Room change (Cartographer)
+```json
+{"type": "room", "cmd": "north", "id": 75, "name": "Forest Path"}
+```
+Emitted whenever the player's location changes after a turn completes.
+`cmd` is the raw input that produced the move, or `null` if the move
+wasn't player-initiated (opening placement, a restore, or a client
+reconnect re-announcing the current room). `id` is the Z-machine object
+number of the new location — stable and globally unique within a story,
+even across rooms that share a display name (e.g. a maze). `name` is the
+decoded short name. Sent before the `output` frame for the same turn,
+like `status`. See CARTOGRAPHER.md for the client-side map engine this
+feeds.
+
 ### Game list
 ```json
 {"type": "games", "list": ["restaurant.z3", "zork1.z3"]}
@@ -167,6 +192,9 @@ Client                              Server
   │                                    │  (check if session busy)
   │◄── {"type":"games","list":[...]} ──│  (send game list on connect)
   │── {"type":"load","game":"foo.z3"} ─►│
+  │◄── {"type":"story",...} ───────────│  (Cartographer key)
+  │◄── {"type":"status",...} ──────────│
+  │◄── {"type":"room",...} ────────────│  (opening placement, cmd:null)
   │◄── {"type":"output","text":"..."   │
   │         "prompt":true} ────────────│
   │── {"type":"input","text":"look"} ──►│
@@ -183,8 +211,10 @@ Client                              Server
   │── WebSocket upgrade ──────────────►│
   │◄── 101 Switching Protocols ────────│
   │                                    │  (session found, paused)
-  │◄── {"type":"resumed",              │
-  │      "history":"...","prompt":true}│
+  │◄── {"type":"resumed","prompt":true}│
+  │◄── {"type":"story",...} ───────────│  (Cartographer key)
+  │◄── {"type":"room",...} ────────────│  (re-announce, cmd:null)
+  │◄── {"type":"output","text":"..."}  │  (history replay)
   │── {"type":"input","text":"look"} ──►│
   │  ...
 ```

@@ -172,10 +172,28 @@ mapToggle.addEventListener('click', () => {
     if (hidden) cart.hide(); else cart.show();
 });
 
+/* ── map persistence: localStorage, keyed by story identity ──
+ * See CARTOGRAPHER.md § Persistence. cartKey is set from the "story"
+ * message (sent on load and on resume); until then, cart state isn't
+ * saved. Writes are debounced so rapid movement doesn't hammer storage. */
+let cartKey = null;
+let cartSaveTimer = null;
+
+function cartScheduleSave() {
+    if (!cartKey) return;
+    clearTimeout(cartSaveTimer);
+    cartSaveTimer = setTimeout(() => {
+        try { localStorage.setItem(cartKey, JSON.stringify(cart.serialize())); }
+        catch { /* storage full or unavailable — persistence is best-effort */ }
+    }, 500);
+}
+
 cartStage.addEventListener('cart:update', e => {
-    if (!e.detail.hidden) return;
-    mapToggle.classList.add('attn');
-    setTimeout(() => mapToggle.classList.remove('attn'), 700);
+    if (e.detail.hidden) {
+        mapToggle.classList.add('attn');
+        setTimeout(() => mapToggle.classList.remove('attn'), 700);
+    }
+    cartScheduleSave();
 });
 
 (function bindGutter() {
@@ -247,6 +265,14 @@ function connect() {
 
             case 'room':
                 cart.observe(msg.cmd, msg.id, msg.name);
+                break;
+
+            case 'story':
+                cartKey = `cart:${msg.release}-${msg.serial}-${msg.checksum}`;
+                try {
+                    const saved = localStorage.getItem(cartKey);
+                    if (saved) cart.restore(JSON.parse(saved));
+                } catch { /* corrupt or unavailable storage — start empty */ }
                 break;
 
             case 'status': {

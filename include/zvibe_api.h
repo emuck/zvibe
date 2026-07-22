@@ -291,6 +291,28 @@ zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,
                            char *name_buf, size_t name_buf_size);
 
 /**
+ * @brief Get the loaded story's identity
+ *
+ * Reads (release, serial, checksum) from the already-parsed story header.
+ * Together these uniquely identify a specific build of a story file —
+ * intended for host code that needs a stable per-story key (e.g. the
+ * webterm target's Cartographer map persistence).
+ *
+ * @param[in]  ctx             Context (must not be NULL)
+ * @param[out] release         Receives the release number (may be NULL)
+ * @param[out] serial_buf      Receives the 6-character serial, null-terminated
+ *                             (may be NULL)
+ * @param[in]  serial_buf_size Size of @p serial_buf in bytes (ignored if
+ *                             serial_buf is NULL)
+ * @param[out] checksum        Receives the story checksum (may be NULL)
+ *
+ * @return ZVIBE_OK on success, ZVIBE_ERROR if ctx is NULL
+ */
+zvibeResult zvibe_get_story_id(zvibeContext *ctx, uint16_t *release,
+                               char *serial_buf, size_t serial_buf_size,
+                               uint16_t *checksum);
+
+/**
  * @brief Seed the random number generator
  *
  * Seeds the Z-machine's LCG before story execution begins.

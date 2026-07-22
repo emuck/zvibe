@@ -559,6 +559,7 @@ const LEVEL_NAME = lv => lv === 0 ? "Surface"
      cart.observe(cmd, roomId, roomName)
      cart.reset()
      cart.show() / cart.hide()
+     cart.serialize() / cart.restore(data)   — see § Persistence
    Everything else here (DOM construction, camera, tabs, fit
    button) is an internal implementation detail.
    ══════════════════════════════════════════════════════════ */
@@ -626,6 +627,57 @@ class Cartographer {
 
   show() { this.hidden = false; }
   hide() { this.hidden = true; }
+
+  /**
+   * Plain-JSON snapshot of the graph, suitable for JSON.stringify() and
+   * later restore(). See CARTOGRAPHER.md § Persistence — the host page
+   * decides when and where to store this (e.g. localStorage keyed by the
+   * "story" message); Cartographer only knows how to (de)serialize itself.
+   */
+  serialize() {
+    return {
+      nodes: [...this.mapper.nodes.values()].map(n => ({
+        id: n.id, name: n.name, level: n.level, x: n.x, y: n.y,
+        displaced: !!n.displaced,
+        crossLinks: n.crossLinks.map(c => ({ to: c.to, dir: c.dir })),
+      })),
+      edges: this.mapper.edges.map(e => ({
+        from: e.from, to: e.to, dir: e.dir,
+        oneWay: e.oneWay, dashed: e.dashed, level: e.level,
+      })),
+    };
+  }
+
+  /**
+   * Rebuild the graph from a previous serialize() and redraw it without
+   * per-element entrance animation. Call before the first observe() —
+   * the server re-announces the current room (cmd:null) on load/resume,
+   * so the next observe() call will highlight the right node without
+   * re-placing it.
+   */
+  restore(data) {
+    if (!data || !Array.isArray(data.nodes) || !Array.isArray(data.edges)) return;
+
+    this.mapper = new Mapper();
+    for (const n of data.nodes) {
+      this.mapper.nodes.set(n.id, {
+        ...n, crossLinks: (n.crossLinks || []).map(c => ({ ...c })),
+      });
+    }
+    this.mapper.edges = data.edges.map(e => ({ ...e }));
+
+    this.svg.innerHTML = "";
+    this.renderer = new Renderer(this.svg, this.mapper,
+      id => this.jumpTo(id), /* reduced, for a static bulk redraw */ true);
+    for (const n of this.mapper.nodes.values()) this.renderer.drawNode(n);
+    for (const e of this.mapper.edges) this.renderer.drawEdge(e);
+    for (const n of this.mapper.nodes.values())
+      if (n.crossLinks.length) this.renderer.drawCrossBadges(n);
+    this.renderer.reduced = this.reduced;   // resume normal motion for live updates
+
+    this.camera.fit();
+    this._renderTabs();
+  }
 
   /* ── stats, read-only, for host header/chrome ── */
   get roomCount() { return this.mapper.nodes.size; }

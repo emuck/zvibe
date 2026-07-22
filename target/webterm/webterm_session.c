@@ -284,6 +284,67 @@ static zvibeContext *create_zvibe(void) {
 }
 
 /* -------------------------------------------------------------------------
+ * Cartographer
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Compare the player's location against the last one reported and, if it
+ * changed, emit a cart_room_changed() event. Called at each turn boundary
+ * (WAIT_FOR_INPUT / GAME_FINISHED) — see CARTOGRAPHER.md for why hooking
+ * here, rather than the shared interpreter core, is sufficient.
+ */
+static void cart_check_room_change(webterm_session_t *s) {
+    uint16_t room_id = 0;
+    char name[80];
+
+    if (zvibe_get_room(s->zvibe, &room_id, name, sizeof(name)) != ZVIBE_OK) return;
+    if (room_id == s->cart_room) return;
+
+    s->cart_room = room_id;
+    cart_room_changed(s->platform, s->cart_cmd_valid ? s->cart_cmd : NULL,
+                       room_id, name);
+    s->cart_cmd_valid = 0;
+}
+
+/**
+ * Send the loaded story's identity, once per load and once per resume.
+ * The client uses (release, serial, checksum) as a localStorage key to
+ * persist and restore the Cartographer map across page reloads — see
+ * CARTOGRAPHER.md § Persistence. Silently does nothing if no story is
+ * loaded (zvibe_get_story_id() only fails on a NULL context).
+ */
+static void send_story_id(webterm_session_t *s) {
+    uint16_t release = 0, checksum = 0;
+    char serial[8] = {0};
+
+    if (zvibe_get_story_id(s->zvibe, &release, serial, sizeof(serial),
+                            &checksum) != ZVIBE_OK) return;
+
+    char buf[96];
+    snprintf(buf, sizeof(buf),
+        "{\"type\":\"story\",\"release\":%u,\"serial\":\"%s\",\"checksum\":%u}",
+        (unsigned)release, serial, (unsigned)checksum);
+    send_ephemeral(s, buf);
+}
+
+/**
+ * Re-announce the current room to a reconnecting client, unconditionally
+ * (not gated on a change, since nothing has moved server-side). Lets a
+ * client that just restored a persisted map from localStorage highlight
+ * the right node immediately, instead of waiting for the player's next
+ * move. No-op before the first room has ever been reported.
+ */
+static void cart_resume_announce(webterm_session_t *s) {
+    if (s->cart_room == 0) return;
+
+    uint16_t room_id = 0;
+    char name[80];
+    if (zvibe_get_room(s->zvibe, &room_id, name, sizeof(name)) != ZVIBE_OK) return;
+
+    cart_room_changed(s->platform, NULL, room_id, name);
+}
+
+/* -------------------------------------------------------------------------
  * Lifecycle
  * ---------------------------------------------------------------------- */
 
@@ -343,6 +404,11 @@ int webterm_session_accept(webterm_session_t *s) {
             : "{\"type\":\"resumed\"}";
         s->platform->send(s->platform, hdr, strlen(hdr));
 
+        /* Let the client key/restore its persisted Cartographer map and
+         * highlight the current room before the transcript replay lands. */
+        send_story_id(s);
+        cart_resume_announce(s);
+
         /* Replay output history oldest-first, re-encoding each entry as JSON */
         for (int i = 0; i < s->history_count; i++) {
             int idx = (s->history_head + i) % WEBTERM_HISTORY_FRAMES;
@@ -396,30 +462,8 @@ webterm_result_t webterm_session_load(webterm_session_t *s,
     }
 
     s->state = WEBTERM_STATE_RUNNING;
+    send_story_id(s);
     return WEBTERM_OK;
-}
-
-/* -------------------------------------------------------------------------
- * Cartographer
- * ---------------------------------------------------------------------- */
-
-/**
- * Compare the player's location against the last one reported and, if it
- * changed, emit a cart_room_changed() event. Called at each turn boundary
- * (WAIT_FOR_INPUT / GAME_FINISHED) — see CARTOGRAPHER.md for why hooking
- * here, rather than the shared interpreter core, is sufficient.
- */
-static void cart_check_room_change(webterm_session_t *s) {
-    uint16_t room_id = 0;
-    char name[80];
-
-    if (zvibe_get_room(s->zvibe, &room_id, name, sizeof(name)) != ZVIBE_OK) return;
-    if (room_id == s->cart_room) return;
-
-    s->cart_room = room_id;
-    cart_room_changed(s->platform, s->cart_cmd_valid ? s->cart_cmd : NULL,
-                       room_id, name);
-    s->cart_cmd_valid = 0;
 }
 
 /* -------------------------------------------------------------------------

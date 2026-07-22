@@ -258,6 +258,25 @@ zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,
     return ZVIBE_OK;
 }
 
+zvibeResult zvibe_get_story_id(zvibeContext *ctx, uint16_t *release,
+                               char *serial_buf, size_t serial_buf_size,
+                               uint16_t *checksum) {
+    if (!ctx) return ZVIBE_ERROR;
+
+    zState *G = &ctx->z_state;
+    if (release) *release = G->header.release;
+    if (checksum) *checksum = G->header.story_checksum;
+
+    if (serial_buf && serial_buf_size > 0) {
+        size_t n = sizeof(G->header.serial) - 1;  /* 6 chars, excl. NUL */
+        if (n >= serial_buf_size) n = serial_buf_size - 1;
+        memcpy(serial_buf, G->header.serial, n);
+        serial_buf[n] = '\0';
+    }
+
+    return ZVIBE_OK;
+}
+
 void zvibe_set_random_seed(zvibeContext *ctx, int seed) {
     (void)ctx;  /* seed is global state; ctx kept for API consistency */
     z_random_set_seed((zSDWord)seed);
