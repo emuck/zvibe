@@ -41,3 +41,11 @@ else
     echo
     echo "==> Skipping SAME51 build (xc32-gcc not found)"
 fi
+
+if have_cmd x86_64-w64-mingw32-gcc; then
+    run_step "Windows build" make -C target/windows clean
+    run_step "Windows build" make -C target/windows all
+else
+    echo
+    echo "==> Skipping Windows build (x86_64-w64-mingw32-gcc not found)"
+fi
