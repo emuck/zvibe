@@ -1,0 +1,7 @@
+# Force LF for files that run through a shell/interpreter or a shebang.
+# Without this, a Windows checkout with core.autocrlf=true silently rewrites
+# these to CRLF, which breaks execution both locally and in Linux CI.
+*.sh text eol=lf
+Makefile text eol=lf
+*.mk text eol=lf
+*.py text eol=lf
