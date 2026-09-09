@@ -10,7 +10,8 @@ target/windows/
 ├── Makefile                     # Windows-specific build system
 ├── icons/                       # Application and file icons
 │   ├── ZVibe.ico               # Main application icon (custom)
-│   └── Z3.ico                  # Z3 game file icon (custom)
+│   ├── Z3.ico                  # Z3 game file icon (custom)
+│   └── Restaurant.ico          # "Play Restaurant" shortcut icon (from box art)
 ├── resources/                   # Windows resource files
 │   ├── zvibe_console.rc        # Console app resources
 │   ├── zvibe_minimal.rc        # Minimal app resources
@@ -19,7 +20,8 @@ target/windows/
 │   ├── update_windows_build.sh        # Update existing installation
 │   ├── build_and_update_windows.sh    # Build and update
 │   ├── create_placeholder_icons.py    # Generate placeholder icons
-│   ├── Create-Desktop-Shortcuts.ps1   # Desktop shortcuts
+│   ├── Setup-Desktop-Shortcuts.bat    # Double-click entry point (run this)
+│   ├── Create-Desktop-Shortcuts.ps1   # Desktop shortcuts (the .bat runs this)
 │   ├── Launch-ZVibe.ps1               # PowerShell launcher
 │   ├── launch_zvibe.bat               # Batch launcher
 │   ├── register_z3_files.reg          # File associations
@@ -114,7 +116,7 @@ make deploy
 # 3. Test on Windows
 # Open Windows Terminal or Command Prompt:
 # cd C:\tmp\zvibe_win\win
-# zvibe_console.exe czech.z3
+# zvibe_console.exe restaurant.z3
 ```
 
 ### Quick Updates
@@ -146,18 +148,26 @@ C:\tmp\zvibe_win\
 ├── win\
 │   ├── zvibe_console.exe        # With embedded custom icon
 │   ├── zvibe_minimal.exe        # With embedded custom icon
-│   └── czech.z3                 # Test game
+│   └── restaurant.z3            # Bundled game (registry "default" entry)
 ├── win_lib\
 │   ├── libzvibe.dll             # Shared library
 │   └── libzvibe.dll.a           # Import library
 ├── Z3.ico                       # Icon for .z3 file associations
-├── Create-Desktop-Shortcuts.ps1 # Desktop integration
+├── Restaurant.ico               # Icon for the "Play Restaurant" shortcut
+├── Setup-Desktop-Shortcuts.bat  # Double-click this to install shortcuts
+├── Create-Desktop-Shortcuts.ps1 # Desktop integration (invoked by the .bat)
 ├── Launch-ZVibe.ps1             # PowerShell launcher
 ├── launch_zvibe.bat             # Batch launcher
 ├── register_z3_files.reg        # File associations
 ├── unregister_z3_files.reg      # Remove associations
 └── WINDOWS_INSTALLATION.md      # End-user guide
 ```
+
+The bundled game is whichever entry in [`games/registry.json`](../../games/registry.json)
+is marked `"default": true` — currently `restaurant.z3`, ZVibe's own game
+"The Restaurant at the End of the Universe." The Makefile reads this at
+build time, so the Windows package can't silently drift from what the
+other targets ship.
 
 ## Integration with Main Project
 

@@ -17,8 +17,14 @@ The build system uses custom icons:
 ```
 target/windows/icons/
 ├── ZVibe.ico            # Custom icon for both applications
-└── Z3.ico               # Custom icon for Z3 game files
+├── Z3.ico               # Custom icon for Z3 game files (generic)
+└── Restaurant.ico       # Custom icon for the "Play Restaurant" shortcut,
+                          # cropped from docs/assets/restaurant-box.png
 ```
+
+`Restaurant.ico` is game-specific branding, distinct from the generic `Z3.ico`
+used for arbitrary `.z3` file associations — it exists only to give the
+one-click "Play Restaurant" desktop shortcut its own recognizable face.
 
 ### Windows Installation
 Icons are deployed to Windows installation:
@@ -29,6 +35,7 @@ C:\tmp\zvibe_win\
 │   ├── zvibe_console.exe    # Executable with embedded blue icon
 │   └── zvibe_minimal.exe    # Executable with embedded gray icon
 ├── Z3.ico                  # Icon for .z3 file associations
+├── Restaurant.ico          # Icon for the "Play Restaurant" shortcut
 └── register_z3_files.reg   # Registry file using custom icon
 ```
 

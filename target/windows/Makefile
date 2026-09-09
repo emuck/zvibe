@@ -19,6 +19,13 @@ LIB_DIR = $(BUILD_DIR)/lib
 # Windows installation directory (accessible from Windows)
 WINDOWS_INSTALL_DIR = /mnt/c/tmp/zvibe_win
 
+# Game to bundle with the Windows package: read the "default" entry from the
+# shared game registry so this target can't drift from what the other
+# platforms ship. Falls back to restaurant.z3 if the registry is unreadable.
+GAMES_DIR = ../../games/catalog
+GAME_REGISTRY = ../../games/registry.json
+DEFAULT_GAME := $(shell python3 -c "import json,sys; d=json.load(open('$(GAME_REGISTRY)')); print(next((g['filename'] for g in d['games'] if g.get('default')), 'restaurant.z3'))" 2>/dev/null || echo restaurant.z3)
+
 # Source files
 CORE_SRCS = $(wildcard $(SRC_DIR)/core/*.c)
 CONSOLE_SRC = $(CONSOLE_SRC_DIR)/zvibe_console.c
@@ -128,6 +135,13 @@ copy-install:
 	@cp $(LIB_DIR)/*.dll $(WINDOWS_INSTALL_DIR)/win_lib/
 	@cp $(LIB_DIR)/*.a $(WINDOWS_INSTALL_DIR)/win_lib/ 2>/dev/null || true
 	@cp icons/Z3.ico $(WINDOWS_INSTALL_DIR)/
+	@cp icons/Restaurant.ico $(WINDOWS_INSTALL_DIR)/
+	@if [ -f $(GAMES_DIR)/$(DEFAULT_GAME) ]; then \
+		cp $(GAMES_DIR)/$(DEFAULT_GAME) $(WINDOWS_INSTALL_DIR)/win/; \
+		echo "🎮 Bundled game: $(DEFAULT_GAME)"; \
+	else \
+		echo "⚠️  Default game not found: $(GAMES_DIR)/$(DEFAULT_GAME)"; \
+	fi
 	@echo "✅ Installation complete: C:\\tmp\\zvibe_win"
 
 # Development workflow
@@ -136,6 +150,7 @@ deploy: all install copy-launchers
 copy-launchers:
 	@echo "📋 Copying Windows launchers and setup files..."
 	@cp scripts/Create-Desktop-Shortcuts.ps1 $(WINDOWS_INSTALL_DIR)/ 2>/dev/null || echo "⚠️  Create-Desktop-Shortcuts.ps1 not found"
+	@cp scripts/Setup-Desktop-Shortcuts.bat $(WINDOWS_INSTALL_DIR)/ 2>/dev/null || echo "⚠️  Setup-Desktop-Shortcuts.bat not found"
 	@cp scripts/Launch-ZVibe.ps1 $(WINDOWS_INSTALL_DIR)/ 2>/dev/null || echo "⚠️  Launch-ZVibe.ps1 not found"
 	@cp scripts/launch_zvibe.bat $(WINDOWS_INSTALL_DIR)/ 2>/dev/null || echo "⚠️  launch_zvibe.bat not found"
 	@cp scripts/register_z3_files.reg $(WINDOWS_INSTALL_DIR)/ 2>/dev/null || echo "⚠️  register_z3_files.reg not found"

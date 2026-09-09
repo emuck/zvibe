@@ -6,15 +6,43 @@ This guide helps you set up ZVibe for easy desktop launching on Windows 11.
 
 ### 1. Create Desktop Shortcuts
 
-**Option A: Using PowerShell (Recommended)**
+**Option A: Double-click `Setup-Desktop-Shortcuts.bat` (Recommended)**
+
+That's it — it runs the PowerShell script for you and creates the shortcuts.
+
+**Expect a security prompt here.** ZVibe's Windows files aren't code-signed
+(that requires a paid certificate), so Windows treats them as unrecognized
+software freshly downloaded from the internet and will warn you before
+running them. This is expected, happens with any unsigned indie or
+open-source tool, and isn't a sign anything is wrong with the download.
+You'll see one of two prompts, depending on your Windows security settings:
+
+- **SmartScreen** ("Windows protected your PC"): click **"More info"** then
+  **"Run anyway."**
+- **Smart App Control** (Windows 11, blocks instead of warning): right-click
+  the file → **Properties** → check **"Unblock"** at the bottom → **OK**, then
+  try again. To unblock the whole extracted folder at once, run this in
+  PowerShell:
+  ```powershell
+  Get-ChildItem "C:\tmp\zvibe_win" -Recurse | Unblock-File
+  ```
+  (Smart App Control can also be turned off entirely in Windows Security
+  settings, but that's a one-way change — Microsoft requires a clean
+  Windows reinstall to turn it back on — so it isn't necessary and isn't
+  recommended just to run ZVibe.)
+
+**Option B: Run the PowerShell script directly**
 1. Right-click on `Create-Desktop-Shortcuts.ps1`
 2. Select "Run with PowerShell"
-3. If prompted about execution policy, type `Y` and press Enter
 
-**Option B: Manual Shortcuts**
+(Double-clicking the `.ps1` file itself just opens it in a text editor —
+that's a Windows security default, not a bug. Use the `.bat` file or the
+right-click menu instead.)
+
+**Option C: Manual Shortcuts**
 1. Right-click on desktop → New → Shortcut
 2. Browse to: `C:\tmp\zvibe_win\win\zvibe_console.exe`
-3. Add arguments: `czech.z3` (or path to your game)
+3. Add arguments: `restaurant.z3` (or path to your game)
 4. Name it "ZVibe Console"
 
 ### 2. Set Up File Associations (Optional)
@@ -29,15 +57,16 @@ This guide helps you set up ZVibe for easy desktop launching on Windows 11.
 ### 🖥️ Desktop Shortcuts
 After setup, you'll have these desktop icons:
 
-- **ZVibe Console**: Full interactive experience with status line
+- **Play Restaurant**: One-click launch straight into the bundled game, with its own icon
+- **ZVibe Console**: Full interactive experience with status line (same game)
 - **ZVibe Minimal**: Clean text output for scripting
-- **ZVibe Game Launcher**: Browse and select any Z3 game
+- **ZVibe Game Launcher**: Browse and select any other Z3 game
 - **ZVibe Folder**: Quick access to installation directory
 
 ### 🎮 Playing Games
 
-**Method 1: Double-click shortcuts**
-- Use the desktop shortcuts to play the included test game
+**Method 1: Double-click "Play Restaurant"**
+- The simplest path: double-click the desktop icon and you're in the game
 
 **Method 2: Right-click .z3 files** (after registry setup)
 - Right-click any `.z3` file → "Play with ZVibe"
@@ -74,7 +103,7 @@ zvibe_console.exe "path\to\your\game.z3"
 
 ZVibe supports **Z-machine Version 3** story files (`.z3` extension):
 
-- **Included**: `czech.z3` (test suite)
+- **Included**: `restaurant.z3` — "The Restaurant at the End of the Universe," an original game written for ZVibe
 - **Compatible**: Most classic text adventure games
 - **Examples**: Zork series, Hitchhiker's Guide, Planetfall, etc.
 
@@ -88,7 +117,7 @@ ZVibe supports **Z-machine Version 3** story files (`.z3` extension):
 ### Change Default Game
 Edit the desktop shortcuts to point to your preferred game:
 1. Right-click shortcut → Properties
-2. In "Target" field, change `czech.z3` to your game path
+2. In "Target" field, change `restaurant.z3` to your game path
 3. Example: `"C:\Games\zork1.z3"`
 
 ### Create Game-Specific Shortcuts
@@ -128,6 +157,13 @@ for %%f in (*.z3) do (
 ```
 
 ## Troubleshooting
+
+### "Windows protected your PC" / Smart App Control blocked this app
+Expected — see [Create Desktop Shortcuts](#1-create-desktop-shortcuts) above.
+ZVibe's files aren't code-signed, so freshly downloaded copies have no
+reputation with Windows yet. Click "Run anyway" (SmartScreen) or unblock the
+file via Properties → "Unblock" (Smart App Control). Not a sign of a problem
+with the download.
 
 ### Shortcuts Don't Work
 - Check that paths in shortcuts match your installation location
@@ -172,4 +208,4 @@ To remove ZVibe:
 For issues or questions:
 - Check the main ZVibe documentation
 - Review build logs in WSL2
-- Test with the included `czech.z3` file first
+- Test with the included `restaurant.z3` file first
