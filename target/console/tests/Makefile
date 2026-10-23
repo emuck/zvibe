@@ -15,7 +15,7 @@ BUILD_DIR = ../build
 BIN_DIR = $(BUILD_DIR)/bin
 
 # Test executables
-TEST_TARGETS = test_split_memory
+TEST_TARGETS = test_split_memory test_screen
 
 # Integration test scripts
 INTEGRATION_TESTS = test_czech.sh
@@ -25,6 +25,9 @@ all: $(TEST_TARGETS)
 
 # Unit test targets
 test_split_memory: test_split_memory.c $(CORE_DIR)/zvibe_memory.c
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
+
+test_screen: test_screen.c $(CORE_DIR)/../screen/zvibe_screen.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
 # Ensure zvibe binaries are built before running integration tests
@@ -48,6 +51,9 @@ test-unit: $(TEST_TARGETS)
 	@echo
 	@echo "Running split memory unit tests..."
 	@./test_split_memory
+	@echo
+	@echo "Running V4 screen layer unit tests..."
+	@./test_screen
 	@echo
 	@echo "=== Unit Tests Complete ==="
 

@@ -52,6 +52,7 @@ __pycache__/
 
 # Compiled test binaries (no extension — must be listed explicitly)
 target/console/tests/test_split_memory
+target/console/tests/test_screen
 target/riscv/serv_zvibe/common/sw/flash_boot_banner
 
 # FPGA binary files
