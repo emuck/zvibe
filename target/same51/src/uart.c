@@ -27,6 +27,9 @@
 static SERCOM5_USART_RING_BUFFER_CALLBACK SERCOM5_USART_ReadCallback = NULL;
 static uintptr_t SERCOM5_USART_ReadContext;
 
+/* Hardware receive errors seen (framing/parity/overrun); each one also drops buffered bytes */
+volatile uint32_t SERCOM5_USART_ErrorCount = 0U;
+
 /*******************************************************************************
   Internal Functions
 *******************************************************************************/
@@ -38,6 +41,7 @@ void static SERCOM5_USART_ErrorClear(void)
 
     if(errorStatus != USART_ERROR_NONE)
     {
+        SERCOM5_USART_ErrorCount++;
         /* Clear error flag */
         SERCOM5_REGS->USART_INT.SERCOM_INTFLAG = (uint8_t)SERCOM_USART_INT_INTFLAG_ERROR_Msk;
         /* Clear all errors */
@@ -157,6 +161,17 @@ bool SERCOM5_USART_ReceiverIsReady(void)
 int SERCOM5_USART_ReadByte(void)
 {
     return (int)SERCOM5_REGS->USART_INT.SERCOM_DATA;
+}
+
+/* RXC is SERCOM5_2 (IRQ 68) and ERROR is SERCOM5_OTHER (IRQ 69) on the SAM E51.
+ * Opt-in: with no callback registered, a pending RXC would re-enter the ISR
+ * forever, so polling-only firmware must not call this. */
+void SERCOM5_USART_EnableRxInterrupt(void)
+{
+    NVIC_ClearPendingIRQ(SERCOM5_2_IRQn);
+    NVIC_ClearPendingIRQ(SERCOM5_3_IRQn);
+    NVIC_EnableIRQ(SERCOM5_2_IRQn);
+    NVIC_EnableIRQ(SERCOM5_3_IRQn);
 }
 
 void SERCOM5_USART_ReadCallbackRegister(SERCOM5_USART_RING_BUFFER_CALLBACK callback, uintptr_t context)
