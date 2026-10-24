@@ -1,7 +1,12 @@
 # Z-machine V4 Feasibility
 
-Status: **Stage 1 (screen layer) in progress** on branch `dev/v4-screen-layer`.
-V4 stays out of scope for the main line until the Stage 1 hardware test passes.
+Status: **Stage 1 (screen layer) built and host-tested; awaiting the SAME51
+hardware run.** Work is on branch `dev/v4-screen-layer`. V4 stays out of scope
+for the main line until the Stage 1 hardware test passes.
+
+How V4 will be built in the core (one parametrized core, one `ZVIBE_ENABLE_V4`
+compile switch, V3-only builds unchanged or smaller) is in
+[V4_DESIGN.md](V4_DESIGN.md).
 
 ## Why V4
 
@@ -43,18 +48,25 @@ fields (`zscreen`, 184 bytes).
 
 ## Stages
 
+**Gate (this document):** prove a UART terminal can host the V4 screen model.
+
 1. **Screen layer + host test + board exerciser** (`include/zvibe_screen.h`,
    `src/screen/zvibe_screen.c`, `target/console/tests/test_screen.c`,
-   `target/same51/src/screen_demo.c`, `make screen-demo`).
-2. **Minimal V4 core**, wired to the screen layer. Must cover the whole matrix
-   above, not only what the test story uses: `read_char`, timed `read`
-   (resumable editing, interrupt routine), `call_vs2`, store-style
-   `save`/`restore`, `scan_table`, ZSCII decoding above the ASCII screen API
-   (`print_char(0)` vs string zero, extended characters), and replacing the
-   firmware-side echo in `zvibe_same51.c` so the screen layer is the single
-   owner of the cursor.
-3. **Standalone Inform 6 `-v4` madlibs story** (form in the upper window,
-   answers reused for Douglas-Adams-style humour). Transcript compared to frotz.
+   `target/same51/src/screen_demo.c`, `make screen-demo`). Built and passing on
+   the host. Next step: run the exerciser on the SAME51 and check the criteria
+   below.
+2. **Standalone Inform 6 `-v4` madlibs story** (form in the upper window,
+   answers reused for Douglas-Adams-style humour). It needs no interpreter
+   work, so it can be written and checked against frotz in parallel with
+   Stage 1. Its transcript becomes the reference for the first V4 run.
+
+**After the gate passes:** the core work follows the ordered slices in
+[V4_DESIGN.md](V4_DESIGN.md#order-of-work): const opcode tables, config header,
+addresses/objects/properties/dictionary, decoder and save/restore lifecycle,
+screen/streams/`read_char`, then regression and playthroughs. That work must
+cover the whole V4 matrix above, not only what the test story uses, and must
+replace the firmware-side echo in `zvibe_same51.c` so the screen layer is the
+single owner of the cursor.
 
 ## Green-light criteria
 
@@ -72,6 +84,35 @@ styles, or input integrity, so the test needs more than frotz parity:
 - Verified in at least two terminal programs (scroll-region handling differs).
 - Stage 3 story transcript equals frotz for the text; screen state is checked
   separately by the host VT100 emulator.
+
+## Running the Stage 1 hardware test
+
+Host side (no board needed): `cd target/console/tests && make test-unit`
+runs the 66 screen-layer checks against the VT100 emulator.
+
+Board side (SAM E51 Curiosity Nano):
+
+1. `cd target/same51 && make screen-demo` (builds `build_screen_demo/`, about 9.8 KB).
+2. `make screen-demo-program` flashes it with `edbg`.
+3. Open the EDBG virtual COM port at 115200 8N1 in an xterm-compatible
+   terminal, at least 56 columns wide. Press the board reset so the demo
+   probes the terminal size on start.
+4. Press RETURN to step through the four phases and check each against the
+   green-light criteria below:
+   - Phase 1: the reverse-video status bar stays on row 1 through 60 scrolled
+     lines and updates to `Score: 60`.
+   - Phase 2: no word is split across lines; reverse, bold and underline stop
+     at their words.
+   - Phase 3: the form box is intact; type the answers with backspace; the
+     answers appear in the form afterward.
+   - Phase 4: paste a known block of text while the burst runs. Compare the
+     reported RX byte count and byte-sum with the host
+     (`python3 -c "print(sum(open('f','rb').read()))"`). Ring overflow and
+     UART hardware errors must both be 0.
+5. Repeat in a second terminal program; scroll-region handling differs.
+
+If RX is silent, suspect the interrupt wiring first: the demo is the first
+code to use the SERCOM5 RX interrupt, which was previously mis-numbered.
 
 ## Known limits of Stage 1
 

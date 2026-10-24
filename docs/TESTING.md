@@ -26,7 +26,18 @@ cd target/console/tests
 make test-unit
 ```
 
-**Expected:** 133 tests pass.
+**Expected:** 133 split-memory tests pass, then the screen layer suite below.
+
+**File:** `test_screen.c`
+
+Tests the V4 ANSI screen layer (`src/screen/zvibe_screen.c`) against a minimal
+VT100 emulator that models cursor addressing, scroll regions, SGR rendition,
+erase, and auto-wrap. Covers split-window scrolling, word wrap, upper-window
+clipping, erase semantics, text styles, input echo at the right edge, and
+dimension validation.
+
+**Expected:** 66 checks pass. The board-side counterpart is
+`make screen-demo` in `target/same51` (see [V4 Feasibility](V4_ANALYSIS.md)).
 
 ### Integration Tests
 

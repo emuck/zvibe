@@ -29,6 +29,8 @@ developing ZVibe.
 | [Targets](TARGETS.md) | Supported target platforms and constraints |
 | [FPGA](FPGA.md) | RISC-V/FPGA target notes |
 | [Code Size Analysis](CODE_SIZE_ANALYSIS.md) | Size and memory footprint analysis |
+| [V4 Feasibility](V4_ANALYSIS.md) | Whether a UART terminal can host the V4 screen model; Stage 1 status and green-light criteria |
+| [V4 Design](V4_DESIGN.md) | Plan for adding V4 to the core with one compile switch, ordered slices, and measured size effects |
 
 ## Development
 

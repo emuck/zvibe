@@ -26,7 +26,7 @@ The Z-machine core is derived from prior work; attribution in [THIRD_PARTY_NOTIC
 
 ## Goals
 
-- **Z-machine v3 only.** v3 is the last version where the full spec fits a static-allocation model. Later versions add undo stacks, sound, and variable-length encodings that require heap allocation and break the memory guarantees this design depends on. v4 is a possible future direction — *Bureaucracy* and *Trinity* are good reasons to revisit.
+- **Z-machine v3 only.** v3 is the last version where the full spec fits a static-allocation model. V5 and later add undo, extended opcodes, and larger tables that strain the static-allocation model. v4 does not need those and is under evaluation — *Bureaucracy* and *Trinity* are good reasons to revisit. See [docs/V4_ANALYSIS.md](docs/V4_ANALYSIS.md) and [docs/V4_DESIGN.md](docs/V4_DESIGN.md).
 - **Minimal RAM.** The interpreter must run on targets with 32KB of working memory.
 - **No heap allocation.** All state is statically sized; no `malloc` at runtime.
 - **Single C library.** Platform-specific code is isolated to thin HAL layers.
@@ -145,7 +145,7 @@ validated on physical hardware.
 - Regression suite expansion
 
 **Out of scope:**
-- Z-machine v4 and later
+- Z-machine v5 and later (v4 is under evaluation; see docs/V4_ANALYSIS.md)
 - Networking or multiplayer
 
 ## License
@@ -164,7 +164,7 @@ Good starting points — no embedded hardware required for most:
 - **Unit test coverage** — `test_split_memory.c` covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet
 - **Console target improvements** — status line rendering, save file compatibility, platform edge cases
 - **New board port** — `docs/TARGETS.md` has a porting checklist; any target with 32 KB RAM and XIP-accessible flash is a candidate
-- **v4 groundwork** — *Bureaucracy* and *Trinity* are the motivation; starts with undo stack design and extended object model
+- **v4 groundwork** — *Bureaucracy* and *Trinity* are the motivation; the plan and ordered slices are in [docs/V4_DESIGN.md](docs/V4_DESIGN.md), and the first slice (const opcode tables) is independent of V4 itself
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and PR checklist.
 Bugs and feature requests: [GitHub Issues](https://github.com/emuck/zvibe/issues).
