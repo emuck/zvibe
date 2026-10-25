@@ -154,6 +154,14 @@ loadable image bytes, symbol sizes, normalized disassembly, and
 `test-restaurant`, then the same V3 stories in the dual build. Also check that a
 V4-only story is rejected by a V3-only build, and the reverse.
 
+### V4 gate: Czech
+
+`czech.z4` (Czech 0.8 built with `inform -v4`; see
+[V4_ANALYSIS.md](V4_ANALYSIS.md#stages)) is the conformance gate for slices 3
+and 4: same result as frotz (386 tests, 367 passed, 0 failed, 19 print tests).
+It already covers `call_1s`, `call_2s` and `call_vs2`. The repo runs the V3
+build today (368/368), so the harness extends naturally.
+
 ### V4 fixtures needed
 
 Eight-operand call, object ids above 255, a 64-byte property, a third
@@ -169,6 +177,13 @@ target adapters. Timed input would add 150-300. The earlier draft estimate
 Highest risks: restored-save continuation (resume with result 2), the
 two-type-byte decoder, and output stream 3 routing.
 
+## Memory
+
+Per-target RAM, flash and save limits, and where V4 does not fit, are in
+[V4_MEMORY.md](V4_MEMORY.md). Design consequences: `ZVIBE_MEMORY_BUFFER_SIZE`
+and the Z-machine stack size become explicit per-target settings
+(`ZVIBE_STACK_WORDS`), and the single-game SAME51 firmware moves to delta saves.
+
 ## Existing issues to fix independently
 
 - Opcode tables are mutable RAM (first slice above).
@@ -178,6 +193,7 @@ two-type-byte decoder, and output stream 3 routing.
   interpreter's host-endian variable representation. It is correct on
   little-endian hosts only; the comment is misleading.
 - The comment calling the stack buffer "shared" is inaccurate; stack storage
-  stays separate in `zState`.
+  stays separate in `zState`. The load check at `zvibe_core.c:475` therefore
+  reserves 1 KB of the buffer for a stack that is not there.
 - `output_stream`, `input_stream` and `sound_effect` are unimplemented, which
   affects V3 stories too.

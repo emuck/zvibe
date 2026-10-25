@@ -1,8 +1,8 @@
 # Z-machine V4 Feasibility
 
-Status: **Stage 1 (screen layer) passes on SAME51 hardware** (2026-10-25,
-automated run through a terminal emulator; a visual check in a real terminal
-program is still to do). Work is on branch `dev/v4-screen-layer`. V4 stays out
+Status: **Stage 1 (screen layer) passes on SAME51 hardware and in two real
+terminals** (2026-10-25), and the UART requirements below are checked off, so
+the board is no longer needed for this work. Work is on branch `dev/v4-screen-layer`. V4 stays out
 of scope for the main line until the remaining green-light items below are done.
 
 How V4 will be built in the core (one parametrized core, one `ZVIBE_ENABLE_V4`
@@ -57,9 +57,20 @@ fields (`zscreen`, 184 bytes).
    the host. Next step: run the exerciser on the SAME51 and check the criteria
    below.
 2. **Standalone Inform 6 `-v4` madlibs story** (form in the upper window,
-   answers reused for Douglas-Adams-style humour). It needs no interpreter
-   work, so it can be written and checked against frotz in parallel with
-   Stage 1. Its transcript becomes the reference for the first V4 run.
+   answers reused for Douglas-Adams-style humour). Reassessed: it is an
+   acceptance demo for after the core work, **not a gate**. It would exercise
+   the screen opcodes, V4 `read`, and a few objects and properties end to end,
+   but it would not retire the risks that matter for real V4 games: object ids
+   above 255, 64-byte properties, output stream 3, restored-save result 2, or
+   memory fit. The V4 gate for the core is the **Czech conformance suite built
+   for V4** (below).
+
+**V4 core gate:** `czech.z4` must run under zvibe with the same result as frotz.
+Czech 0.8 (IF Archive, `infocom/interpreters/tools/czech_0_8.zip`) compiles for
+V4 with `inform -v4 czech.inf czech.z4` (11 KB, dynamic memory 2.3 KB). Under
+frotz it runs 386 tests: 367 passed, 0 failed, 19 print tests. Its source
+exercises `call_1s`, `call_2s` and `call_vs2`. The repo already runs the V3
+build (368/368).
 
 **After the gate passes:** the core work follows the ordered slices in
 [V4_DESIGN.md](V4_DESIGN.md#order-of-work): const opcode tables, config header,
@@ -166,6 +177,32 @@ handling now agree.
 
 Green-light status: every criterion above is met except the Stage 3 madlibs
 story transcript, which has not been written yet.
+
+## UART requirements checklist (SAME51, 2026-10-25)
+
+Run with `tests/test_screen_demo.py` (32 checks per run) against the demo
+firmware. All runs below passed 32/32.
+
+| Requirement | Result |
+|---|---|
+| Transmit at the 115200 8N1 line rate | 24.8 KB in 2.2 s per run = 93-100% of line rate across 13 runs |
+| Receive at full rate while transmitting | 200 B paste exact (count and sum); 2000 B paste exact with an earlier build |
+| No lost bytes, no hardware errors | 0 errors in every automated run, including 5 back-to-back soak runs; one unexplained error in a manual session (see above) |
+| Enter as CR, LF or CR+LF | each treated as one Enter |
+| Backspace as 0x7F or 0x08 | both work |
+| Arrow-key and other escape sequences | swallowed, not echoed (3 runs) |
+| Terminal sizes | 24x80, 20x60, 50x100 and 40x132 (uses 80 columns) pass; below 56 columns falls back to 24x80 (not tested) |
+| Size probe (`CSI 6n`) | answered: correct size used. Never answered: falls back to 24x80 and the first screen appears in about 2 s |
+| Status bar and form survive scrolling | pass, emulator and two real terminals |
+| First use of the RX interrupt | pass; vector table and IRQ numbers fixed |
+
+Two demo changes came out of this: input now treats CR, LF and CR+LF as one
+Enter and swallows escape sequences. The real interpreter input path must do
+the same.
+
+Not covered, because it needs the real interpreter rather than the demo: the
+input path draining the RX ring during long output, and long lines (the demo
+stops at the right edge instead of wrapping input).
 
 ## Known limits of Stage 1
 
