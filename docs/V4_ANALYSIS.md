@@ -159,8 +159,13 @@ automated run. The demo now reports burst errors and since-boot errors
 separately, so a recurrence will show where it happened. A framing error also
 makes the driver flush the RX FIFO, so if it recurs under load it can drop bytes.
 
-Still open for the green light: a second terminal program (scroll-region
-handling differs between terminals), and the Stage 3 story.
+Real terminal, terminal 2 (macOS Terminal.app, same `screen` connection):
+confirmed on 2026-10-25. Styles, wrapping, layout and the other phases behave
+the same as in terminal 1. Two terminal programs with different scroll-region
+handling now agree.
+
+Green-light status: every criterion above is met except the Stage 3 madlibs
+story transcript, which has not been written yet.
 
 ## Known limits of Stage 1
 
