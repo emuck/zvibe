@@ -143,8 +143,24 @@ SAM E51J20A (Rev D), 115200 8N1, driven through pyte as an 80x24 terminal.
   software choice. The real input path must drain the ring while printing, or
   use a larger ring.
 
-Still open for the green light: a look in a real terminal program (and a
-second one, since scroll-region handling differs), and the Stage 3 story.
+Real terminal, terminal 1 (Cursor's built-in terminal, xterm.js, through
+`screen /dev/cu.usbmodem14102 115200`): phases 1-3 confirmed by eye on 2026-10-25.
+Reverse, bold and underline render and stop at their words; wrapping and the
+bottom-anchored lower window match the emulator capture; the form stays intact;
+backspace works. (The underlined text in phase 2 is also bold because Z-machine
+style bits accumulate until a roman reset; the demo does not clear bold first.)
+
+One unexplained event: in the same session the burst phase reported
+`UART hw errors: 1` with 0 bytes received. That counter was cumulative since
+boot, so the error may have happened at any point, including when the terminal
+connected. It could not be reproduced: 8 trials of closing and reopening the port,
+including GNU screen connecting and quitting, gave 0 errors, as did every
+automated run. The demo now reports burst errors and since-boot errors
+separately, so a recurrence will show where it happened. A framing error also
+makes the driver flush the RX FIFO, so if it recurs under load it can drop bytes.
+
+Still open for the green light: a second terminal program (scroll-region
+handling differs between terminals), and the Stage 3 story.
 
 ## Known limits of Stage 1
 
