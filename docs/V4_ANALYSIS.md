@@ -1,8 +1,9 @@
 # Z-machine V4 Feasibility
 
-Status: **Stage 1 (screen layer) built and host-tested; awaiting the SAME51
-hardware run.** Work is on branch `dev/v4-screen-layer`. V4 stays out of scope
-for the main line until the Stage 1 hardware test passes.
+Status: **Stage 1 (screen layer) passes on SAME51 hardware** (2026-10-25,
+automated run through a terminal emulator; a visual check in a real terminal
+program is still to do). Work is on branch `dev/v4-screen-layer`. V4 stays out
+of scope for the main line until the remaining green-light items below are done.
 
 How V4 will be built in the core (one parametrized core, one `ZVIBE_ENABLE_V4`
 compile switch, V3-only builds unchanged or smaller) is in
@@ -90,10 +91,19 @@ styles, or input integrity, so the test needs more than frotz parity:
 Host side (no board needed): `cd target/console/tests && make test-unit`
 runs the 66 screen-layer checks against the VT100 emulator.
 
-Board side (SAM E51 Curiosity Nano):
+Board side, automated: flash the demo, then
+`python3 target/same51/tests/test_screen_demo.py` (needs `pip install pyserial
+pyte`). It resets the board with `edbg -x 100 -t same51`, answers the size
+query, runs all four phases through a pyte terminal emulator, types into the
+form with backspace edits, pastes a known payload, and checks the screen and
+the RX statistics. 32 checks.
+
+Board side, by eye (SAM E51 Curiosity Nano):
 
 1. `cd target/same51 && make screen-demo` (builds `build_screen_demo/`, about 9.8 KB).
-2. `make screen-demo-program` flashes it with `edbg`.
+2. `make screen-demo-program` flashes it with `edbg`. To restart the demo
+   later without reflashing, `edbg -x 100 -t same51` pulses reset (`-b` is
+   verbose, not boot).
 3. Open the EDBG virtual COM port at 115200 8N1 in an xterm-compatible
    terminal, at least 56 columns wide. Press the board reset so the demo
    probes the terminal size on start.
@@ -113,6 +123,28 @@ Board side (SAM E51 Curiosity Nano):
 
 If RX is silent, suspect the interrupt wiring first: the demo is the first
 code to use the SERCOM5 RX interrupt, which was previously mis-numbered.
+
+## Stage 1 hardware results (2026-10-25)
+
+SAM E51J20A (Rev D), 115200 8N1, driven through pyte as an 80x24 terminal.
+
+- All 32 automated checks pass: the status bar stays on row 1 in reverse video
+  through 60 scrolled lines and updates; words wrap at boundaries with reverse,
+  bold and underline attributes landing on the right cells; the form box stays
+  intact while answers are typed with backspace and then filled in; the size
+  probe gets its answer on start.
+- RX interrupt (first use of the corrected IRQ numbering): a 200-byte paste at
+  full line rate during the burst arrives exactly, count and byte-sum, with
+  zero ring overflow and zero UART hardware errors. A 2000-byte paste also
+  arrives exactly with zero hardware errors while the transmitter is saturated.
+  Ring overflow in that run (1745) is the demo's 255-byte ring filling because
+  the demo does not read during the burst, as expected.
+- Consequence for Stage 2: the hardware keeps up; the supported paste size is a
+  software choice. The real input path must drain the ring while printing, or
+  use a larger ring.
+
+Still open for the green light: a look in a real terminal program (and a
+second one, since scroll-region handling differs), and the Stage 3 story.
 
 ## Known limits of Stage 1
 
