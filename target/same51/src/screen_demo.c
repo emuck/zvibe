@@ -66,6 +66,23 @@ static int rx_wait(void) {
     return c;
 }
 
+/* Next keystroke with terminal quirks removed: CR, LF and CR+LF all arrive as one
+ * '\r'; escape sequences (arrow keys etc.) are swallowed. A lone ESC eats the
+ * key after it. This is the input behavior the real interpreter path needs. */
+static int next_key(void) {
+    static int state = 0;      /* 0 normal, 1 after ESC, 2 inside CSI/SS3 */
+    static int last_cr = 0;
+    for (;;) {
+        int c = rx_wait();
+        if (state == 1) { state = (c == '[' || c == 'O') ? 2 : 0; continue; }
+        if (state == 2) { if (c >= 0x40 && c <= 0x7E) state = 0; continue; }
+        if (c == 0x1B) { state = 1; continue; }
+        if (c == '\n' && last_cr) { last_cr = 0; continue; }
+        last_cr = (c == '\r');
+        return c == '\n' ? '\r' : c;
+    }
+}
+
 static void put_byte(uint8_t b) { SERCOM5_USART_WriteByte(b); }
 
 static zscreen scr;
@@ -115,8 +132,8 @@ static void read_line(char *buf, uint8_t n) {
     uint8_t len = 0;
     zscreen_flush(&scr);
     for (;;) {
-        char c = (char)rx_wait();
-        if (c == '\r' || c == '\n') { zscreen_echo(&scr, '\n'); break; }
+        char c = (char)next_key();
+        if (c == '\r') { zscreen_echo(&scr, '\n'); break; }
         if (c == 0x08 || c == 0x7F) {
             if (len && zscreen_echo(&scr, c)) len--;
         } else if (c >= 32 && c < 127 && len < n - 1) {
@@ -129,7 +146,7 @@ static void read_line(char *buf, uint8_t n) {
 static void press_return(void) {
     zscreen_puts(&scr, "\n[press RETURN] ");
     zscreen_flush(&scr);
-    while (rx_wait() != '\r') {}
+    while (next_key() != '\r') {}
     zscreen_echo(&scr, '\n');
 }
 
