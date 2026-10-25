@@ -155,7 +155,7 @@ if m:
     print(f"   sent {len(payload)} bytes sum {sent_sum}; board saw {rx_n} bytes sum {rx_sum}")
     check("p4 RX byte count exact", rx_n == len(payload), f"{rx_n} vs {len(payload)}")
     check("p4 RX byte-sum exact", rx_sum == sent_sum, f"{rx_sum} vs {sent_sum}")
-m2 = re.search(r"Ring overflow: (\d+)\s+UART hw errors: (\d+)", joined)
+m2 = re.search(r"Ring overflow: (\d+)\s+UART hw errors in burst: (\d+)", joined)
 check("p4 error line found", bool(m2))
 if m2:
     check("p4 ring overflow 0", int(m2.group(1)) == 0, m2.group(1))

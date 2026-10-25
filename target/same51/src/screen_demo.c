@@ -220,6 +220,7 @@ static void phase_burst(void) {
     zscreen_erase_window(&scr, -1);
     zscreen_split_window(&scr, 1);
     status("PHASE 4: burst - type while this runs", "");
+    uint32_t err_before = SERCOM5_USART_ErrorCount;
     rx_dropped = 0;
     rx_total = 0;
     rx_sum = 0;
@@ -233,8 +234,11 @@ static void phase_burst(void) {
     snprintf(buf, sizeof buf, "\nBurst done. RX bytes: %lu  byte-sum: %lu\n",
              (unsigned long)rx_total, (unsigned long)rx_sum);
     zscreen_puts(&scr, buf);
-    snprintf(buf, sizeof buf, "Ring overflow: %lu  UART hw errors: %lu  (both expect 0)\n",
-             (unsigned long)rx_dropped, (unsigned long)SERCOM5_USART_ErrorCount);
+    snprintf(buf, sizeof buf, "Ring overflow: %lu  UART hw errors in burst: %lu  (both expect 0)\n",
+             (unsigned long)rx_dropped, (unsigned long)(SERCOM5_USART_ErrorCount - err_before));
+    zscreen_puts(&scr, buf);
+    snprintf(buf, sizeof buf, "UART hw errors since boot: %lu  (a port open/close can glitch the line)\n",
+             (unsigned long)SERCOM5_USART_ErrorCount);
     zscreen_puts(&scr, buf);
     zscreen_puts(&scr, "Compare bytes/sum with what you sent (host: sum of ord() over the pasted text).\n");
     press_return();
