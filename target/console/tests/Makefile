@@ -21,7 +21,7 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Test executables
 TEST_TARGETS = test_split_memory test_screen test_config_v3 test_config_v4 test_config_stack1024 \
                test_save_restore test_save_restore_v4_stack1024 test_save_restore_san \
-               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_save_restore_san
+               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_save_restore_san
 
 # Integration test scripts
 INTEGRATION_TESTS = test_czech.sh
@@ -75,6 +75,13 @@ test_objects_v3: test_objects.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
 test_objects_v4: test_objects.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
 	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_objects.c $(ALL_SRCS)
 
+# Loading, header setup, instruction decoding, call forms, save/restore results.
+test_opcodes_v3: test_opcodes.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -o $@ test_opcodes.c $(ALL_SRCS)
+
+test_opcodes_v4: test_opcodes.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_opcodes.c $(ALL_SRCS)
+
 # Dictionary encoding, lookup and tokenizing. The test #includes zvibe_ops_text.c
 # to reach its static functions, so that file is left out of the link.
 DICT_SRCS = $(filter-out %zvibe_ops_text.c,$(ALL_SRCS))
@@ -96,6 +103,24 @@ test-delta-copies:
 	@cmp ../../same51/src/save_delta.c ../../riscv/serv_zvibe/common/sw/save_delta.c
 	@cmp ../../same51/include/save_delta.h ../../riscv/serv_zvibe/common/sw/save_delta.h
 	@echo "save_delta copies identical"
+
+# ZVIBE_VERIFY_SAVE_IDENTITY defaults: on for hosted builds and any V4 build,
+# off for freestanding / minimal V3-only firmware (and overridable)
+test-config-identity:
+	@check() { \
+	  want=$$1; shift; \
+	  got=$$(printf '#include "zvibe_config.h"\nint v = ZVIBE_VERIFY_SAVE_IDENTITY;\n' | $(CC) -I../../../include "$$@" -E -x c - | tail -1 | sed 's/.*= \([01]\);/\1/'); \
+	  [ "$$got" = "$$want" ] || { echo "FAIL: ZVIBE_VERIFY_SAVE_IDENTITY with [$$*] is $$got, expected $$want"; exit 1; }; \
+	}; \
+	check 1; \
+	check 1 -DZVIBE_ENABLE_V4=1; \
+	check 0 -DZVIBE_FREESTANDING=1; \
+	check 0 -DZVIBE_MINIMAL_FEATURES; \
+	check 1 -DZVIBE_ENABLE_V4=1 -DZVIBE_FREESTANDING=1; \
+	check 1 -DZVIBE_ENABLE_V4=1 -DZVIBE_MINIMAL_FEATURES; \
+	check 1 -DZVIBE_FREESTANDING=1 -DZVIBE_VERIFY_SAVE_IDENTITY=1; \
+	check 0 -DZVIBE_VERIFY_SAVE_IDENTITY=0
+	@echo "ZVIBE_VERIFY_SAVE_IDENTITY defaults OK"
 
 # zvibe_config.h must reject anything but a literal 0 or 1 for ZVIBE_ENABLE_V4
 test-config-defines:
@@ -157,6 +182,7 @@ test-unit: $(TEST_TARGETS)
 	@./test_config_v4
 	@./test_config_stack1024
 	@$(MAKE) --no-print-directory test-config-defines
+	@$(MAKE) --no-print-directory test-config-identity
 	@echo
 	@echo "Running restore safety tests (raw and delta saves)..."
 	@./test_save_restore
@@ -168,6 +194,8 @@ test-unit: $(TEST_TARGETS)
 	@./test_objects_v4
 	@./test_dict_v3
 	@./test_dict_v4
+	@./test_opcodes_v3
+	@./test_opcodes_v4
 	@$(MAKE) --no-print-directory test-delta-copies
 	@echo
 	@echo "=== Unit Tests Complete ==="
@@ -203,6 +231,12 @@ test-split-memory: test_split_memory
 test-czech: ensure-binaries
 	@echo "Running Czech Z3 functionality test..."
 	./test_czech.sh
+
+# V4 conformance gate: Czech built for V4, against a V4-enabled console build.
+# Run with: make test-czech-v4 ZVIBE_BUILD=build_v4 EXPECT_V4=1
+test-czech-v4: ensure-binaries
+	@echo "Running Czech V4 conformance test..."
+	./test_czech_v4.sh
 
 test-plundered: ensure-binaries
 	@echo "Running Plundered Hearts integration test..."
@@ -290,4 +324,4 @@ help:
 	@echo "  make coverage                # Run unit tests with coverage analysis"
 
 # Phony targets
-.PHONY: verify-console-config test-delta-copies test-config-defines all test test-unit test-integration test-verbose clean test-split-memory test-czech test-plundered test-seastalker test-restaurant coverage debug memcheck profile help ensure-binaries
+.PHONY: test-config-identity test-czech-v4 verify-console-config test-delta-copies test-config-defines all test test-unit test-integration test-verbose clean test-split-memory test-czech test-plundered test-seastalker test-restaurant coverage debug memcheck profile help ensure-binaries

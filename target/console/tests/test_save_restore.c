@@ -49,10 +49,12 @@ static int same(const live_t *a) {
            memcmp(a->stack, b.stack, a->stack_words * sizeof(zWord)) == 0;
 }
 
-/* Give the live machine a recognizable state: `words` stack words, a PC, etc. */
+/* Give the live machine a recognizable state: `words` stack words, a PC, etc.
+ * The 64-byte header is left alone: it identifies the story, and a restore refuses
+ * a save whose header does not match (see ZVIBE_VERIFY_SAVE_IDENTITY). */
 static void set_state(uint8_t ram_seed, size_t words, zDWord pc, zWord bp) {
     size_t i;
-    for (i = 0; i < DYN_SIZE; i++) G->memory_state.ram_buffer[i] = (uint8_t)(ram_seed + i * 3);
+    for (i = 0x40; i < DYN_SIZE; i++) G->memory_state.ram_buffer[i] = (uint8_t)(ram_seed + i * 3);
     for (i = 0; i < words; i++) G->stack_mem[i] = (zWord)(0x1000 + ram_seed + i);
     G->stack_ptr = G->stack_mem + words;
     G->logical_pc = pc;

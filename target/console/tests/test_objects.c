@@ -8,8 +8,9 @@
  * layout macros in src/core/zvibe_object.c, so a mistake in those macros cannot
  * make this test agree with itself.
  *
- * A story is loaded as V3 (the loader still refuses V4) and then
- * G->header.version is set to 4 for the V4 cases, which only exist in a build
+ * A story is loaded as V3 and then G->header.version is set to 4 for the V4
+ * cases, so the V4 data structures are tested in isolation from loading and
+ * header setup (test_opcodes.c covers those). The V4 cases only exist in a build
  * with ZVIBE_ENABLE_V4=1. The V3 cases run in both builds: a dual build must
  * behave exactly like a V3-only build for a V3 story.
  *

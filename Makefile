@@ -55,6 +55,8 @@ validate-v4:
 	@cd target/console/tests && make test-unit
 	@echo "Running czech conformance suite (V3-only story on the V4-enabled build)..."
 	@$(MAKE) -C target/console/tests test-czech ZVIBE_BUILD=build_v4 EXPECT_V4=1
+	@echo "Running Czech built for V4 (the V4 conformance gate)..."
+	@$(MAKE) -C target/console/tests test-czech-v4 ZVIBE_BUILD=build_v4 EXPECT_V4=1
 	@echo "Running Restaurant playthrough on the V4-enabled build..."
 	@$(MAKE) -C target/console/tests test-restaurant ZVIBE_BUILD=build_v4 EXPECT_V4=1
 

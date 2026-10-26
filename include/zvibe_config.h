@@ -71,12 +71,56 @@
 #error "ZVIBE_STACK_WORDS is too small to run any story"
 #endif
 
+/**
+ * @def ZVIBE_VERIFY_SAVE_IDENTITY
+ * @brief Refuse to restore a raw save made from a different story, and refresh the
+ *        interpreter-owned header fields after a restore
+ *
+ * On by default for hosted builds (the console loads saves from files, where a
+ * save from another game is easy to pick) and for every V4 build (a V3 save
+ * restored into a V4 story would be decoded wrongly). Off by default for
+ * freestanding V3-only firmware, where each game's saves live in its own slot
+ * and flash is tight. Override with -DZVIBE_VERIFY_SAVE_IDENTITY=0|1.
+ */
+#ifndef ZVIBE_VERIFY_SAVE_IDENTITY
+#if ZVIBE_ENABLE_V4 || !(ZVIBE_FREESTANDING || defined(ZVIBE_MINIMAL_FEATURES))
+#define ZVIBE_VERIFY_SAVE_IDENTITY 1
+#else
+#define ZVIBE_VERIFY_SAVE_IDENTITY 0
+#endif
+#endif
+
 /** @brief Largest V3 story file in bytes (Z-machine standard) */
 #define Z3_STORY_LIMIT (128 * 1024)
 /** @brief Largest V4 story file in bytes (Z-machine standard) */
 #define Z4_STORY_LIMIT (256 * 1024)
 
+/** @brief True if story version v can be run by this build (V3 always; V4 when enabled) */
+#define Z_VERSION_SUPPORTED(v)  ((v) == 3 || (ZVIBE_ENABLE_V4 && (v) == 4))
+
 #if ZVIBE_ENABLE_V4
+
+/**
+ * @def ZVIBE_INTERPRETER_NUMBER
+ * @brief Interpreter number written to the V4 header (byte 0x1E, standard section 11.1.3)
+ *
+ * 1 is "DECSystem-20", the plain-terminal machine type; stories use this number
+ * to choose conventions, so a text terminal should not claim to be a graphics
+ * machine. The version letter goes in byte 0x1F.
+ */
+#ifndef ZVIBE_INTERPRETER_NUMBER
+#define ZVIBE_INTERPRETER_NUMBER 1
+#endif
+#ifndef ZVIBE_INTERPRETER_VERSION
+#define ZVIBE_INTERPRETER_VERSION 'Z'
+#endif
+/** @brief Screen size reported in the V4 header (bytes 0x20 height, 0x21 width) */
+#ifndef ZVIBE_SCREEN_ROWS
+#define ZVIBE_SCREEN_ROWS 24
+#endif
+#ifndef ZVIBE_SCREEN_COLS
+#define ZVIBE_SCREEN_COLS 80
+#endif
 
 /**
  * @brief True when the loaded story is V4 (runtime test in a dual build)

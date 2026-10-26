@@ -10,10 +10,9 @@
  * Checks that the capacity constants follow the switch; that Z_IS_V4() is a
  * constant 0 in a V3-only build and follows the story header in a dual build;
  * that story loading enforces size limits and keeps the loaded machine intact
- * when an oversize story is rejected; that V4 stories are still refused (the
- * core cannot run them yet: when V4 loading is enabled, update the "V4
- * refused" checks); and that the stack setting does not shrink the dynamic
- * memory a story may have.
+ * when an oversize story is rejected; that V4 stories load only in a build with
+ * V4 enabled; and that the stack setting does not shrink the dynamic memory a
+ * story may have.
  */
 
 #include <stdio.h>
@@ -70,7 +69,7 @@ static void test_loading(void) {
     CHECK(try_load(3, 128 * 1024 + 1) == ZVIBE_ERROR);          /* one byte over, both builds */
     CHECK(try_load(3, 200 * 1024) == ZVIBE_ERROR);              /* a dual build must not accept a V4-sized V3 story */
     CHECK(try_load(3, Z4_STORY_LIMIT + 1) == ZVIBE_ERROR);      /* over everything */
-    CHECK(try_load(4, 4096) == ZVIBE_ERROR);                    /* V4 refused: core cannot run it yet */
+    CHECK((try_load(4, 4096) == ZVIBE_OK) == (ZVIBE_ENABLE_V4 != 0));   /* V4 loads only when compiled in */
     CHECK(try_load(2, 4096) == ZVIBE_ERROR);
     CHECK(try_load(5, 4096) == ZVIBE_ERROR);
     CHECK(try_load(0, 4096) == ZVIBE_ERROR);

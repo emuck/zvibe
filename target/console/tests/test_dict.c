@@ -11,7 +11,7 @@
  *
  * Built twice: V3-only, and V3+V4 (the V3 cases must behave identically in the
  * dual build; the V4 cases set G->header.version to 4 after loading a V3 story,
- * since the loader still refuses V4).
+ * so the dictionary code is tested in isolation from loading).
  */
 
 #include <stdio.h>

@@ -264,6 +264,9 @@ int z_load_story_data(const void *data, size_t size);
 /** @brief Execute one Z-machine instruction */
 void z_run_instruction(void);
 
+/** @brief Write the interpreter's capabilities into the story header (load and restart) */
+void z_init_interpreter_header(void);
+
 /** @brief Get handler for a decoded opcode */
 zOpcodeFn z_get_opcode_handler(zByte opcode);
 
@@ -313,6 +316,23 @@ void z_do_return(zWord val);
 
 /** @brief Execute conditional branch */
 void z_do_branch(int truth);
+
+/**
+ * @brief Finish a save/restore: V3 branches on success; V4 stores 0 (failed),
+ *        1 (saved) or 2 (restored)
+ *
+ * In a V3-only build this is exactly the original z_do_branch() call.
+ */
+Z_VERSION_HELPER void z_do_save_result(int result) {
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        zByte *store = z_var_addr(z_read_pc_byte(), 1);
+        Z_WRITE16(store, result);
+        return;
+    }
+#endif
+    z_do_branch(result ? 1 : 0);
+}
 
 /** @brief Print ZSCII-encoded string to output */
 zSize z_print_zscii(const zByte *str, int abbr);

@@ -41,6 +41,43 @@
  * a story may have. Removing the reserve is a separate behavior change. */
 #define Z_LEGACY_STACK_RESERVE_BYTES 1024
 
+/**
+ * Write the interpreter's capabilities into the story header.
+ *
+ * Called when a story is loaded and again on restart (restart restores dynamic
+ * memory, which includes the header flags).
+ *
+ * V3: set flags1 bit 4, "status line not available" (the host draws it).
+ * V4: the game draws its own status line, so that bit means something else;
+ *     clear the capability bits (bold 2, italic 3, fixed-space 4, timed input 7)
+ *     because no screen is attached at this level, and write the interpreter
+ *     number/version (0x1E, 0x1F) and screen size (0x20 rows, 0x21 columns).
+ *
+ * Also called after a successful restore: the interpreter-owned header fields
+ * describe THIS interpreter, so they must not be taken from the saved image.
+ */
+void z_init_interpreter_header(void) {
+    /* The story's own flags1, which is also what dynamic memory holds at load and
+     * after a restart restores it from the story. */
+    zmem_byte_t flags1 = G->header.flags1;
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        flags1 &= (zmem_byte_t)~((1 << 2) | (1 << 3) | (1 << 4) | (1 << 7));
+        zmem_write_byte(&G->memory_state, 1, flags1);
+        zmem_write_byte(&G->memory_state, 0x1E, (zmem_byte_t)ZVIBE_INTERPRETER_NUMBER);
+        zmem_write_byte(&G->memory_state, 0x1F, (zmem_byte_t)ZVIBE_INTERPRETER_VERSION);
+        zmem_write_byte(&G->memory_state, 0x20, (zmem_byte_t)ZVIBE_SCREEN_ROWS);
+        zmem_write_byte(&G->memory_state, 0x21, (zmem_byte_t)ZVIBE_SCREEN_COLS);
+        /* The standard revision (0x32, 0x33) is deliberately NOT written: declaring 1.1
+         * claims every opcode of the standard, and this build is not there yet. Write it
+         * when the V4 opcode set is complete. */
+        return;
+    }
+#endif
+    flags1 |= (1<<4);  /* Status line flag - we disable it */
+    zmem_write_byte(&G->memory_state, 1, flags1);
+}
+
 /* Global state pointer */
 zState *G = NULL;
 
@@ -210,6 +247,31 @@ static zByte z_parse_var_operands(zWord *operands) {
     return i;
 }
 
+#if ZVIBE_ENABLE_V4
+/**
+ * Parse the operands of a VAR-form instruction that has two operand-type bytes
+ * (call_vs2, opcode 236: up to eight operands).
+ *
+ * Both type bytes are read BEFORE any operand data, even when the first byte
+ * already ends in "omitted" (standard section 4.4.3.1); the operands are then
+ * read in order up to the first omitted type.
+ */
+static zByte z_parse_double_var_operands(zWord *operands) {
+    const zByte types1 = z_read_pc_byte();
+    const zByte types2 = z_read_pc_byte();
+    zByte i;
+
+    for (i = 0; i < 8; i++) {
+        const zByte types = (i < 4) ? types1 : types2;
+        const zByte optype = (zByte)((types >> (6 - 2 * (i & 3))) & 0x3);
+        if (!z_parse_operand(optype, operands + i))
+            break;
+    }
+
+    return i;
+}
+#endif
+
 /**
  * Execute a single Z-machine instruction
  */
@@ -230,6 +292,11 @@ void z_run_instruction(void) {
     } else if (opcode <= 191) {  /* 0OP */
         G->operand_count = 0;
     } else if (opcode > 191) {  /* VAR */
+#if ZVIBE_ENABLE_V4
+        if (opcode == 236 && Z_IS_V4())             /* call_vs2: two type bytes */
+            G->operand_count = z_parse_double_var_operands(G->operands);
+        else
+#endif
         G->operand_count = z_parse_var_operands(G->operands);
     }
     
@@ -351,6 +418,27 @@ size_t z_get_save_data(void *buffer, size_t buffer_size) {
     return ptr - (uint8_t *)buffer;
 }
 
+#if ZVIBE_VERIFY_SAVE_IDENTITY
+/**
+ * Does a saved image belong to the story that is loaded? Compares the header
+ * bytes that identify a story and that neither the game nor the interpreter
+ * ever writes: version (0), then everything from the release (2) up to the
+ * checksum (0x1D) except flags 2 (0x10-0x11). That covers release, addresses,
+ * serial number, abbreviations, length and checksum. The image starts with
+ * dynamic memory, which holds the header. (Flags 1 at byte 1 and the
+ * interpreter fields from 0x1E are written by the interpreter, so they differ
+ * legitimately between a save and the running machine.)
+ */
+static int z_save_matches_story(const zByte *saved) {
+    const zByte *story = (const zByte *)G->memory_state.flash_data;
+    zByte diff = saved[0] ^ story[0];                         /* version */
+    for (int i = 2; i < 0x1E; i++)
+        if (i < 0x10 || i >= 0x12)                            /* skip flags 2 (0x10-0x11): the game writes it */
+            diff |= saved[i] ^ story[i];                      /* release, addresses, serial, abbreviations, length, checksum */
+    return diff == 0;
+}
+#endif
+
 /**
  * Restore Z-machine state from save data
  * 
@@ -382,6 +470,14 @@ int z_restore_save_data(const void *data, size_t length) {
     if (stack_size > ZVIBE_STACK_WORDS) return 3; /* Invalid stack size */
     if (length - minimum_size < stack_size * sizeof(zWord)) return 2;
 
+#if ZVIBE_VERIFY_SAVE_IDENTITY
+    /* The save must belong to the story that is running. Restoring another story's
+     * (or another version's) image would put a foreign header and continuation into
+     * this machine: reject it before anything is overwritten. */
+    if (!z_save_matches_story((const zByte *)data))
+        return 4; /* Save belongs to a different story */
+#endif
+
     /* Validated: now restore dynamic memory, stack and base pointer */
     memcpy(G->memory_state.ram_buffer, data, ram_size);
     memcpy(G->stack_mem, ptr, stack_size * sizeof(zWord));
@@ -391,6 +487,10 @@ int z_restore_save_data(const void *data, size_t length) {
     /* Set program counter and stack pointer */
     G->logical_pc = pc_addr;
     G->stack_ptr = G->stack_mem + stack_size;
+
+#if ZVIBE_VERIFY_SAVE_IDENTITY
+    z_init_interpreter_header();    /* interpreter-owned header fields describe this interpreter */
+#endif
     
     return 0; /* Success */
 }
@@ -443,9 +543,7 @@ int z_load_story_data(const void *data, size_t size) {
     G->header.version = Z_READ8(ptr);
 
     /* Verify version is 3 */
-    /* V4 is not accepted yet: the core compiles with ZVIBE_ENABLE_V4 but cannot
-     * execute V4 stories until the decoder, objects and screen support land. */
-    if (G->header.version != Z3_VERSION)
+    if (!Z_VERSION_SUPPORTED(G->header.version))
         return 3; /* Unsupported version */
 
     G->header.flags1 = Z_READ8(ptr);
@@ -477,6 +575,13 @@ int z_load_story_data(const void *data, size_t size) {
         G->header.abbrtab_addr >= size)
         return 5; /* Corrupt header */
 
+#if ZVIBE_ENABLE_V4
+    /* Dynamic memory must hold the whole 64-byte header: the interpreter writes its
+     * identity and screen size into it. (V3 loading is left exactly as it was.) */
+    if (Z_IS_V4() && G->header.staticmem_addr < 0x40)
+        return 5; /* Corrupt header */
+#endif
+
     /* Validate game fits in buffer with room for minimum stack */
     size_t min_stack_bytes = Z_LEGACY_STACK_RESERVE_BYTES;
     if (G->header.staticmem_addr + min_stack_bytes > ZVIBE_MEMORY_BUFFER_SIZE) {
@@ -496,10 +601,7 @@ int z_load_story_data(const void *data, size_t size) {
     }
 
     /* Set up interpreter flags using split memory */
-    zmem_byte_t flags1;
-    zmem_read_byte(&G->memory_state, 1, &flags1);
-    flags1 |= (1<<4);  /* Status line flag - we disable it */
-    zmem_write_byte(&G->memory_state, 1, flags1);
+    z_init_interpreter_header();
 
     /* Set up program counter */
     G->logical_pc = (zDWord)G->header.pc_start;

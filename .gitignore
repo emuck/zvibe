@@ -54,6 +54,7 @@ __pycache__/
 target/console/tests/test_split_memory
 target/console/tests/test_screen
 target/console/tests/.test_build_flags
+target/console/tests/czech_v4_test_output.log
 target/console/tests/test_config_v3
 target/console/tests/test_config_v4
 target/console/tests/test_config_stack1024
@@ -64,6 +65,8 @@ target/console/tests/test_objects_v3
 target/console/tests/test_objects_v4
 target/console/tests/test_dict_v3
 target/console/tests/test_dict_v4
+target/console/tests/test_opcodes_v3
+target/console/tests/test_opcodes_v4
 target/console/tests/test_save_restore_san.dSYM/
 target/riscv/serv_zvibe/common/sw/flash_boot_banner
 

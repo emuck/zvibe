@@ -71,6 +71,9 @@ static const zOpcodeFn z_2op_table[Z3_2OP_COUNT] = {
     [22] = op_mul,
     [23] = op_div,
     [24] = op_mod,
+#if ZVIBE_ENABLE_V4
+    [25] = op_call,                 /* call_2s */
+#endif
 };
 
 /* 1OP (opcodes 128-175; index is the low 4 bits) */
@@ -83,6 +86,9 @@ static const zOpcodeFn z_1op_table[Z3_1OP_COUNT] = {
     [5] = op_inc,
     [6] = op_dec,
     [7] = op_print_addr,
+#if ZVIBE_ENABLE_V4
+    [8] = op_call,                  /* call_1s */
+#endif
     [9] = op_remove_obj,
     [10] = op_print_obj,
     [11] = op_ret,
@@ -124,6 +130,9 @@ static const zOpcodeFn z_var_table[Z3_VAR_COUNT] = {
     [9] = op_pull,
     [10] = op_split_window,
     [11] = op_set_window,
+#if ZVIBE_ENABLE_V4
+    [12] = op_call,                 /* call_vs2 (the decoder reads its second type byte) */
+#endif
 };
 
 zOpcodeFn z_get_opcode_handler(zByte opcode) {
