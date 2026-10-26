@@ -112,11 +112,11 @@ configs and the measured firmware sizes in `CODE_SIZE_ANALYSIS.md`.
 
 ## Cross-cutting issues
 
-1. **Stack size.** The Z-machine stack is a fixed 512 words (`Z3_STACK_SIZE`).
+1. **Stack size.** The Z-machine stack is 512 words by default (`ZVIBE_STACK_WORDS`, now a per-build setting).
    A larger stack (1024 words was assumed for the estimates above) may be
    needed by deeply recursive V4 games, but this was not verified against the
    standard or a reference interpreter, and whether the Infocom V4 titles need
-   more than 512 words is unmeasured. Make it a per-build constant (`ZVIBE_STACK_WORDS`) so the 32 KB
+   more than 512 words is unmeasured. Override it per target (`-DZVIBE_STACK_WORDS=1024`) so the 32 KB
    targets can stay at 512 until a real story proves otherwise.
 2. **Per-target buffer size.** `ZVIBE_MEMORY_BUFFER_SIZE` is a single 16 KB
    default. It must become an explicit per-target setting.

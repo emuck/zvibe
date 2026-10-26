@@ -140,8 +140,56 @@ each is a separate commit.
    - RISC-V (rv32i `-O1`, the MAX10 and Arty flags): text 18,600 to 18,160
      (-440), RAM 17,960 to 17,572 (-388).
    Czech 368/368, Restaurant, and the unit tests pass.
-2. **`zvibe_config.h`**, compile-time capacities, `Z_IS_V4()` defined but with
-   V4 loading still rejected. Prove the V3 build is unchanged.
+2. **`zvibe_config.h`**: **Done.** `include/zvibe_config.h` is now the one
+   place that defines `ZVIBE_ENABLE_V4` (validated: only a literal 0 or 1),
+   `Z_IS_V4()`, `Z_VSEL()`, `Z_MAX_OPERANDS`, `Z_STORY_MEM_SIZE`, and a
+   configurable `ZVIBE_STACK_WORDS`. The old `Z3_STACK_SIZE`,
+   `Z3_STORY_MEM_SIZE` and `Z3_MAX_OPERANDS` are gone. V4 stories are still
+   refused. In a dual build a V3 story keeps its 128 KB limit, checked before
+   any state is touched.
+
+   The adversarial review of this slice (two rounds, with Codex) also forced
+   real fixes that belong with it, because a configurable stack makes them
+   reachable:
+   - `delta_decode` copied a saved stack into `stack_mem` with no bound. It now
+     takes the capacity, rejects an oversized stack, and checks the structure of
+     the whole save (lengths and bounds; not that the PC or base pointer are
+     meaningful) before writing anything. The core's raw restore does the same.
+     Both `save_delta.c` copies were updated, read the header with `memcpy`
+     instead of a typed cast, and compare remaining lengths instead of forming
+     pointers past the end; a test keeps the two copies identical.
+   - The load check that keeps 1 KB of the RAM buffer free no longer follows
+     `ZVIBE_STACK_WORDS`; it keeps its historical fixed value.
+
+   **What the V3-only proof showed.** The first measurement, section totals,
+   was not proof, and the review showed it. `scripts/core_size.sh` gained
+   `HASH=1` (a hash of each object's disassembly, relocations and section
+   contents) and `OPT=`. At `-O0`, `-Os`, `-O1`, `-O2` and `-O3`, on SAM E51
+   (xc32) and RISC-V, against the previous commit, **eight of the nine core
+   objects have identical code and data; only `zvibe_core` differs**, because
+   of the restore-safety change, and it gets *smaller*: SAM E51 -8 to -12 bytes
+   at every level, RISC-V -16 to -28 bytes at every level except `-Os`, where it
+   grows by 20 bytes. No target in this repository builds RISC-V with `-Os`
+   (SAM E51 uses `-O2`, RISC-V uses `-O1`); that growth is reported, not
+   hidden. Core totals with V4 off: SAM E51 9,308 to 9,300 bytes, RISC-V 18,160
+   to 18,132, RAM unchanged. Reviewers cannot guarantee equal size at every
+   optimization level for any C rewrite, so the rule is: shipped build settings
+   must not grow, and every other level is measured and recorded.
+
+   **What a dual build costs** (`ZVIBE_ENABLE_V4=1`, core only): SAM E51 +32
+   bytes of flash and +8 bytes of RAM (the four extra operand slots), RISC-V +24
+   bytes and +8 bytes. With file I/O enabled (hosted builds only) the existing
+   static file buffer grows from 128 KB to 256 KB.
+
+   **How it is tested.** `make validate` (V3-only) runs the unit suites and
+   Czech; `make validate-v4` (V4 compiled in, V3 stories) runs the unit suites,
+   Czech and Restaurant. The console binaries embed a configuration marker
+   (V4 flag and stack size) and the tests refuse to run against the wrong
+   configuration; test binaries rebuild when headers or compiler flags change.
+   The restore tests also run under AddressSanitizer and UBSan, with exact-size
+   inputs so an over-read fails. Nine deliberate bugs reintroduced in a scratch
+   copy are each caught by a test. See [TESTING.md](TESTING.md).
+
 3. **Addresses, objects, properties, dictionary**, with focused V4 fixtures.
 4. **Decoder, new opcode entries, save/restore lifecycle, header init and
    restart paths.** Then enable V4 loading.

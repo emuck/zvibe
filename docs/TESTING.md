@@ -39,6 +39,50 @@ dimension validation.
 **Expected:** 66 checks pass. The board-side counterpart is
 `make screen-demo` in `target/same51` (see [V4 Feasibility](V4_ANALYSIS.md)).
 
+### Build configuration and restore safety (V3 / V4 switch)
+
+**Files:** `test_config.c`, `test_save_restore.c`, `test_story.h`
+
+`test_config.c` is built three ways (V3-only, V3+V4, and a 1024-word stack),
+each stating what it must be (`EXPECT_V4`, `EXPECT_STACK_WORDS`) so a wrong
+define fails the build. It checks the capacity constants, that `Z_IS_V4()` is a
+constant in a V3-only build, story size limits, that a rejected oversize load
+leaves the loaded machine unchanged, and that the stack setting does not
+change how much dynamic memory a story may have. `make test-config-defines`
+checks that `ZVIBE_ENABLE_V4` accepts only a literal 0 or 1.
+
+`test_save_restore.c` covers raw saves (`zvibe_restore_data`) and the delta
+codec shared by the SAM E51 and RISC-V targets: a save made with a larger stack
+must be rejected, never copied past the stack, and a rejected restore must
+leave the running machine untouched. It is built three ways, including under
+AddressSanitizer and UBSan, and feeds the decoder exact-size and misaligned
+inputs so an over-read or a typed cast on unaligned data fails. `make test-delta-copies` keeps the two
+copies of `save_delta.c` identical.
+
+**Run:** `cd target/console/tests && make test-unit`
+
+### V4-enabled build
+
+`make validate-v4` (repo root) builds the console with `ZVIBE_ENABLE_V4=1` into
+`target/console/build_v4/` and runs the unit tests, Czech and Restaurant
+against it. (`make validate` runs the unit tests and Czech on the default
+V3-only build.) The console binaries embed a `zvibe-build:v4=N` marker and
+`make verify-console-config` refuses to run integration tests against a binary
+of the wrong configuration (`EXPECT_V4`, `EXPECT_STACK`). To test another build
+directory: `make test-czech ZVIBE_BUILD=<dir> EXPECT_V4=<0|1>`.
+
+### Proving a change is free for V3-only builds
+
+```bash
+scripts/core_size.sh                # per-object text/data/bss, SAM E51 and RISC-V
+HASH=1 OPT=-O0 scripts/core_size.sh # plus a hash of each object's code and data
+```
+
+Run the second form on the tree before and after at several `OPT` levels and
+compare: an object whose hash is unchanged has identical code and data. (`ONLY=zvibe_core` limits a run to one file for quick experiments.) Section totals
+alone are not enough. (`brew install isl libmpc` if the RISC-V compiler fails
+to start on macOS.)
+
 ### Integration Tests
 
 Tests run complete games with scripted input.
