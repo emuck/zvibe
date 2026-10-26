@@ -11,6 +11,15 @@ EDBG_TARGET = same51
 # Story file configuration (single-game mode)
 STORY_FILE ?= ../../games/catalog/czech.z3
 
+# Version 4 game firmware: `make v4 [STORY_FILE=...]` (see README). V4=1 builds the
+# full-screen terminal path; V4_RAM is the RAM given to the story's dynamic memory.
+V4 ?= 0
+V4_RAM ?= 32768
+ifeq ($(V4),1)
+    PROJECT_NAME = same51_zvibe_v4
+    STORY_FILE ?= ../../games/catalog/czech.z4
+endif
+
 # Screen-layer exerciser: `make screen-demo` (see src/screen_demo.c)
 ifeq ($(SCREEN_DEMO),1)
     PROJECT_NAME = same51_screen_demo
@@ -103,6 +112,9 @@ CFLAGS += -I"packs/ATSAME51J20A_DFP" -I"packs/CMSIS/" -I"packs/CMSIS/CMSIS/Core/
 # zvibe integration for embedded build:
 # keep save/restore, but compile out host file I/O and status-line code.
 CFLAGS += -I"$(ZVIBE_ROOT)/include" -I"$(ZVIBE_ROOT)/src"
+ifeq ($(V4),1)
+CFLAGS += -DZVIBE_ENABLE_V4=1 -DZVIBE_MEMORY_BUFFER_SIZE=$(V4_RAM)
+endif
 CFLAGS += -DZVIBE_FREESTANDING=1 -DZVIBE_ENABLE_FILE_IO=0 -DZVIBE_ENABLE_STATUS_LINE=0 -DZVIBE_ENABLE_SAVE_RESTORE=1
 
 # Linker flags
@@ -151,6 +163,9 @@ else
                     $(SRC_DIR)/flash.c \
                     $(SRC_DIR)/uart.c
 endif
+ifneq ($(filter 1,$(SCREEN_DEMO) $(V4)),)
+    LOCAL_SOURCES += $(SRC_DIR)/terminal_io.c
+endif
 
 # zvibe core sources
 ZVIBE_ROOT = ../..
@@ -161,6 +176,9 @@ else
 ZVIBE_CORE_SOURCES = $(wildcard $(ZVIBE_CORE_DIR)/core/*.c) \
                      $(ZVIBE_CORE_DIR)/api/zvibe_api.c \
                      $(ZVIBE_CORE_DIR)/api/zvibe_api_file.c
+ifeq ($(V4),1)
+ZVIBE_CORE_SOURCES += $(ZVIBE_CORE_DIR)/screen/zvibe_screen.c
+endif
 endif
 
 # Object files - all in build/obj directory
@@ -277,9 +295,18 @@ screen-demo:
 screen-demo-program:
 	$(MAKE) SCREEN_DEMO=1 BUILD_DIR=build_screen_demo program
 
+# Version 4 firmware. The story array is regenerated every time (it is shared with the V3 build).
+v4:
+	rm -f $(SRC_DIR)/story_data.c
+	$(MAKE) V4=1 BUILD_DIR=build_v4 all
+
+v4-program:
+	rm -f $(SRC_DIR)/story_data.c
+	$(MAKE) V4=1 BUILD_DIR=build_v4 program
+
 # Clean target - removes both single-game and multi-game generated files
 clean:
-	rm -rf $(BUILD_DIR) build_screen_demo
+	rm -rf $(BUILD_DIR) build_screen_demo build_v4
 	rm -f $(SRC_DIR)/game_registry.c $(SRC_DIR)/*_data.c $(SRC_DIR)/story_data.c
 
 # Help target
@@ -333,4 +360,4 @@ endif
 -include $(LOCAL_OBJECTS:.o=.d)
 -include $(ZVIBE_OBJECTS:.o=.d)
 
-.PHONY: all platform_info directories clean program help story_data screen-demo screen-demo-program
+.PHONY: all platform_info directories clean program help story_data screen-demo screen-demo-program v4 v4-program

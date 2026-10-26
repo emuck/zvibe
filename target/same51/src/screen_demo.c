@@ -31,87 +31,9 @@
 #include "board_support.h"
 #include "../../../include/zvibe_screen.h"
 
-#define DEFAULT_ROWS 24
-#define DEFAULT_COLS 80
-
-/* RX is interrupt-driven into a ring so keystrokes survive blocking TX */
-#define RX_RING 256
-static volatile uint8_t  rx_ring[RX_RING];
-static volatile uint16_t rx_head, rx_tail;
-static volatile uint32_t rx_dropped;    /* software ring overflow */
-static volatile uint32_t rx_total;      /* every byte the ISR received */
-static volatile uint32_t rx_sum;        /* running sum of those bytes, to compare with the host */
-
-static void rx_callback(uintptr_t ctx) {
-    (void)ctx;
-    uint8_t c = (uint8_t)SERCOM5_USART_ReadByte();
-    rx_total++;
-    rx_sum += c;
-    uint16_t next = (uint16_t)((rx_head + 1) % RX_RING);
-    if (next == rx_tail) { rx_dropped++; return; }
-    rx_ring[rx_head] = c;
-    rx_head = next;
-}
-
-static int rx_get(void) {
-    if (rx_head == rx_tail) return -1;
-    uint8_t c = rx_ring[rx_tail];
-    rx_tail = (uint16_t)((rx_tail + 1) % RX_RING);
-    return c;
-}
-
-static int rx_wait(void) {
-    int c;
-    while ((c = rx_get()) < 0) {}
-    return c;
-}
-
-/* Next keystroke with terminal quirks removed: CR, LF and CR+LF all arrive as one
- * '\r'; escape sequences (arrow keys etc.) are swallowed. A lone ESC eats the
- * key after it. This is the input behavior the real interpreter path needs. */
-static int next_key(void) {
-    static int state = 0;      /* 0 normal, 1 after ESC, 2 inside CSI/SS3 */
-    static int last_cr = 0;
-    for (;;) {
-        int c = rx_wait();
-        if (state == 1) { state = (c == '[' || c == 'O') ? 2 : 0; continue; }
-        if (state == 2) { if (c >= 0x40 && c <= 0x7E) state = 0; continue; }
-        if (c == 0x1B) { state = 1; continue; }
-        if (c == '\n' && last_cr) { last_cr = 0; continue; }
-        last_cr = (c == '\r');
-        return c == '\n' ? '\r' : c;
-    }
-}
-
-static void put_byte(uint8_t b) { SERCOM5_USART_WriteByte(b); }
+#include "terminal_io.h"
 
 static zscreen scr;
-static uint8_t g_rows = DEFAULT_ROWS, g_cols = DEFAULT_COLS;
-
-/* Ask the terminal how big it is: park the cursor far off-screen (the terminal
- * clamps it to the corner) and read back the position report ESC [ r ; c R.
- * Falls back to 24x80 if nothing sensible answers. */
-static void probe_size(void) {
-    static const char q[] = "\033[999;999H\033[6n";
-    unsigned long spin;
-    int state = 0, row = 0, col = 0, c;
-    const char *p;
-    for (p = q; *p; p++) put_byte((uint8_t)*p);
-    for (spin = 0; spin < 20000000UL; spin++) {
-        c = rx_get();
-        if (c < 0) continue;
-        if (state == 0 && c == 0x1B) state = 1;
-        else if (state == 1 && c == '[') state = 2;
-        else if (state == 2 && c >= '0' && c <= '9') row = row * 10 + (c - '0');
-        else if (state == 2 && c == ';') state = 3;
-        else if (state == 3 && c >= '0' && c <= '9') col = col * 10 + (c - '0');
-        else if (state == 3 && c == 'R') {
-            if (row >= 10 && row <= 250 && col >= 56) { g_rows = (uint8_t)row; g_cols = (uint8_t)col; }
-            return;
-        }
-        else state = 0;
-    }
-}
 
 static void status(const char *left, const char *right) {
     int i;
@@ -132,7 +54,7 @@ static void read_line(char *buf, uint8_t n) {
     uint8_t len = 0;
     zscreen_flush(&scr);
     for (;;) {
-        char c = (char)next_key();
+        char c = (char)term_next_key();
         if (c == '\r') { zscreen_echo(&scr, '\n'); break; }
         if (c == 0x08 || c == 0x7F) {
             if (len && zscreen_echo(&scr, c)) len--;
@@ -146,7 +68,7 @@ static void read_line(char *buf, uint8_t n) {
 static void press_return(void) {
     zscreen_puts(&scr, "\n[press RETURN] ");
     zscreen_flush(&scr);
-    while (next_key() != '\r') {}
+    while (term_next_key() != '\r') {}
     zscreen_echo(&scr, '\n');
 }
 
@@ -238,9 +160,9 @@ static void phase_burst(void) {
     zscreen_split_window(&scr, 1);
     status("PHASE 4: burst - type while this runs", "");
     uint32_t err_before = SERCOM5_USART_ErrorCount;
-    rx_dropped = 0;
-    rx_total = 0;
-    rx_sum = 0;
+    term_rx_dropped = 0;
+    term_rx_total = 0;
+    term_rx_sum = 0;
     zscreen_puts(&scr, "Paste or type now; totals are shown at the end.\n");
     for (i = 1; i <= 300; i++) {
         snprintf(buf, sizeof buf,
@@ -249,10 +171,10 @@ static void phase_burst(void) {
         zscreen_putc(&scr, '\n');
     }
     snprintf(buf, sizeof buf, "\nBurst done. RX bytes: %lu  byte-sum: %lu\n",
-             (unsigned long)rx_total, (unsigned long)rx_sum);
+             (unsigned long)term_rx_total, (unsigned long)term_rx_sum);
     zscreen_puts(&scr, buf);
     snprintf(buf, sizeof buf, "Ring overflow: %lu  UART hw errors in burst: %lu  (both expect 0)\n",
-             (unsigned long)rx_dropped, (unsigned long)(SERCOM5_USART_ErrorCount - err_before));
+             (unsigned long)term_rx_dropped, (unsigned long)(SERCOM5_USART_ErrorCount - err_before));
     zscreen_puts(&scr, buf);
     snprintf(buf, sizeof buf, "UART hw errors since boot: %lu  (a port open/close can glitch the line)\n",
              (unsigned long)SERCOM5_USART_ErrorCount);
@@ -263,10 +185,9 @@ static void phase_burst(void) {
 
 int main(void) {
     SYS_Initialize(NULL);
-    SERCOM5_USART_ReadCallbackRegister(rx_callback, 0);
-    SERCOM5_USART_EnableRxInterrupt();
-    probe_size();
-    zscreen_init(&scr, put_byte, g_rows, g_cols);
+    term_start();
+    term_probe_size();
+    zscreen_init(&scr, term_put_byte, term_rows, term_cols);
     for (;;) {
         phase_scroll();
         phase_wrap();

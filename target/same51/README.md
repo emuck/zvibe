@@ -228,6 +228,27 @@ Enter your choice (1-9): _
 - **Delta compressed**: Only changed bytes stored (typically 500-2000 bytes per save)
 - **Smart fusing**: Automatic 16KB SmartEEPROM configuration
 
+## Version 4 firmware
+
+`make v4` builds the single-game firmware with Z-machine V4 support: the story
+drives a full-screen terminal (split windows, cursor addressing, styles,
+single-key input) through the screen layer in `src/screen`. The default build
+stays V3-only and unchanged.
+
+```
+make v4-program                                   # Czech (V4) by default
+make v4-program STORY_FILE=../console/tests/data/v4screen.z4
+python3 tests/test_v4_game.py                     # needs pyserial and pyte
+```
+
+Connect at 115200 8N1 with an xterm-compatible terminal of at least 56 columns
+(the firmware asks the terminal for its size at boot). `V4_RAM` (default 32768)
+is the RAM given to the story's dynamic memory; a story needs its dynamic
+memory plus about 5 KB. Saves use the 16 KB SmartEEPROM, so a V4 story whose
+full save is larger (Bureaucracy, about 20 KB) cannot save here yet.
+`terminal_io.c` holds the interrupt-driven receive ring and key decoding that
+the screen demo shares.
+
 ## Hardware Requirements
 
 ### SAM E51 Curiosity Nano

@@ -12,6 +12,10 @@
 #include <string.h>
 #include "board_support.h"
 #include "../../../include/zvibe_api.h"
+#if ZVIBE_ENABLE_V4
+#include "../../../include/zvibe_screen.h"
+#include "terminal_io.h"
+#endif
 
 /* External story data (generated at build time) */
 extern const uint8_t story_data[];
@@ -336,6 +340,15 @@ static void rtcEventHandler(RTC_TIMER32_INT_MASK intCause, uintptr_t context) {
     }
 }
 
+#if ZVIBE_ENABLE_V4
+/* V4: the story's text goes through the screen layer, which owns the terminal */
+static zscreen scr;
+
+static void zvibe_output_func(const char *text, size_t length) {
+    size_t i;
+    for (i = 0; i < length; i++) zscreen_putc(&scr, text[i]);
+}
+#else
 /* zvibe output function */
 static void zvibe_output_func(const char *text, size_t length) {
     if (length == 0) return;
@@ -352,6 +365,7 @@ static void zvibe_output_func(const char *text, size_t length) {
         SERCOM5_REGS->USART_INT.SERCOM_DATA = (uint16_t)c;
     }
 }
+#endif
 
 /* Wait for the user to press RETURN before starting the game.
  *
@@ -402,6 +416,10 @@ static bool init_zvibe() {
     if (!g_zvibe_ctx) {
         return false;
     }
+#if ZVIBE_ENABLE_V4
+    zscreen_init(&scr, term_put_byte, term_rows, term_cols);   /* clears the terminal: a restarted game starts clean */
+    zvibe_set_screen(g_zvibe_ctx, &zscreen_ops, &scr);
+#endif
 
     if (zvibe_load_story_from_memory(g_zvibe_ctx, story_data, story_data_size) != ZVIBE_OK) {
         zvibe_destroy(g_zvibe_ctx);
@@ -411,6 +429,102 @@ static bool init_zvibe() {
     
     return true;
 }
+
+#if ZVIBE_ENABLE_V4
+/* ---- V4: the story drives a full-screen terminal through the screen layer ---- */
+
+#define V4_LINE_SIZE 80
+
+static void v4_puts(const char *s) {
+    while (*s) zscreen_putc(&scr, *s++);
+}
+
+static void v4_press_return(void) {
+    v4_puts("\n[Press RETURN to start]\n");
+    zscreen_flush(&scr);
+    while (term_next_key() != '\r') {}
+}
+
+/* Start the game afresh; wait for RETURN first unless a test script asked for a quiet reset */
+static void v4_start(bool wait) {
+    zvibe_initialized = init_zvibe();
+    if (zvibe_initialized && wait) v4_press_return();
+}
+
+static void v4_save(void) {
+    size_t size = zvibe_get_save_size(g_zvibe_ctx);
+    int ok = 0;
+    if (size > 0 && size <= MAX_SAVE_SIZE) {
+        char buffer[MAX_SAVE_SIZE];
+        size_t actual = zvibe_get_save_data(g_zvibe_ctx, buffer, MAX_SAVE_SIZE);
+        ok = actual > 0 && save_callback(buffer, actual);
+    }
+    zvibe_save_completed(g_zvibe_ctx, ok);
+}
+
+static void v4_restore(void) {
+    char buffer[MAX_SAVE_SIZE];
+    size_t size = restore_callback(buffer, MAX_SAVE_SIZE);
+    zvibe_restore_completed(g_zvibe_ctx, size > 0 && zvibe_restore_data(g_zvibe_ctx, buffer, size) == ZVIBE_OK);
+}
+
+/* Read a command line with echo and backspace; the screen layer says what fits on the line. */
+static void v4_read_line(char *buf, size_t size) {
+    size_t len = 0;
+    zscreen_flush(&scr);
+    for (;;) {
+        int k = term_next_key();
+        if (k == '\r') { zscreen_echo(&scr, '\n'); break; }
+        if (k == 8 || k == 127) {
+            if (len && zscreen_echo(&scr, 8)) len--;
+        } else if (k >= 32 && k < 127 && len + 1 < size) {
+            if (zscreen_echo(&scr, (char)k)) buf[len++] = (char)k;
+        }
+    }
+    buf[len] = '\0';
+}
+
+static void v4_loop(void) __attribute__((noreturn));
+static void v4_loop(void) {
+    char line[V4_LINE_SIZE];
+    v4_start(true);
+    for (;;) {
+        zvibeResult result;
+        if (zvibeReset) {
+            zvibeReset = false;
+            v4_start(true);
+        }
+        if (!zvibe_initialized) {                       /* the game could not start: any key tries again */
+            (void)term_next_key();
+            v4_start(false);
+            continue;
+        }
+        result = zvibe_run(g_zvibe_ctx);
+        zscreen_flush(&scr);
+        switch (result) {
+        case ZVIBE_WAIT_FOR_INPUT:
+            v4_read_line(line, sizeof line);
+            if (strcmp(line, "~reset~") == 0) v4_start(false);     /* test scripts: restart with no prompt */
+            else zvibe_input(g_zvibe_ctx, line);
+            break;
+        case ZVIBE_WAIT_FOR_CHAR:
+            zvibe_input_char(g_zvibe_ctx, (uint16_t)term_next_zscii());
+            break;
+        case ZVIBE_SAVE_REQUESTED:    v4_save(); break;
+        case ZVIBE_RESTORE_REQUESTED: v4_restore(); break;
+        case ZVIBE_RESTART_REQUESTED: zvibe_restart_completed(g_zvibe_ctx); break;
+        case ZVIBE_GAME_FINISHED:
+            v4_puts("\n[Game finished]\n");
+            v4_start(true);
+            break;
+        default:
+            v4_puts("\n[Game error - restarting]\n");
+            v4_start(true);
+            break;
+        }
+    }
+}
+#endif /* ZVIBE_ENABLE_V4 */
 
 int main(void) {
     /* Initialize all modules */
@@ -422,9 +536,19 @@ int main(void) {
     RTC_Timer32Compare0Set(PERIOD_50MS);
     RTC_Timer32Start();
     
+#if ZVIBE_ENABLE_V4
+    term_start();
+    term_probe_size();
+#endif
+
     /* Initialize SmartEEPROM first */
     bool smarteeprom_available = smarteeprom_init();
     
+#if ZVIBE_ENABLE_V4
+    (void)smarteeprom_available;
+    v4_loop();
+#endif
+
     /* Initialize zvibe Z-machine */
     zvibe_initialized = init_zvibe();
 
