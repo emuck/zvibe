@@ -8,16 +8,20 @@ PROJECT_NAME = same51_zvibe
 MCU_TARGET = ATSAME51J20A
 EDBG_TARGET = same51
 
+V4 ?= 0
+
 # Story file configuration (single-game mode)
+ifeq ($(V4),1)
+STORY_FILE ?= ../../games/catalog/czech.z4
+else
 STORY_FILE ?= ../../games/catalog/czech.z3
+endif
 
 # Version 4 game firmware: `make v4 [STORY_FILE=...]` (see README). V4=1 builds the
 # full-screen terminal path; V4_RAM is the RAM given to the story's dynamic memory.
-V4 ?= 0
 V4_RAM ?= 32768
 ifeq ($(V4),1)
     PROJECT_NAME = same51_zvibe_v4
-    STORY_FILE ?= ../../games/catalog/czech.z4
 endif
 
 # Screen-layer exerciser: `make screen-demo` (see src/screen_demo.c)
