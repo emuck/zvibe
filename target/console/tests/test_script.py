@@ -21,8 +21,9 @@ import select
 
 TESTS_DIR    = os.path.dirname(os.path.abspath(__file__))
 CONSOLE_DIR  = os.path.dirname(TESTS_DIR)
-ZVIBE        = os.path.join(CONSOLE_DIR, "build", "bin", "zvibe_console")
-ZVIBE_MINIMAL = os.path.join(CONSOLE_DIR, "build", "bin", "zvibe_minimal")
+BUILD_NAME   = os.environ.get("ZVIBE_BUILD", "build")   # e.g. build_v4 for the V4-enabled build
+ZVIBE        = os.path.join(CONSOLE_DIR, BUILD_NAME, "bin", "zvibe_console")
+ZVIBE_MINIMAL = os.path.join(CONSOLE_DIR, BUILD_NAME, "bin", "zvibe_minimal")
 GAMES_DIR    = os.path.join(os.path.dirname(os.path.dirname(CONSOLE_DIR)), "games")
 CATALOG_DIR  = os.path.join(GAMES_DIR, "catalog")
 SCRIPTS_DIR  = os.path.join(GAMES_DIR, "scripts")

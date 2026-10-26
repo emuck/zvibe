@@ -30,6 +30,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "zvibe_config.h"
 
 /*
  * Compile-time feature flags:
@@ -51,6 +52,12 @@
  *
  * ZVIBE_ENABLE_FILE_IO - Enable zvibe_load_story() filesystem helper
  *   Default: 1 (enabled) unless ZVIBE_MINIMAL_FEATURES defined
+ *
+ * ZVIBE_ENABLE_V4 - Compile in Z-machine V4 support (see zvibe_config.h)
+ *   Default: 0 (V3 only)
+ *
+ * ZVIBE_STACK_WORDS - Z-machine stack size in 16-bit words (see zvibe_config.h)
+ *   Default: 512
  */
 #ifndef ZVIBE_MINIMAL_FEATURES
   #ifndef ZVIBE_FREESTANDING

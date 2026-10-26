@@ -237,7 +237,7 @@ static int do_delta_restore(void) {
         G->memory_state.ram_buffer,
         current_game_data,
         G->memory_state.ram_size,
-        &pc, (uint16_t *)G->stack_mem, &stack_words, &base_ptr
+        &pc, (uint16_t *)G->stack_mem, ZVIBE_STACK_WORDS, &stack_words, &base_ptr
     );
 
     if (result != 0) {

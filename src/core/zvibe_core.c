@@ -34,6 +34,13 @@
 #endif
 #include "zvibe.h"
 
+/* The load check below keeps 1KB of the RAM buffer free for a stack, but the
+ * stack actually lives in zState (stack_mem), not in that buffer. The value is
+ * the historical one (512 words x 2 bytes) and must not follow
+ * ZVIBE_STACK_WORDS, or raising the stack size would shrink the dynamic memory
+ * a story may have. Removing the reserve is a separate behavior change. */
+#define Z_LEGACY_STACK_RESERVE_BYTES 1024
+
 /* Global state pointer */
 zState *G = NULL;
 
@@ -85,7 +92,7 @@ zByte *z_unpack_addr(zDWord addr) {
 zByte *z_var_addr(zByte var, int writing) {
     if (var == 0) { /* Stack */
         if (writing) {
-            if (G->stack_ptr >= G->stack_mem + Z3_STACK_SIZE)
+            if (G->stack_ptr >= G->stack_mem + ZVIBE_STACK_WORDS)
                 G->die("Stack overflow");
             return (zByte *)G->stack_ptr++;
         } else {
@@ -259,13 +266,13 @@ void z_report_memory_usage(void) {
     printf("Memory Usage Report:\n");
     printf("  Story memory: %u/%u bytes (%.1f%%)\n", 
            (unsigned int)G->story_size, 
-           Z3_STORY_MEM_SIZE,
-           (G->story_size * 100.0f) / Z3_STORY_MEM_SIZE);
+           Z_STORY_MEM_SIZE,
+           (G->story_size * 100.0f) / Z_STORY_MEM_SIZE);
     
     printf("  Stack usage: %u/%u entries (%.1f%%)\n",
            (unsigned int)(G->stack_ptr - G->stack_mem),
-           Z3_STACK_SIZE,
-           ((G->stack_ptr - G->stack_mem) * 100.0f) / Z3_STACK_SIZE);
+           ZVIBE_STACK_WORDS,
+           ((G->stack_ptr - G->stack_mem) * 100.0f) / ZVIBE_STACK_WORDS);
     
     /* Calculate actual static memory size (with split memory) */
     size_t static_size = sizeof(zState);
@@ -359,35 +366,28 @@ int z_restore_save_data(const void *data, size_t length) {
 
     if (length < minimum_size) return 2; /* Data too small */
 
-    memcpy(G->memory_state.ram_buffer, data, ram_size);
-
-    /* Read execution state */
+    /* Read and validate the execution state before touching any live state, so
+     * a rejected save leaves the running machine unchanged. */
     const uint8_t *ptr = (const uint8_t *)data + ram_size;
-    
-    /* Restore program counter */
+
     uint32_t pc_addr;
     memcpy(&pc_addr, ptr, sizeof(pc_addr));
     ptr += sizeof(pc_addr);
-    
-    /* Restore stack size */
+
     uint32_t stack_size;
     memcpy(&stack_size, ptr, sizeof(stack_size));
     ptr += sizeof(stack_size);
-    
-    /* Validate stack size and serialized length */
-    if (stack_size > Z3_STACK_SIZE) return 3; /* Invalid stack size */
 
-    if ((size_t)(ptr - (const uint8_t *)data) + (stack_size * sizeof(zWord)) + sizeof(G->base_ptr) > length) {
-        return 2;
-    }
-    
-    /* Restore stack data */
+    /* Validate stack size, then that the stack words fit in what remains */
+    if (stack_size > ZVIBE_STACK_WORDS) return 3; /* Invalid stack size */
+    if (length - minimum_size < stack_size * sizeof(zWord)) return 2;
+
+    /* Validated: now restore dynamic memory, stack and base pointer */
+    memcpy(G->memory_state.ram_buffer, data, ram_size);
     memcpy(G->stack_mem, ptr, stack_size * sizeof(zWord));
     ptr += stack_size * sizeof(zWord);
-    
-    /* Restore base pointer */
     memcpy(&G->base_ptr, ptr, sizeof(G->base_ptr));
-    
+
     /* Set program counter and stack pointer */
     G->logical_pc = pc_addr;
     G->stack_ptr = G->stack_mem + stack_size;
@@ -403,16 +403,23 @@ int z_restore_save_data(const void *data, size_t length) {
  * @return 0 on success, error code otherwise
  */
 int z_load_story_data(const void *data, size_t size) {
-    #define Z3_VERSION 3  /* Version 3 Z-machine */
-
     if (!data || size == 0)
         return 1; /* Invalid arguments */
 
     if (size < 64)
         return 2; /* Too small for Z-machine header */
 
-    if (size > Z3_STORY_MEM_SIZE)
+    if (size > Z_STORY_MEM_SIZE)
         return 2; /* Story data too large */
+
+#if ZVIBE_ENABLE_V4
+    /* In a dual build the check above uses the V4 limit; a V3 story is still
+     * capped at the V3 limit. Done before any state is touched, so a rejected
+     * load leaves the machine as it was. A V3-only build already enforced the
+     * V3 limit above and compiles none of this. */
+    if (((const uint8_t *)data)[0] == 3 && size > Z3_STORY_LIMIT)
+        return 2; /* V3 story data too large */
+#endif
 
     /* Initialize state with new story */
     G->story_size = (zSize)size;
@@ -436,6 +443,8 @@ int z_load_story_data(const void *data, size_t size) {
     G->header.version = Z_READ8(ptr);
 
     /* Verify version is 3 */
+    /* V4 is not accepted yet: the core compiles with ZVIBE_ENABLE_V4 but cannot
+     * execute V4 stories until the decoder, objects and screen support land. */
     if (G->header.version != Z3_VERSION)
         return 3; /* Unsupported version */
 
@@ -469,7 +478,7 @@ int z_load_story_data(const void *data, size_t size) {
         return 5; /* Corrupt header */
 
     /* Validate game fits in buffer with room for minimum stack */
-    size_t min_stack_bytes = Z3_STACK_SIZE * sizeof(uint16_t);
+    size_t min_stack_bytes = Z_LEGACY_STACK_RESERVE_BYTES;
     if (G->header.staticmem_addr + min_stack_bytes > ZVIBE_MEMORY_BUFFER_SIZE) {
         return 4; /* Game too large for buffer */
     }

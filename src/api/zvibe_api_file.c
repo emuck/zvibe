@@ -26,7 +26,7 @@ zvibeResult zvibe_load_story(zvibeContext *ctx, const char *filename) {
     }
 
     long size = ftell(file);
-    if (size <= 0 || size > Z3_STORY_MEM_SIZE) {
+    if (size <= 0 || size > Z_STORY_MEM_SIZE) {
         fclose(file);
         return ZVIBE_ERROR;
     }
@@ -37,7 +37,7 @@ zvibeResult zvibe_load_story(zvibeContext *ctx, const char *filename) {
     }
 
     /* Keep the host-side file buffer out of the core API object. */
-    static uint8_t file_buffer[Z3_STORY_MEM_SIZE];
+    static uint8_t file_buffer[Z_STORY_MEM_SIZE];
 
     if (fread(file_buffer, 1, (size_t)size, file) != (size_t)size) {
         fclose(file);

@@ -174,7 +174,7 @@ void op_call(void) {
     
     /* Verify enough stack space for call frame (5 words) + locals */
     size_t frame_size = 5 + local_count;
-    if (G->stack_ptr + frame_size > G->stack_mem + Z3_STACK_SIZE)
+    if (G->stack_ptr + frame_size > G->stack_mem + ZVIBE_STACK_WORDS)
         G->die("Stack overflow in call (need %u words)", (unsigned)frame_size);
 
     /* Save call frame on stack */

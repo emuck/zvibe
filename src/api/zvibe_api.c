@@ -134,7 +134,7 @@ void zvibe_destroy(zvibeContext *ctx) {
 zvibeResult zvibe_load_story_from_memory(zvibeContext *ctx, const uint8_t *data, size_t size) {
     if (!ctx || !data || size == 0) return ZVIBE_ERROR;
     
-    if (size > Z3_STORY_MEM_SIZE) {
+    if (size > Z_STORY_MEM_SIZE) {
         return ZVIBE_ERROR;
     }
     

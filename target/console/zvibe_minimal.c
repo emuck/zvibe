@@ -33,6 +33,14 @@ static size_t read_input(char *buffer, size_t max_length) {
     return len;
 }
 
+/* Records the build configuration inside the binary, so tests can verify which
+ * configuration they are exercising (see `verify-console-config` in
+ * tests/Makefile). Host frontends only; costs nothing on embedded targets. */
+#define ZV_STR_(x) #x
+#define ZV_STR(x) ZV_STR_(x)
+__attribute__((used)) static const char zvibe_build_marker[] =
+    "zvibe-build:v4=" ZV_STR(ZVIBE_ENABLE_V4) ":stack=" ZV_STR(ZVIBE_STACK_WORDS);
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         fprintf(stderr, "Usage: %s <story.z3>\n", argv[0]);

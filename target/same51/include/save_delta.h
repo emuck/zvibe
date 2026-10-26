@@ -75,11 +75,14 @@ size_t delta_encode(
  *   original     - Original game data (from flash)
  *   dynamic_size - Size of dynamic memory
  *   pc           - Output: program counter
- *   stack        - Output: stack buffer (must be large enough)
+ *   stack        - Output: stack buffer
+ *   stack_capacity - Size of the stack buffer in 16-bit words (ZVIBE_STACK_WORDS);
+ *                  a save whose stack is larger is rejected (-7)
  *   stack_words  - Output: number of stack words restored
  *   base_ptr     - Output: base pointer
  *
- * Returns: 0 on success, negative on error
+ * Returns: 0 on success, negative on error. On any error no output (RAM, stack,
+ * pc, base_ptr) has been modified.
  */
 int delta_decode(
     const uint8_t *input,
@@ -89,6 +92,7 @@ int delta_decode(
     size_t dynamic_size,
     uint32_t *pc,
     uint16_t *stack,
+    size_t stack_capacity,
     size_t *stack_words,
     uint32_t *base_ptr
 );

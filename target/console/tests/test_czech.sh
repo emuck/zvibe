@@ -10,7 +10,7 @@ set -e  # Exit on any error
 # Configuration
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$TESTS_DIR/.." && pwd)"
-ZVIBE_MINIMAL="$PROJECT_ROOT/build/bin/zvibe_minimal"
+ZVIBE_MINIMAL="$PROJECT_ROOT/${ZVIBE_BUILD:-build}/bin/zvibe_minimal"
 GAME_FILE="$TESTS_DIR/../../../games/catalog/czech.z3"
 SCRIPT_FILE="$TESTS_DIR/czech-script.txt"
 LOG_FILE="$TESTS_DIR/czech_test_output.log"

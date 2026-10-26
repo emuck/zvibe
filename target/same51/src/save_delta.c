@@ -57,12 +57,13 @@ size_t delta_encode(
     }
 
     /* Write header */
-    delta_header_t *header = (delta_header_t *)output;
-    header->magic = DELTA_MAGIC;
-    header->pc = pc;
-    header->stack_words = (uint16_t)stack_words;
-    header->delta_count = delta_count;
-    header->base_ptr = base_ptr;
+    delta_header_t header;
+    header.magic = DELTA_MAGIC;
+    header.pc = pc;
+    header.stack_words = (uint16_t)stack_words;
+    header.delta_count = delta_count;
+    header.base_ptr = base_ptr;
+    memcpy(output, &header, sizeof header);   /* output may be unaligned */
 
     uint8_t *ptr = output + header_size;
 
@@ -105,18 +106,28 @@ int delta_decode(
     size_t dynamic_size,
     uint32_t *pc,
     uint16_t *stack,
+    size_t stack_capacity,
     size_t *stack_words,
     uint32_t *base_ptr)
 {
+    /* Validate everything before touching any output, so a bad save leaves the
+     * running machine unchanged. */
+
     /* Validate minimum size */
     if (input_size < sizeof(delta_header_t)) {
         return -1;
     }
 
-    /* Read and validate header */
-    const delta_header_t *header = (const delta_header_t *)input;
+    /* Read and validate header (copied out: the input may be unaligned) */
+    delta_header_t hdr;
+    memcpy(&hdr, input, sizeof hdr);
+    const delta_header_t *header = &hdr;
     if (header->magic != DELTA_MAGIC) {
         return -2;
+    }
+
+    if (header->stack_words > stack_capacity) {
+        return -7;  /* Saved stack does not fit this build's stack */
     }
 
     size_t stack_size = header->stack_words * sizeof(uint16_t);
@@ -125,31 +136,41 @@ int delta_decode(
         return -3;
     }
 
+    /* Validate pass: every delta entry must be complete and in bounds */
+    const uint8_t *end = input + input_size;
+    const uint8_t *ptr = input + sizeof(delta_header_t) + stack_size;
+    for (uint16_t i = 0; i < header->delta_count; i++) {
+        /* Compare remaining length: never form a pointer past `end` */
+        if ((size_t)(end - ptr) < 3) {
+            return -4;  /* Truncated delta entry */
+        }
+        uint16_t offset = ((uint16_t)ptr[0] << 8) | ptr[1];
+        uint8_t length = ptr[2];
+        ptr += 3;
+        if ((size_t)(end - ptr) < length) {
+            return -5;  /* Truncated delta data */
+        }
+        if ((size_t)offset + length > dynamic_size) {
+            return -6;  /* Delta out of bounds */
+        }
+        ptr += length;
+    }
+
+    /* Apply pass: nothing below can fail */
+
     /* Copy original game data to RAM (fresh start) */
     memcpy(ram_buffer, original, dynamic_size);
 
     /* Read stack data */
-    const uint8_t *ptr = input + sizeof(delta_header_t);
+    ptr = input + sizeof(delta_header_t);
     memcpy(stack, ptr, stack_size);
     ptr += stack_size;
 
     /* Apply delta entries */
-    const uint8_t *end = input + input_size;
     for (uint16_t i = 0; i < header->delta_count; i++) {
-        if (ptr + 3 > end) {
-            return -4;  /* Truncated delta entry */
-        }
-
         uint16_t offset = ((uint16_t)ptr[0] << 8) | ptr[1];
         uint8_t length = ptr[2];
         ptr += 3;
-
-        if (ptr + length > end) {
-            return -5;  /* Truncated delta data */
-        }
-        if (offset + length > dynamic_size) {
-            return -6;  /* Delta out of bounds */
-        }
 
         memcpy(&ram_buffer[offset], ptr, length);
         ptr += length;

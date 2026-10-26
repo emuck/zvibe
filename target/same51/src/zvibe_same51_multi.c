@@ -315,8 +315,9 @@ static int do_delta_restore(void) {
         return 0;
     }
 
-    const delta_header_t *hdr = (const delta_header_t *)delta_buf;
-    if (hdr->magic != DELTA_MAGIC) {
+    delta_header_t hdr;
+    memcpy(&hdr, delta_buf, sizeof hdr);
+    if (hdr.magic != DELTA_MAGIC) {
         printf("\n[No saved game found]\n");
         return 0;
     }
@@ -332,7 +333,7 @@ static int do_delta_restore(void) {
         G->memory_state.ram_buffer,
         game->data,
         G->memory_state.ram_size,
-        &pc, (uint16_t *)G->stack_mem, &stack_words, &base_ptr
+        &pc, (uint16_t *)G->stack_mem, ZVIBE_STACK_WORDS, &stack_words, &base_ptr
     );
 
     if (result != 0) {

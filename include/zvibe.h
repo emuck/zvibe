@@ -36,6 +36,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "zvibe_config.h"
 #include "zvibe_memory.h"
 
 /* -------------------- BASIC TYPE DEFINITIONS -------------------- */
@@ -63,42 +64,23 @@ typedef size_t zSize;
 
 /* -------------------- MEMORY CONFIGURATION -------------------- */
 
-/**
- * @def Z3_STORY_MEM_SIZE
- * @brief Maximum story file size for bounds checking
- *
- * Z-machine V3 maximum: 128KB (per spec)
- */
-#define Z3_STORY_MEM_SIZE   (128*1024)
-
-/**
- * @def Z3_STACK_SIZE
- * @brief Minimum stack size in 16-bit words
- *
- * Stack size: 512 words = 1KB
- * Sufficient for typical V3 games (max call depth ~10-20)
- */
-#define Z3_STACK_SIZE       512
+/* Story size limit, stack size and operand count depend on the enabled
+ * versions; see zvibe_config.h (Z_STORY_MEM_SIZE, ZVIBE_STACK_WORDS,
+ * Z_MAX_OPERANDS). */
 
 /*
- * ZVIBE_MEMORY_BUFFER_SIZE - Shared buffer size for dynamic memory + stack
+ * ZVIBE_MEMORY_BUFFER_SIZE - RAM buffer for the story's dynamic memory
  *
  * Default: 16KB
- * Layout: [dynamic memory (0..staticmem_addr)][stack (grows upward)]
- * Stack space = buffer_size - staticmem_addr (typically 2-4KB for V3 games)
+ * Holds only dynamic memory (0..staticmem_addr). The Z-machine stack is
+ * separate: zState::stack_mem, ZVIBE_STACK_WORDS words.
  *
  * Override at compile time: -DZVIBE_MEMORY_BUFFER_SIZE=...
  */
 #ifndef ZVIBE_MEMORY_BUFFER_SIZE
-/** @brief Shared buffer size for dynamic memory and stack (default: 16KB) */
+/** @brief RAM buffer size for dynamic memory (default: 16KB) */
 #define ZVIBE_MEMORY_BUFFER_SIZE  (16*1024)
 #endif
-
-/**
- * @def Z3_MAX_OPERANDS
- * @brief Maximum operands per instruction (Z-machine V3 spec)
- */
-#define Z3_MAX_OPERANDS     4
 
 /**
  * @def Z3_ALPHABET_SIZE
@@ -220,7 +202,7 @@ typedef struct {
 typedef struct {
     /* Memory management */
     zmem_state_t memory_state;           /**< Split memory manager (RAM/flash) */
-    zWord stack_mem[Z3_STACK_SIZE];      /**< Stack memory (512 words = 1KB) */
+    zWord stack_mem[ZVIBE_STACK_WORDS];  /**< Stack memory (default 512 words = 1KB) */
 
     /* Core execution state */
     zWord *stack_ptr;             /**< Current stack pointer */
@@ -233,7 +215,7 @@ typedef struct {
     zHeader header;               /**< Parsed story file header (V3 format) */
 
     /* Instruction decoding */
-    zWord operands[Z3_MAX_OPERANDS];  /**< Current instruction operands */
+    zWord operands[Z_MAX_OPERANDS];   /**< Current instruction operands */
     zByte operand_count;          /**< Number of operands for current instruction */
     int quit_flag;                /**< Set by QUIT opcode */
 
