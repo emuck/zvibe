@@ -16,8 +16,9 @@ game files except for the bundled test assets listed below.
 The repository includes these story files for testing:
 
 **Czech Z-machine Test Suite**
-- Location: `games/catalog/czech.z3`
-- License: Public domain
+- Location: `games/catalog/czech.z3` (version 3) and `games/catalog/czech.z4` (version 4)
+- License: Czech v0.8, Copyright (C) 2003 Amir Karger; freely redistributable with its
+  notice preserved (see THIRD_PARTY_NOTICES.md)
 - Purpose: Z-machine conformance testing
 
 This file tests interpreter correctness and is safe to distribute.

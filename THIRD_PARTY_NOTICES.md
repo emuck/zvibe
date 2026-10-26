@@ -21,7 +21,7 @@ file at the repository root also reproduces all required license texts.
 | 5 | [verilog-uart](#5-verilog-uart) | `common/rtl/uart/uart_tx.sv`, `uart_rx.sv` | MIT | ✅ |
 | 6 | [Microchip SAM E51 DFP](#6-microchip-sam-e51-dfp) | `target/same51/packs/ATSAME51J20A_DFP/` | Apache-2.0 | ✅ |
 | 7 | [ARM CMSIS Core](#7-arm-cmsis-core) | `target/same51/packs/CMSIS/` | Apache-2.0 | ✅ |
-| 8 | [Czech Z-machine test suite](#8-czech-z-machine-test-suite) | `games/catalog/czech.z3` | Public domain | ✅ |
+| 8 | [Czech Z-machine test suite](#8-czech-z-machine-test-suite) | `games/catalog/czech.z3`, `czech.z4` | Permissive (Karger) | ✅ |
 | 9 | [Intel/Altera ALTPLL](#9-intelaltera-altpll-max10-pll-primitive) | *(primitive, no files)* | BSD-3-Clause | ✅ |
 | 10 | [QFlexpress (removed)](#10-qflexpress-lgpl-30--removed) | *(not present in repo)* | LGPL-3.0 | ⚠️ |
 
@@ -176,21 +176,38 @@ text in [Appendix C](#c-apache-license-version-20).
 
 ## 8. Czech Z-machine Test Suite
 
-**Description:** `czech.z3` is a Z-machine version 3 compliance test suite
-used to validate opcode correctness.
+**Description:** CZECH, the Comprehensive Z-machine Emulation CHecker, is a
+Z-machine compliance test suite used to validate opcode correctness.
+`czech.z3` is the version 3 build and `czech.z4` the version 4 build, both
+compiled from the upstream source `czech.inf` (Czech v0.8) with Inform 6.
+Czech is based on Evin Robertson's test script for nitfol.
 
-**Author:** Mark Knibbs
-**Copyright:** Public domain
-**License:** Public domain — no restrictions on use, reproduction, or
-distribution.
+**Author:** Amir Karger
+**Copyright:** (C) 2003, Amir Karger
+**License:** Permissive; the notice below must be preserved.
+**Source:** `https://ifarchive.org/if-archive/infocom/interpreters/tools/czech_0_8.zip`
 **Files:**
 
 ```
 games/catalog/czech.z3
+games/catalog/czech.z4
 ```
 
-No notices are required.  The public-domain status is per the upstream
-distribution of the Czech test suite.
+**Required notice** (verbatim from the upstream `README.txt`):
+
+```
+Czech, v0.8
+Copyright (C) 2003, Amir Karger
+
+The copyright holder hereby grants the rights of usage, distribution
+and modification of this software to everyone and for any purpose, as
+long as this license and the copyright notice above are preserved and
+not modified.  There is no warranty for this software.
+```
+
+**Correction:** an earlier version of this entry attributed Czech to another
+author and described it as public domain. The upstream distribution says
+otherwise, as above.
 
 ---
 

@@ -45,7 +45,7 @@ restaurant                                                      ╭───╮
 
 The project started with a Z-machine Version 3 interpreter written in C for desktop (console)
 platforms. The initial focus was getting the core opcode engine correct and validating it against
-the public-domain czech.z3 conformance suite before touching any hardware.
+the freely redistributable czech.z3 conformance suite (Czech v0.8 by Amir Karger) before touching any hardware.
 
 Early work established a platform-abstraction API that would later allow the same core to run
 on microcontrollers and FPGAs without modification.

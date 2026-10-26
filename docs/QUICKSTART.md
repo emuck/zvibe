@@ -33,7 +33,7 @@ Or with the minimal interpreter:
 
 ## Obtain Test Files
 
-The repository includes the Czech Z-machine test suite (`games/catalog/czech.z3`), which is public domain:
+The repository includes the Czech Z-machine test suite (`games/catalog/czech.z3`), which is freely redistributable (see THIRD_PARTY_NOTICES.md):
 
 ```bash
 ./build/bin/zvibe_minimal ../../games/catalog/czech.z3

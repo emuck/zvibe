@@ -60,7 +60,7 @@ Build time: ~30 seconds on any modern machine.
 ./build/bin/zvibe_minimal path/to/game.z3
 ```
 
-The bundled `games/catalog/czech.z3` is a public-domain Z-machine opcode test suite — it runs automatically and needs no input beyond an optional `quit` to exit.
+The bundled `games/catalog/czech.z3` is the freely redistributable Czech Z-machine opcode test suite (Copyright (C) 2003 Amir Karger; see THIRD_PARTY_NOTICES.md) — it runs automatically and needs no input beyond an optional `quit` to exit.
 
 ---
 

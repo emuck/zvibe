@@ -104,7 +104,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform support (Linux, macOS, Windows/WSL2)
 
 **Testing**
-- Czech Z-machine test suite integration (368 tests, public domain)
+- Czech Z-machine test suite integration (368 tests; freely redistributable, Copyright (C) 2003 Amir Karger)
 - 119 unit tests for memory subsystem
 - Hardware validation suite for RISC-V FPGA
 - Automated UART testing with latency metrics
