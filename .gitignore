@@ -186,8 +186,9 @@ save.dat
 *.z5
 *.z8
 
-# Exceptions: public domain / original works committed to the repo
+# Exceptions: redistributable third-party assets / original works committed to the repo
 !games/catalog/czech.z3
+!games/catalog/czech.z4
 !games/catalog/restaurant.z3
 
 # Vendor files (should not be in open source repo)

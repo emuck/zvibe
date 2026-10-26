@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Czech Z-machine test suite attribution and license. It was described as public
+  domain and credited to another author; the upstream Czech v0.8 distribution
+  says Copyright (C) 2003 Amir Karger, free to use, distribute and modify with
+  the license and notice preserved. `THIRD_PARTY_NOTICES.md` and `NOTICE` now carry
+  the real notice, `games/catalog/CZECH-NOTICE.txt` and `CZECH-README.txt` travel
+  with the story files, and every public-domain claim was corrected.
+
 ## [2.0.0] - 2026-06-22
 
 ### Added

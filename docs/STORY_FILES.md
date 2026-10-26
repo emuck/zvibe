@@ -21,7 +21,8 @@ The repository includes these story files for testing:
   notice preserved (see THIRD_PARTY_NOTICES.md)
 - Purpose: Z-machine conformance testing
 
-This file tests interpreter correctness and is safe to distribute.
+These files test interpreter correctness and may be redistributed subject to
+preserving Czech's license and copyright notice (`games/catalog/CZECH-NOTICE.txt`).
 
 **Restaurant**
 - Location: `games/catalog/restaurant.z3`

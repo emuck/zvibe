@@ -404,3 +404,7 @@ Automated testing requires only device connection.
 ## License
 
 BSD-3-Clause. See [../../LICENSE](../../LICENSE).
+
+Bundled Czech story data retains its own license; see the root `NOTICE` and
+`games/catalog/CZECH-NOTICE.txt`. Include that notice with any distribution
+(firmware, flash image or generated array) that contains Czech.

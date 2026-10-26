@@ -256,6 +256,8 @@ See [`common/tb/README.md`](common/tb/README.md) for the full testbench inventor
 - **Servile**: Apache-2.0 License (see serv/LICENSE)
 - **UART (alexforencich)**: MIT License (attributed in source files)
 - **ZVibe Core**: BSD-3-Clause (see ../../../../LICENSE)
+- **Bundled Czech story data** retains its own license; see the root `NOTICE` and
+  `games/catalog/CZECH-NOTICE.txt`, and include it with any image that contains Czech
 
 ## References
 

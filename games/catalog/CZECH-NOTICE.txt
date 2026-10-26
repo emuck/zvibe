@@ -1,0 +1,17 @@
+Czech Z-machine test suite
+(games/catalog/czech.z3, games/catalog/czech.z4)
+
+Include this notice, unmodified, with any distribution that contains Czech: the
+story files, C arrays generated from them, or firmware or flash images that
+embed them. The upstream README.txt is kept unchanged as CZECH-README.txt.
+
+Czech, v0.8
+Copyright (C) 2003, Amir Karger
+
+The copyright holder hereby grants the rights of usage, distribution
+and modification of this software to everyone and for any purpose, as
+long as this license and the copyright notice above are preserved and
+not modified.  There is no warranty for this software.
+
+Czech is based on Evin Robertson's test script for nitfol.
+Upstream: https://ifarchive.org/if-archive/infocom/interpreters/tools/czech_0_8.zip
