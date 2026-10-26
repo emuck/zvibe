@@ -85,6 +85,6 @@ if riscv_works; then
     echo "== RISC-V: BUILD FAILED"; exit 1
   fi
 else
-  echo "== RISC-V: skipped (riscv64-unknown-elf-gcc missing or not working; on macOS a missing"
-  echo "   libisl.23.dylib means: brew install isl)"
+  echo "== RISC-V: skipped (riscv64-unknown-elf-gcc missing or not working; on macOS a"
+  echo "   dyld error naming libisl or libmpc means: brew install isl libmpc)"
 fi

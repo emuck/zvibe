@@ -132,10 +132,14 @@ with `Z_IS_V4()`:
 Each slice leaves the V3-only build byte-for-byte equivalent or smaller, and
 each is a separate commit.
 
-1. **Const opcode tables.** No behavior change, independently valuable.
-   Measured on Cortex-M4 (xc32 `-O2`) for `zvibe_ops_base.o`: 1786 to 1214
-   bytes. RAM drops by **388 bytes** (`.bss` to 0) and net flash drops by 184
-   bytes, because the removed init code exceeds the 384-byte table.
+1. **Const opcode tables.** **Done** (`4076301`). No behavior change. Measured
+   with `scripts/core_size.sh`, core objects only:
+   - SAM E51 (xc32 `-O2`): text 9,504 to 9,308 (-196), RAM 17,960 to 17,572
+     (-388). The full firmware shrinks by 244 bytes of flash and 388 bytes of
+     RAM.
+   - RISC-V (rv32i `-O1`, the MAX10 and Arty flags): text 18,600 to 18,160
+     (-440), RAM 17,960 to 17,572 (-388).
+   Czech 368/368, Restaurant, and the unit tests pass.
 2. **`zvibe_config.h`**, compile-time capacities, `Z_IS_V4()` defined but with
    V4 loading still rejected. Prove the V3 build is unchanged.
 3. **Addresses, objects, properties, dictionary**, with focused V4 fixtures.
