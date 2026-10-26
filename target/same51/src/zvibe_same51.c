@@ -448,7 +448,10 @@ static void v4_press_return(void) {
 
 /* Start the game afresh; wait for RETURN first unless a test script asked for a quiet reset */
 static void v4_start(bool wait) {
-    if (wait) v4_press_return();            /* before init_zvibe(), which clears the screen */
+    if (wait) {
+        v4_press_return();                  /* before init_zvibe(), which clears the screen */
+        term_probe_size();                  /* ask again: the terminal may have been opened (or resized) since boot */
+    }
     zvibe_initialized = init_zvibe();
 }
 

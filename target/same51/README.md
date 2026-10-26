@@ -246,7 +246,9 @@ python3 tests/test_v4_bigsave.py                  # a 21 KB save, packed into th
 ```
 
 Connect at 115200 8N1 with an xterm-compatible terminal of at least 56 columns
-(the firmware asks the terminal for its size at boot). `V4_RAM` (default 32768)
+(the firmware asks the terminal for its size at boot and again each time you press
+RETURN to start, so a terminal opened after boot is measured too; if it never
+answers, 24x80 is assumed, and a taller window will show stale text below row 24). `V4_RAM` (default 32768)
 is the RAM given to the story's dynamic memory; a story needs its dynamic
 memory plus about 5 KB. A V4 story's full save can be over 20 KB (Bureaucracy), more
 than the 16 KB SmartEEPROM, so the firmware stores it packed against the story in
