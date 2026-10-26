@@ -76,6 +76,14 @@ AddressSanitizer and UBSan, and feeds the decoder exact-size and misaligned
 inputs so an over-read or a typed cast on unaligned data fails. `make test-delta-copies` keeps the two
 copies of `save_delta.c` identical.
 
+`test_delta_pack.c` covers `delta_pack`/`delta_unpack`, which the V4 firmware uses to
+fit a save larger than its storage by keeping only the bytes that differ from the
+story: round trips (identical, single and merged changes, runs over 65,535 bytes,
+no base, random blobs), exact and insufficient output capacity, every truncation and
+corruption of the packed data (output must stay untouched), and a real save from the
+core restored after packing. Also built under ASan/UBSan; eight deliberately
+reintroduced bugs are each caught.
+
 **Run:** `cd target/console/tests && make test-unit`
 
 ### Object table, properties, packed addresses and dictionary (V3 / V4 layouts)
@@ -245,6 +253,19 @@ make test
 ```
 
 Tests SmartEEPROM save/restore functionality.
+
+The V4 firmware (`make v4-program`, see `target/same51/README.md`) has three scripts
+that need `pyserial` and `pyte` and drive the board over its serial port, each with
+its own small story built with Inform 6.44 (`target/console/tests/data`):
+
+| Script | Story | Checks |
+|---|---|---|
+| `tests/test_v4_game.py` | `v4screen.z4` | status bar, styles, scrolling, wrap, stream 3, `read_char` (letter or arrow key), line editing, `get_cursor`, `scan_table`, `erase_line`, restart prompt |
+| `tests/test_v4_save.py` | `v4save.z4` | save stores 1, restore resumes with 2, counter restored, survives a reset |
+| `tests/test_v4_bigsave.py` | `v4bigsave.z4` | a 21 KB save packed into the 16 KB SmartEEPROM, exact contents after restore and reset, an oversized change set fails with 0 and keeps the old save |
+
+Czech V4 on the board should give 386 tests, 367 passed, 0 failed, 19 print tests.
+Flash the right story first: each script's header gives the `make` line.
 
 ### RISC-V FPGA — MAX10 08 Eval Board
 

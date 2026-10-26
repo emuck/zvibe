@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Z-machine version 4 support, selected at build time with `ZVIBE_ENABLE_V4=1`
+  (default off: V3-only builds are unchanged in behavior and size). Covers the V4
+  object, property and dictionary layouts, the V4 opcodes (`call_1s`, `call_2s`,
+  `call_vs2`, `read_char`, `scan_table`, `erase_window`/`erase_line`, cursor,
+  text style, buffering, output stream 3), V4 save and restore results, and the
+  header fields a V4 story reads. See `docs/V4_DESIGN.md`.
+- An ANSI/VT100 screen layer (`src/screen`) and a public screen interface
+  (`zvibe_screen_ops.h`, `zvibe_set_screen`) for split windows, cursor addressing and styles.
+- The console plays V4 stories full-screen on a terminal.
+- SAM E51 V4 firmware (`make v4`): terminal input ring, key decoding, and saves
+  packed against the story so that saves larger than the SmartEEPROM fit.
+- Czech V4 conformance gate, and V4 test stories with hardware test scripts.
+
 ### Fixed
 - Czech Z-machine test suite attribution and license. It was described as public
   domain and credited to another author; the upstream Czech v0.8 distribution

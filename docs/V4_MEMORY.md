@@ -72,11 +72,14 @@ configs and the measured firmware sizes in `CODE_SIZE_ANALYSIS.md`.
 
 - **RAM:** no concern. A 64 KB buffer costs 48 KB of 256 KB.
 - **Flash:** 786,432 B available holds three maximum-size V4 stories.
-- **Saves, single-game firmware:** `zvibe_same51.c:37` uses a 16 KB on-stack
-  buffer for a **full** save (dynamic memory plus stack). A V4 story with
-  dynamic memory above about 15 KB cannot save. The multi-game build already
-  uses delta compression (`delta_encode`); the single-game path should be moved
-  to it.
+- **Saves, single-game firmware:** the V3 build still writes a **full** save
+  through a 16 KB buffer, so a story with more than about 15 KB of dynamic memory
+  cannot save there. The V4 build (`make v4`) instead packs the save blob against the
+  story in flash (`delta_pack`, `save_delta.c`) and stores only the changed bytes, so
+  a 21 KB save works (hardware-tested with a 21 KB test story). A game that changes
+  more than about 16 KB still fails to save, cleanly, keeping the previous save.
+  The static buffers for this cost about 50 KB of RAM (85 KB `.bss` in total with
+  the default 32 KB story buffer).
 
 ### Arty S7-50 (RISC-V)
 
@@ -121,8 +124,8 @@ configs and the measured firmware sizes in `CODE_SIZE_ANALYSIS.md`.
 2. **Per-target buffer size.** `ZVIBE_MEMORY_BUFFER_SIZE` is a single 16 KB
    default. It must become an explicit per-target setting.
 3. **Delta saves everywhere.** Full saves cap dynamic memory at the save
-   buffer size. Use the delta path on SAME51 single-game and check delta sizes
-   against the 2 KB MAX10 slot.
+   buffer size. Done for the SAME51 single-game V4 firmware (`delta_pack`). Still to
+   do: check delta sizes against the 2 KB MAX10 slot.
 4. **Speed, not size.** The SERV core runs about 5 MIPS. *AMFV* runs a
    heavy simulation; an Arty latency of 0.5 s median on V3 (see
    `CODE_SIZE_ANALYSIS.md`) may not carry over. This was not measured and is a

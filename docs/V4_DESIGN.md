@@ -352,9 +352,9 @@ each is a separate commit.
      covers the opcodes and streams directly; `test_screen.c` the layer alone.
 
    **Deferred from this slice:**
-   - Frontend migrations are separate work: SAME51 firmware (replace the
-     firmware-side echo with the UART adapter; needs the board), RISC-V
-     firmware, webterm (128 KB and `.z3`-only limits).
+   - Frontend migrations are separate work: RISC-V firmware and webterm (128 KB
+     and `.z3`-only limits). The console and the SAME51 single-game firmware are
+     done, see below.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
    - Timed input.
@@ -363,8 +363,25 @@ each is a separate commit.
      a shorter upper window than it asked for.
    - The console's V4 player has no horizontal scrolling in its line editor
      and is POSIX only.
-   - A V4 madlibs story as an acceptance demo once the frontends are migrated.
-6. **Regression and playthroughs.**
+   - A V4 madlibs story as an acceptance demo.
+6. **Frontends.** Console: `zvibe_console` hands a V4 story on a terminal to the
+   full-screen player (see slice 5). **SAME51 single-game firmware: done**
+   (`make v4` in `target/same51`):
+   - Story text goes through the screen layer; input is interrupt-driven into a
+     ring (`terminal_io.c`, shared with the screen demo), with arrow keys, Escape
+     and Delete delivered to `read_char` as ZSCII. The terminal is asked for its
+     size at boot; columns are capped at 80.
+   - Saves are packed against the story in flash (`delta_pack`/`delta_unpack`,
+     identical copies for SAME51 and RISC-V), working on the public save blob, so
+     V4 saves larger than the 16 KB SmartEEPROM fit when the game's changes do.
+     An oversized change set fails the save cleanly and keeps the old one.
+   - Hardware-tested on the Curiosity Nano: Czech V4 gives 386/367/0/19 as on the
+     console; `v4screen.z4` (screen), `v4save.z4` (save/restore/reset) and
+     `v4bigsave.z4` (21 KB save) pass their scripts; a save from another release
+     of a story is refused.
+   - Not yet done: playing Bureaucracy through with a real save on the board;
+     the multi-game SAME51 firmware, RISC-V firmware and webterm.
+7. **Regression and playthroughs.**
 
 ### Proving "zero cost"
 
@@ -403,7 +420,7 @@ two-type-byte decoder, and output stream 3 routing.
 Per-target RAM, flash and save limits, and where V4 does not fit, are in
 [V4_MEMORY.md](V4_MEMORY.md). Design consequences: `ZVIBE_MEMORY_BUFFER_SIZE`
 and the Z-machine stack size become explicit per-target settings
-(`ZVIBE_STACK_WORDS`), and the single-game SAME51 firmware moves to delta saves.
+(`ZVIBE_STACK_WORDS`), and the single-game SAME51 V4 firmware uses delta saves.
 
 ## Existing issues to fix independently
 
