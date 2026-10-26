@@ -20,6 +20,7 @@
 #include <limits.h>
 #include <time.h>
 #include "zvibe_api.h"
+#include "zvibe_v4term.h"
 
 /* Platform-specific includes */
 #ifdef _WIN32
@@ -503,6 +504,18 @@ int main(int argc, char *argv[]) {
         }
     }
     
+#if ZVIBE_ENABLE_V4 && !defined(_WIN32)
+    /* A version 4 story on a real terminal gets the full-screen player */
+    if (!script_mode && zvibe_v4term_wants(story_file)) {
+        int rc;
+        setup_save_filename(story_file);
+        rc = zvibe_v4term_play(story_file, rng_seed_set ? rng_seed : (int)time(NULL),
+                               save_filename, transcript_file, commands_file);
+        close_files();
+        return rc;
+    }
+#endif
+
     /* Setup signal handling for clean exit */
 #ifdef _WIN32
     /* Windows uses SetConsoleCtrlHandler for Ctrl+C handling */

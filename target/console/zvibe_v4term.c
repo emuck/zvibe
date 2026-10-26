@@ -10,14 +10,14 @@
  *
  * This is the reference for how a frontend uses the V4 API: zvibe_set_screen(),
  * ZVIBE_WAIT_FOR_CHAR / zvibe_input_char(), and routing the story's text through
- * the screen layer. Build with `make v4term` (needs a V4-enabled build, see the
- * Makefile), run with: zvibe_v4term story.z4
+ * the screen layer.
  *
- * Saves go to <story>.sav next to the story file; restore reads the same file.
  * Terminals narrower than 56 columns are not supported; wider ones use 80.
- * Version 4 stories only: this player attaches the V4 screen table, which a
- * version 3 story does not use for its windows. A command line must fit on the
- * terminal line (there is no horizontal scrolling); further keys ring the bell.
+ * zvibe_console uses this automatically for a version 4 story when both stdin
+ * and stdout are terminals (and no -s script is given); everything else, and all
+ * version 3 stories, take the console's plain line-oriented path. A command line
+ * must fit on the terminal line (there is no horizontal scrolling); further keys
+ * ring the bell. POSIX terminals only.
  */
 
 #include <errno.h>
@@ -27,17 +27,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
-#include <time.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include "zvibe_api.h"
 #include "zvibe_screen.h"
+#include "zvibe_v4term.h"
 
-#if !ZVIBE_ENABLE_V4
-#error "zvibe_v4term needs a build with -DZVIBE_ENABLE_V4=1"
-#endif
+#if ZVIBE_ENABLE_V4 && !defined(_WIN32)
 
 static zscreen scr;
+static FILE *transcript;                  /* -t: the story's text, as printed */
+static FILE *commands;                    /* -c: every command line typed */
 static struct termios saved_tio;
 static int raw_on;
 
@@ -154,6 +154,8 @@ static int read_line(char *buf, size_t size) {
         fflush(stdout);
     }
     buf[len] = 0;
+    if (transcript) fprintf(transcript, "%s\n", buf);
+    if (commands) { fprintf(commands, "%s\n", buf); fflush(commands); }
     return 1;
 }
 
@@ -162,6 +164,7 @@ static int read_line(char *buf, size_t size) {
 static void story_text(const char *text, size_t len) {
     size_t i;
     for (i = 0; i < len; i++) zscreen_putc(&scr, text[i]);
+    if (transcript) fwrite(text, 1, len, transcript);
 }
 
 /* ---- save files ---- */
@@ -196,36 +199,32 @@ static void do_restore(zvibeContext *ctx) {
 
 /* ---- main ---- */
 
-int main(int argc, char **argv) {
+int zvibe_v4term_wants(const char *story_file) {
+    FILE *f = fopen(story_file, "rb");
+    int version = f ? fgetc(f) : -1;
+    if (f) fclose(f);
+    return version == 4 && isatty(STDIN_FILENO) && isatty(STDOUT_FILENO);
+}
+
+int zvibe_v4term_play(const char *story_file, int seed, const char *save_file, FILE *transcript_out, FILE *commands_out) {
     zvibeContext *ctx;
     uint8_t rows, cols;
     char line[256];
     int finished = 0;
 
-    if (argc != 2) {
-        fprintf(stderr, "usage: %s story.z4\n", argv[0]);
-        return 2;
-    }
-    snprintf(save_path, sizeof save_path, "%s.sav", argv[1]);
-    {
-        FILE *f = fopen(argv[1], "rb");
-        int version = f ? fgetc(f) : -1;
-        if (f) fclose(f);
-        if (version != 4) {
-            fprintf(stderr, "%s: not a version 4 story\n", argv[1]);
-            return 1;
-        }
-    }
+    snprintf(save_path, sizeof save_path, "%s", save_file);
+    transcript = transcript_out;
+    commands = commands_out;
 
     ctx = zvibe_create(story_text);
     if (!ctx) return 1;
     terminal_size(&rows, &cols);
     zscreen_init(&scr, out_byte, rows, cols);
     zvibe_set_screen(ctx, &zscreen_ops, &scr);
-    zvibe_set_random_seed(ctx, (int)time(NULL));
-    if (zvibe_load_story(ctx, argv[1]) != ZVIBE_OK) {
+    zvibe_set_random_seed(ctx, seed);
+    if (zvibe_load_story(ctx, story_file) != ZVIBE_OK) {
         zscreen_shutdown(&scr);
-        fprintf(stderr, "cannot load %s (a version 4 story, up to 256 KB)\n", argv[1]);
+        fprintf(stderr, "cannot load %s\n", story_file);
         return 1;
     }
 
@@ -263,3 +262,5 @@ int main(int argc, char **argv) {
     zvibe_destroy(ctx);
     return 0;
 }
+
+#endif /* ZVIBE_ENABLE_V4 && !_WIN32 */

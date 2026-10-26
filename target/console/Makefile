@@ -52,10 +52,9 @@ CORE_SHARED_OBJS = $(patsubst $(SRC_DIR)/core/%.c,$(OBJ_DIR)/%_shared.o,$(CORE_S
 API_SHARED_OBJ = $(OBJ_DIR)/zvibe_api_shared.o
 API_FILE_SHARED_OBJ = $(OBJ_DIR)/zvibe_api_file_shared.o
 
-# V4 terminal player (needs a V4-enabled build, see `make v4term` in the repo root)
+# Full-screen player for V4 stories (compiles to nothing in a V3-only build)
 SCREEN_OBJ = $(OBJ_DIR)/zvibe_screen.o
 V4TERM_OBJ = $(OBJ_DIR)/zvibe_v4term.o
-V4TERM_TARGET = $(BIN_DIR)/zvibe_v4term
 
 # Target binaries
 CONSOLE_TARGET = $(BIN_DIR)/zvibe_console
@@ -93,7 +92,7 @@ $(SCREEN_OBJ) $(V4TERM_OBJ): $(CONFIG_STAMP)
 -include $(wildcard $(OBJ_DIR)/*.d)
 
 # Console target
-$(CONSOLE_TARGET): $(CORE_OBJS) $(API_OBJ) $(API_FILE_OBJ) $(CONSOLE_OBJ)
+$(CONSOLE_TARGET): $(CORE_OBJS) $(API_OBJ) $(API_FILE_OBJ) $(CONSOLE_OBJ) $(SCREEN_OBJ) $(V4TERM_OBJ)
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Minimal target
@@ -106,11 +105,6 @@ $(SCREEN_OBJ): $(SRC_DIR)/screen/zvibe_screen.c
 
 $(V4TERM_OBJ): zvibe_v4term.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
-$(V4TERM_TARGET): $(CORE_OBJS) $(API_OBJ) $(API_FILE_OBJ) $(SCREEN_OBJ) $(V4TERM_OBJ)
-	$(CC) $(CFLAGS) $^ -o $@
-
-v4term: directories $(V4TERM_TARGET)
 
 # Compile core source files
 $(OBJ_DIR)/%.o: $(SRC_DIR)/core/%.c
@@ -185,4 +179,4 @@ minimal: directories $(MINIMAL_TARGET)
 console: directories $(CONSOLE_TARGET)
 test-status: directories $(STATUS_TEST_TARGET)
 
-.PHONY: all clean clean-all directories minimal console docs shared test-status v4term FORCE
+.PHONY: all clean clean-all directories minimal console docs shared test-status FORCE

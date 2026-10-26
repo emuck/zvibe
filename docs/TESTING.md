@@ -51,8 +51,10 @@ through the real ANSI screen layer into a VT100 emulator and compares the
 resulting screen. Rebuild the story with `inform -v4 v4screen.inf v4screen.z4`.
 Both run under `make validate-v4` only.
 
-`make v4term` builds a terminal player for hand testing:
-`target/console/build_v4/bin/zvibe_v4term story.z4`.
+For hand testing, build with V4 enabled (`make validate-v4` leaves the binary at
+`target/console/build_v4/bin/zvibe_console`) and run a V4 story in a terminal:
+`zvibe_console story.z4` switches to the full-screen player automatically. With
+`-s`, or when stdin or stdout is not a terminal, it uses the plain line mode.
 
 ### Build configuration and restore safety (V3 / V4 switch)
 

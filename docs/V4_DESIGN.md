@@ -329,9 +329,12 @@ each is a separate commit.
      supported, and flags1 bit 7 is never set.
    - The header now declares Standard 1.1 (0x32/0x33), since the V4 opcode set
      is complete.
-   - `target/console/zvibe_v4term.c` (`make v4term`) is the reference
-     frontend: it sizes the screen from the terminal, edits input lines
-     itself, maps cursor keys to ZSCII and saves to `<story>.sav`.
+   - `target/console/zvibe_v4term.c` is the reference frontend. `zvibe_console`
+     hands a V4 story to it when stdin and stdout are terminals and no `-s`
+     script is given (POSIX only; V3 stories and piped runs keep the plain
+     path, which also draws the V3 status bar over a V4 story). It sizes the
+     screen from the terminal, edits input lines itself, maps cursor keys to
+     ZSCII, honours `-t`, `-c`, `-r`, and saves like the console.
    - **Cost** of enabling V4 on top of V3 (SAM E51 `-O2`, RISC-V `-O1`): about
      +2,036 B and +4,268 B of flash and +56 B of RAM. V3-only objects are
      byte-identical to before the slice at every optimisation level.
@@ -358,8 +361,8 @@ each is a separate commit.
    - `split_window` is clamped to `rows - 2` lines (DECSTBM needs a lower
      window of at least two rows); a story that splits off all but one row gets
      a shorter upper window than it asked for.
-   - The console player has no horizontal scrolling in its line editor and
-     plays version 4 stories only.
+   - The console's V4 player has no horizontal scrolling in its line editor
+     and is POSIX only.
    - A V4 madlibs story as an acceptance demo once the frontends are migrated.
 6. **Regression and playthroughs.**
 

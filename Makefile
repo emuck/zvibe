@@ -4,7 +4,7 @@
 #
 # Convenience targets for common tasks across all targets
 
-.PHONY: help validate validate-v4 v4term test ci-source clean clean-all docs sim-tier1 sim-questa sim-xsim sim-all
+.PHONY: help validate validate-v4 test ci-source clean clean-all docs sim-tier1 sim-questa sim-xsim sim-all
 
 help:
 	@echo "ZVibe Repository Makefile"
@@ -12,7 +12,6 @@ help:
 	@echo "Validation:"
 	@echo "  make validate       - Console build + unit tests (matches CI)"
 	@echo "  make validate-v4    - Same checks on a V3+V4 (ZVIBE_ENABLE_V4=1) console build"
-	@echo "  make v4term         - Build the V4 terminal player: target/console/build_v4/bin/zvibe_v4term"
 	@echo "  make ci-source      - Full source-change gate (skips missing toolchains)"
 	@echo "  make sim-tier1      - Verilator RTL tests (requires verilator)"
 	@echo ""
@@ -60,11 +59,6 @@ validate-v4:
 	@$(MAKE) -C target/console/tests test-czech-v4 ZVIBE_BUILD=build_v4 EXPECT_V4=1
 	@echo "Running Restaurant playthrough on the V4-enabled build..."
 	@$(MAKE) -C target/console/tests test-restaurant ZVIBE_BUILD=build_v4 EXPECT_V4=1
-
-# The V4 terminal player: play a V3 or V4 story in an ANSI terminal.
-v4term:
-	@cd target/console && make BUILD_DIR=build_v4 EXTRA_CFLAGS=-DZVIBE_ENABLE_V4=1 v4term
-	@echo "Built target/console/build_v4/bin/zvibe_v4term   (run: zvibe_v4term story.z4)"
 
 # Source-change validation: host tests always, embedded builds when toolchains exist.
 ci-source:
