@@ -12,7 +12,7 @@ Setup:   pip install pyserial pyte
 Flash:   cd target/same51 && make v4-program STORY_FILE=../console/tests/data/v4screen.z4
 Run:     python3 tests/test_v4_game.py [serial-port]
 Env:     TERM_SIZE=RxC  terminal size to report and emulate (default 24x80). The story
-                        prints its header screen size, so it must match.
+                        prints its header screen size, so it must match (columns are capped at 80).
          KEY=arrow      answer read_char with the Up-arrow escape sequence (expects
                         ZSCII 129) instead of the letter q (expects 113)
 """
@@ -85,7 +85,7 @@ check("lower window scrolled", any("Lower line 30" in l for l in screen.display)
 check("status bar survived the scrolling", "ZVIBE V4" in screen.display[0])
 check("long paragraph wrapped on a word boundary", any(l.rstrip().endswith("by the") for l in screen.display)
       or "by the interpreter" in " ".join(l.strip() for l in screen.display))
-check("header screen size", any(f"size {ROWS}x{COLS}" in l for l in screen.display))
+check("header screen size", any(f"size {ROWS}x{min(COLS, 80)}" in l for l in screen.display))
 check("stream 3 capture", any("len=8 [captured]" in l for l in screen.display))
 
 ser.write(b"\x1b[A" if ARROW else b"q")
@@ -111,6 +111,8 @@ check("scan_table found the key", any("scan: found" in l for l in screen.display
 check("status bar score updated", "Score: 8" in screen.display[0] and "Score: 7" not in screen.display[0], screen.display[0])
 check("erase_line kept the head", "tail-to-" in screen.display[2] and "erase" not in screen.display[2], screen.display[2])
 check("restart prompt after the game", wait_for("Game finished") and wait_for("Press RETURN to start"))
+ser.write(b"\r")
+check("game restarts after RETURN", wait_for("press a key:"))
 
 print("\nFAILED:" if fails else "\nALL PASSED", fails if fails else "")
 sys.exit(1 if fails else 0)

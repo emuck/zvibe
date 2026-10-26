@@ -447,8 +447,8 @@ static void v4_press_return(void) {
 
 /* Start the game afresh; wait for RETURN first unless a test script asked for a quiet reset */
 static void v4_start(bool wait) {
+    if (wait) v4_press_return();            /* before init_zvibe(), which clears the screen */
     zvibe_initialized = init_zvibe();
-    if (zvibe_initialized && wait) v4_press_return();
 }
 
 static void v4_save(void) {
@@ -487,6 +487,7 @@ static void v4_read_line(char *buf, size_t size) {
 static void v4_loop(void) __attribute__((noreturn));
 static void v4_loop(void) {
     char line[V4_LINE_SIZE];
+    zscreen_init(&scr, term_put_byte, term_rows, term_cols);
     v4_start(true);
     for (;;) {
         zvibeResult result;
