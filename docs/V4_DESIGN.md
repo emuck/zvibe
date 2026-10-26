@@ -190,7 +190,63 @@ each is a separate commit.
    inputs so an over-read fails. Nine deliberate bugs reintroduced in a scratch
    copy are each caught by a test. See [TESTING.md](TESTING.md).
 
-3. **Addresses, objects, properties, dictionary**, with focused V4 fixtures.
+3. **Addresses, objects, properties, dictionary**: **Done** (`90131d2`,
+   `617ae25`). V4 stories are still refused by the loader; the V4 code paths are
+   exercised by tests that load a V3 story and set the header version.
+   - `z_packed_to_byte()` (x2 V3, x4 V4) is used by routine calls, `print_paddr`
+     and unpacking; `verify` scales the header length x2/x4. Abbreviation
+     addresses stay x2.
+   - Object table: 9/14-byte entries, 32/48 attributes, 1/2-byte
+     parent/sibling/child, 31/63 defaults, 255/65535 objects, behind layout
+     macros and a few small helpers. Property headers: V3 one byte; V4 one or
+     two bytes, size 1-64, six-bit numbers. One forward and one backward
+     decoder replace three copies of the size parsing.
+   - Dictionary: 6 vs 9 Z-characters, 2 vs 3 words, compared a word at a time.
+   - `Z_VERSION_HELPER` forces the tiny helpers inline on GCC-family compilers;
+     the field offset and read are macros so a V3 build folds them to constants.
+
+   **Size, V3-only, core text** (`scripts/core_size.sh`, shipped settings SAM E51
+   `-O2` and RISC-V `-O1`), against the commit before:
+
+   | | SAM E51 | RISC-V |
+   |---|---|---|
+   | before | 9,300 | 18,132 |
+   | V4 layering (`90131d2`) | 9,273 (-27) | 18,052 (-80) |
+   | plus bug fixes (`617ae25`) | 9,361 (+61 net) | 18,260 (+128 net) |
+
+   RAM is unchanged. The layering shrinks V3-only builds; the growth is the three
+   fixes below (+88 / +208 bytes, mostly the escape encoding), which is why they
+   are a separate commit that can be reverted on its own. Unoptimized (`-O0`)
+   builds grow by about 9% in `zvibe_object` (+236 bytes SAM E51, +408 RISC-V)
+   because the compiler does not fold the version constants; no target in this
+   repository builds with `-O0`.
+
+   **Three V3 bugs found and fixed here** (inherited, not introduced):
+   - A character outside the two alphabets (for example `@`) was dropped from a
+     dictionary word instead of being written as the ZSCII escape, and at the
+     length limit a shift that did not fit was skipped while a later letter took
+     its slot. The standard truncates the encoded stream, so V3 `abcde!f` must
+     end `0xA545`; the old code produced `0xA54B`.
+   - An empty dictionary started the binary search at entry 65535.
+   - `print_obj` on an object with no short name read the next property header
+     as text and ran until it found an end bit (it crashed the test).
+
+   **Testing.** `test_objects.c` and `test_dict.c` (V3-only and V3+V4 builds). The
+   fixtures are written from the standard, not from the production layout macros,
+   with literal expected words worked out by hand. Tree relations use objects 256
+   to 299 so every parent, sibling and child value needs both bytes; attributes
+   are checked against raw bytes with sentinel neighbours. 25 deliberately
+   reintroduced bugs are each caught by a test.
+
+   **Known gaps carried to later slices** (from the review):
+   - `get_next_prop` on a property the object does not have returns 0; the
+     standard recommends halting (inherited from V3).
+   - The API's status-line code limits room ids to 255 (`zvibe_api.c:248`, `:318`)
+     and the webterm frontend has a 128 KB buffer and discovers only `.z3` files;
+     both must change before a frontend can advertise V4.
+   - Negative dictionary entry counts (unsorted user dictionaries) belong to V5
+     `tokenise` and are not needed for V4.
+   - Calls and printing above 128 KB need a story that large to test; slice 6.
 4. **Decoder, new opcode entries, save/restore lifecycle, header init and
    restart paths.** Then enable V4 loading.
 5. **Screen table, output streams, `read_char`**, `zscreen_get_cursor`, target

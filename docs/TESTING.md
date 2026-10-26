@@ -61,6 +61,21 @@ copies of `save_delta.c` identical.
 
 **Run:** `cd target/console/tests && make test-unit`
 
+### Object table, properties, packed addresses and dictionary (V3 / V4 layouts)
+
+**Files:** `test_objects.c`, `test_dict.c`
+
+Each is built twice: V3-only, and V3+V4 (the V3 cases must behave identically in
+the dual build). Because the loader still refuses V4 stories, the V4 cases load
+a V3 story and set the header version. Fixtures (object tables, property
+headers, dictionary words) are written from the Z-machine standard and do not
+share the production layout macros; `test_dict.c` also checks literal expected
+words worked out by hand. `test_objects.c` covers tree relations with object
+numbers up to 299, attributes against raw bytes, properties of 1 to 64 bytes,
+`print_obj`, `print_paddr`, `call` and `verify` scaling; `test_dict.c` covers
+encoding (including the ZSCII escape and truncation), lookup, empty and
+different-length entries, and tokenizing with several separators.
+
 ### V4-enabled build
 
 `make validate-v4` (repo root) builds the console with `ZVIBE_ENABLE_V4=1` into
