@@ -7,6 +7,11 @@ CFLAGS = -Wall -Wextra -O2 -I../../include
 # `override` keeps them (and header dependency generation) even when CFLAGS is
 # replaced on the make command line.
 override CFLAGS += $(EXTRA_CFLAGS) -MMD -MP
+# A V4 story's dynamic memory can reach 64 KB (Bureaucracy needs about 18 KB, the library
+# games more); a host has the RAM, so a V4-enabled build gets the full size.
+ifneq (,$(findstring ZVIBE_ENABLE_V4=1,$(EXTRA_CFLAGS)))
+override CFLAGS += -DZVIBE_MEMORY_BUFFER_SIZE=$(shell echo $$((72*1024)))
+endif
 SHARED_CFLAGS = $(CFLAGS) -fPIC
 MINIMAL_API_CFLAGS = $(CFLAGS) -DZVIBE_ENABLE_SAVE_RESTORE=0 -DZVIBE_ENABLE_STATUS_LINE=0
 
