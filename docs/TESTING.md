@@ -76,6 +76,26 @@ numbers up to 299, attributes against raw bytes, properties of 1 to 64 bytes,
 encoding (including the ZSCII escape and truncation), lookup, empty and
 different-length entries, and tokenizing with several separators.
 
+### Loading, header, decoding and save/restore (V3 / V4)
+
+**File:** `test_opcodes.c`
+
+Built twice (V3-only and V3+V4). Instruction streams are assembled by hand from
+the standard and run through `zvibe_run`, so the decoder is exercised end to end:
+version acceptance, header setup and restart, `call` forms, `call_vs2` with eight
+operands and two type bytes, save/restore results, refusal of a save from another
+story or version, the status line, and `read`. `make test-config-identity` checks
+the defaults of `ZVIBE_VERIFY_SAVE_IDENTITY`.
+
+### V4 conformance gate: Czech
+
+`make test-czech-v4` (run by `make validate-v4`) runs `games/catalog/czech.z4`
+on the V4-enabled console and requires exactly the result frotz gives: 386
+tests, 367 passed, 0 failed, 19 print tests. The counts are pinned on purpose.
+Czech leaves save/restore/restart and much I/O untested and its print tests are
+checked by eye, so this is a regression check on opcode behavior, not a claim of
+full conformance.
+
 ### V4-enabled build
 
 `make validate-v4` (repo root) builds the console with `ZVIBE_ENABLE_V4=1` into
@@ -103,7 +123,7 @@ to start on macOS.)
 Tests run complete games with scripted input.
 
 **Czech Test Suite:**
-- File: `games/catalog/czech.z3` (public domain)
+- File: `games/catalog/czech.z3` (Czech v0.8 by Amir Karger, freely redistributable; see [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md))
 - Tests Z-machine opcode implementation
 - 368 individual tests
 

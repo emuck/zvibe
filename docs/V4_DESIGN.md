@@ -247,8 +247,67 @@ each is a separate commit.
    - Negative dictionary entry counts (unsorted user dictionaries) belong to V5
      `tokenise` and are not needed for V4.
    - Calls and printing above 128 KB need a story that large to test; slice 6.
-4. **Decoder, new opcode entries, save/restore lifecycle, header init and
-   restart paths.** Then enable V4 loading.
+4. **Decoder, call forms, save/restore lifecycle, header init and restart,
+   V4 loading**: **Done.** V4 stories load in a V4-enabled build, and
+   `czech.z4` gives exactly the result frotz gives (386 tests, 367 passed, 0
+   failed, 19 print tests). Czech needed nothing beyond this slice: no screen
+   opcodes.
+   - `call_1s`, `call_2s` and `call_vs2` map to the existing `op_call`. The
+     decoder reads **both** operand-type bytes of `call_vs2` (opcode 236)
+     before any operand data, even when the first already ends in "omitted",
+     and takes up to 8 operands.
+   - Save and restore: V3 branches on success; V4 stores 0 (failed), 1 (saved)
+     or 2 (restored, stored into the *save's* variable). One inline helper,
+     `z_do_save_result()`, is exactly the old `z_do_branch()` call in a V3-only
+     build.
+   - Header: `z_init_interpreter_header()` runs at load and on both restart
+     paths. V3 sets flags1 bit 4 as before; V4 clears the capability bits
+     (bold, italic, fixed-space, timed input) because no screen is attached at
+     this level, and writes the interpreter number/version and screen size
+     (compile-time defaults 24x80 until slice 5 supplies the real size). The
+     standard revision (0x32/0x33) is **deliberately not written** yet:
+     declaring 1.1 claims every opcode, and this build is not there. Write it
+     when slice 5 completes the opcode set.
+   - The status-line callback is skipped for V4 stories (a V4 game draws its own).
+   - A V4 story whose dynamic memory is smaller than the 64-byte header is
+     refused at load.
+   - **Restoring a save of another story is refused**, found by review: a V3
+     save restored into a V4 story put a V3 header and continuation into the V4
+     machine and then misdecoded the next instruction. A raw save is accepted
+     only if version, release, addresses, serial, length and checksum match, and
+     after a restore the interpreter-owned header fields are rewritten. This is
+     governed by `ZVIBE_VERIFY_SAVE_IDENTITY`: on for hosted builds and any V4
+     build, off for freestanding V3-only firmware (where saves live in per-game
+     slots and the check cost 70-100 bytes of flash). Overridable.
+   - V3-only core text against the previous commit on the shipped settings: SAM
+     E51 `-O2` 9,361 to 9,357, RISC-V `-O1` 18,260 to 18,252; RAM unchanged.
+
+   **Testing.** `test_opcodes.c` assembles instruction streams by hand from the
+   standard and runs them through `zvibe_run`: version acceptance and size
+   limits, header setup and restart, `call` in V3 and V4 forms, `call_1s`,
+   `call_2s`, `call_vs2` with 7 arguments, mixed operand types across the two
+   type bytes, stack-variable operands, save and restore results into
+   different variables, a non-empty and a deeper-than-current stack, a restore
+   from an interpreter with other settings, refusal of saves from another
+   release, serial, checksum or version, the status line, and `read` with a real
+   parse buffer. `test_czech_v4.sh` pins Czech's counts to frotz's. About 40
+   deliberately reintroduced bugs are each caught by a test, and the Czech gate
+   alone catches 8 of 9 sampled decoder, object and address bugs (it does not
+   exercise 9-character dictionary words; the dictionary unit tests do).
+
+   **A caveat about the gate.** Czech leaves save, restore, restart and much I/O
+   untested and its 19 print tests are checked by eye, so matching frotz is a
+   regression check on opcode behavior, not a claim of full conformance.
+
+   **Known gaps carried forward:**
+   - The two live Flags 2 bits (transcript and fixed-pitch) must survive a
+     restore and a restart; they are overwritten today (inherited from V3).
+     They belong with the screen and stream work in slice 5, which gives them
+     meaning.
+   - V4 `read` with a zero parse-buffer address is a V5 convention; V4 stories
+     always pass one.
+   - Public status and room queries still use V3 conventions.
+   - Header screen size must come from the frontend, not compile-time defaults.
 5. **Screen table, output streams, `read_char`**, `zscreen_get_cursor`, target
    adapters.
 6. **Regression and playthroughs.**
