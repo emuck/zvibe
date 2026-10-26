@@ -336,6 +336,11 @@ static void test_printing(const layout_t *l, const char *name) {
     outlen = 0; outbuf[0] = 0;
     G->operands[0] = 5; G->operand_count = 1; op_print_obj();
     CHECK(strcmp(outbuf, "hi") == 0);
+    make_ptab_named(6, none, 0, 0, 0);                          /* no name: prints nothing */
+    outlen = 0; outbuf[0] = 0;
+    G->operands[0] = 6; op_print_obj();
+    CHECK(outlen == 0);
+
     ram[0x2400] = 0xB5; ram[0x2401] = 0xC5;                     /* the string "hi" at byte address 0x2400 */
     outlen = 0; outbuf[0] = 0;
     G->operands[0] = (l->version == 3) ? 0x1200 : 0x0900;       /* packed: 0x2400 / 2, or / 4 */

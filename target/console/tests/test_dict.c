@@ -116,7 +116,8 @@ static unsigned entry_addr(int version, const char *const *words, unsigned count
 /* ---- tests ---- */
 
 static void test_encode(int version) {
-    static const char *const samples[] = { "look", "a", "x", "elephant", "elephantine", "zzzzzzzzzz", "it's", "3d", "n.e.", "(a)", "" };
+    static const char *const samples[] = { "look", "a", "x", "elephant", "elephantine", "zzzzzzzzzz", "it's", "3d", "n.e.", "(a)", "",
+                                           "a@b", "x[y]", "{z}", "~~~~", "abc@def", "abcdef@", "!!!!!!!!!!", "a|b|c|d|e" };
     unsigned i, w;
     printf("== encoding, V%d ==\n", version);
 #if ZVIBE_ENABLE_V4
@@ -151,9 +152,14 @@ static void test_literal_vectors(int version) {
     static const struct { const char *text; int ver; unsigned w[3]; const char *why; } v[] = {
         /* V3: 6 Z-characters, 2 words */
         { "look",    3, { 0x4694, 0xC0A5 }, "l o o k + 2 pad: (17,20,20) (16,5,5)|0x8000" },
+        { "abcde!f", 3, { 0x18E8, 0xA545 }, "a b c d e then the shift fills slot 6; '!' and 'f' are cut" },
+        { "a@b",     3, { 0x18A6, 0x8807 }, "a, shift, 6, 2, 0 (ZSCII 64), b" },
+        { "abc@",    3, { 0x18E8, 0x94C2 }, "a b c shift 6 2: the escape's last half (0) is cut" },
+        { "abcd@",   3, { 0x18E8, 0xA4A6 }, "a b c d shift 6: escape marker is the 6th slot" },
         { "",        3, { 0x14A5, 0x94A5 }, "all padding" },
         /* V4: 9 Z-characters, 3 words */
         { "look",       4, { 0x4694, 0x40A5, 0x94A5 }, "(17,20,20) (16,5,5) (5,5,5)|0x8000" },
+        { "abcdefgh!i", 4, { 0x18E8, 0x254B, 0xB1A5 }, "8 letters, then the shift takes slot 9; 'i' is cut" },
         { "elephantine", 4, { 0x2A2A, 0x55A6, 0xCF2E }, "elephanti: (10,17,10) (21,13,6) (19,25,14)|0x8000" },
     };
     unsigned i, w;
@@ -291,6 +297,18 @@ static void test_empty_and_entry_lengths(int version) {
 #if ZVIBE_ENABLE_V4
     G->header.version = (uint8_t)version;
 #endif
+    z_encode_zchars((const zByte *)"look", 4, enc);
+    CHECK(z_dict_lookup(&ram[DICT + hdr], 0, (zByte)(nw * 2 + 3), (zWord)(DICT + hdr), enc) == 0);   /* zero entries */
+
+    /* tokenizing against an empty dictionary finds nothing and stays in bounds */
+    g_extra = 3;
+    build_dict(version, words, 0, "");
+    ram[INBUF] = 60; memcpy(&ram[INBUF + 1], "look lamp", 10);
+    ram[PARSEBUF] = 8;
+    z_tokenize_input(INBUF, PARSEBUF);
+    CHECK(ram[PARSEBUF + 1] == 2);
+    CHECK(ram[PARSEBUF + 2] == 0 && ram[PARSEBUF + 3] == 0 && ram[PARSEBUF + 6] == 0 && ram[PARSEBUF + 7] == 0);
+
     /* the entry length comes from the dictionary header, not from the version */
     for (extra = 1; extra <= 7; extra += 3) {
         const unsigned count = sizeof words / sizeof words[0];

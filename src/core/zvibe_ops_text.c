@@ -343,19 +343,29 @@ static void z_encode_zchars(const zByte *chars, zByte length, zWord encoded[Z_MA
     zByte z[Z_MAX_DICT_WORDS * 3];
     int n = 0;
     for (int k = 0; k < limit; k++) z[k] = 5;     /* pad */
-    for (zByte i = 0; i < length; i++) {
-        char c = (char)chars[i];
-        if (c >= 'A' && c <= 'Z') c |= 0x20;  /* fold to lowercase */
+    for (zByte i = 0; i < length && n < limit; i++) {
+        zByte c = chars[i];
+        zByte run[4];
+        int run_len, j;
+        if (c >= 'A' && c <= 'Z') c |= 0x20;      /* fold to lowercase */
         if (c >= 'a' && c <= 'z') {
-            if (n >= limit) break;
-            z[n++] = (zByte)(c - 'a' + 6);
+            run[0] = (zByte)(c - 'a' + 6);
+            run_len = 1;
         } else {
-            const char *p = strchr(Z3_A2_CHARS, c);
-            if (p && n + 1 < limit) {
-                z[n++] = 5;
-                z[n++] = (zByte)((p - Z3_A2_CHARS) + 7);
+            const char *p = c ? strchr(Z3_A2_CHARS, c) : NULL;
+            run[0] = 5;                            /* shift to A2 (a single shift in V3 and later) */
+            if (p) {
+                run[1] = (zByte)((p - Z3_A2_CHARS) + 7);  /* z-char = index+7 */
+                run_len = 2;
+            } else {
+                run[1] = 6;                        /* ZSCII escape */
+                run[2] = (zByte)(c >> 5);
+                run[3] = (zByte)(c & 0x1F);
+                run_len = 4;
             }
         }
+        for (j = 0; j < run_len && n < limit; j++)
+            z[n++] = run[j];
     }
     for (int w = 0; w < Z_DICT_WORDS; w++)
         encoded[w] = (zWord)((z[3 * w] << 10) | (z[3 * w + 1] << 5) | z[3 * w + 2]);
@@ -376,6 +386,7 @@ Z_VERSION_HELPER int z_dict_compare(const zByte *e, const zWord encoded[Z_MAX_DI
 /* Binary search the sorted dictionary; returns Z-machine byte address of entry or 0. */
 static zWord z_dict_lookup(const zByte *dict, zWord entries, zByte entry_len,
                             zWord base_addr, const zWord encoded[Z_MAX_DICT_WORDS]) {
+    if (entries == 0) return 0;                   /* empty dictionary: nothing to find (hi would underflow) */
     zWord lo = 0, hi = entries - 1;
     while (lo <= hi) {
         zWord mid = lo + (hi - lo) / 2;

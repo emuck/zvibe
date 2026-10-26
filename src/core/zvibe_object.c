@@ -233,8 +233,8 @@ const zByte *z_get_obj_name(zWord objid) {
     ptr += OBJ_PROP_OFFSET;                /* Skip to properties address field */
     const zWord addr = Z_READ16(ptr);
     const zByte *name = zmem_get_ptr(&G->memory_state, addr, 0);
-    if (!name) return NULL;
-    return name + 1;
+    if (!name || *name == 0) return NULL;  /* No short name: the "text" would be the next property */
+    return name + 1;                       /* Skip the z-char count */
 }
 
 /**
