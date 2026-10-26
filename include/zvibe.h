@@ -299,7 +299,13 @@ void z_process_char(zWord zscii);
 void z_reset_ui_state(void);
 void z_stream3_zscii(zByte code);
 #define Z_OUT(text, length) z_out((text), (length))
+/** Flags 2 bits 0-1 (transcripting, fixed-pitch) belong to the running interpreter (6.1.2):
+ *  carry them across a memory replacement (restart, restore). V3 stories keep the old behaviour. */
+#define Z_FLAGS2_KEEP()    const zByte keep_flags2_ = Z_IS_V4() ? (zByte)(G->memory_state.ram_buffer[0x11] & 3) : 0
+#define Z_FLAGS2_RETURN()  do { if (Z_IS_V4()) G->memory_state.ram_buffer[0x11] = (zByte)((G->memory_state.ram_buffer[0x11] & ~3) | keep_flags2_); } while (0)
 #else
+#define Z_FLAGS2_KEEP()    ((void)0)
+#define Z_FLAGS2_RETURN()  ((void)0)
 #define Z_OUT(text, length) do { if (G->writestr) G->writestr((text), (length)); } while (0)
 #define z_reset_ui_state() ((void)0)
 #endif

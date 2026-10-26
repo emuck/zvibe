@@ -335,6 +335,9 @@ each is a separate commit.
    - **Cost** of enabling V4 on top of V3 (SAM E51 `-O2`, RISC-V `-O1`): about
      +2,036 B and +4,268 B of flash and +56 B of RAM. V3-only objects are
      byte-identical to before the slice at every optimisation level.
+   - Flags 2 bits 0 and 1 (transcript, fixed-pitch) now survive restart and
+     restore in V4 stories (`Z_FLAGS2_KEEP/RETURN`); V3 stories and V3-only
+     builds are unchanged.
    - Review fixes: `get_cursor` checks every byte against dynamic memory;
      stream 3 keeps extended ZSCII and drops null; `scan_table` treats a match at
      address 0 as a match; restart re-enables buffering and clears the text
@@ -349,8 +352,6 @@ each is a separate commit.
    - Frontend migrations are separate work: SAME51 firmware (replace the
      firmware-side echo with the UART adapter; needs the board), RISC-V
      firmware, webterm (128 KB and `.z3`-only limits).
-   - Flags 2 bits 0 and 1 (transcript, fixed-pitch) are still overwritten by
-     restore and restart.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
    - Timed input.

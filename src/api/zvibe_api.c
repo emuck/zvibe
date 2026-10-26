@@ -207,7 +207,9 @@ zvibeResult zvibe_run(zvibeContext *ctx) {
         if (G->restart_requested) {
             G->restart_requested = 0;
             if (G->memory_state.flash_data && G->memory_state.ram_buffer && G->memory_state.ram_size > 0) {
+                Z_FLAGS2_KEEP();
                 memcpy(G->memory_state.ram_buffer, G->memory_state.flash_data, G->memory_state.ram_size);
+                Z_FLAGS2_RETURN();
                 z_init_interpreter_header();
             }
             G->logical_pc = G->header.pc_start;
@@ -427,7 +429,9 @@ zvibeResult zvibe_restart_completed(zvibeContext *ctx) {
     /* Restore dynamic memory from original story data */
     zmem_state_t *mem = &G->memory_state;
     if (mem->flash_data && mem->ram_buffer && mem->ram_size > 0) {
+        Z_FLAGS2_KEEP();
         memcpy(mem->ram_buffer, mem->flash_data, mem->ram_size);
+        Z_FLAGS2_RETURN();
         z_init_interpreter_header();
     }
 

@@ -119,9 +119,11 @@ static void test_header(void) {
     /* a restart restores dynamic memory (which holds the header) and must redo the setup */
     memset(ram + 0x1E, 0xEE, 4);
     ram[1] = 0xFF;
+    ram[0x11] = 0xA2;                                       /* the story asked for fixed pitch; other bits are its own */
     G->restart_requested = 1;
     CHECK(zvibe_restart_completed(ctx) == ZVIBE_OK);
     CHECK(ram[1] == 0x63 && ram[0x1E] == 1 && ram[0x20] == 24 && ram[0x21] == 80);
+    CHECK((ram[0x11] & 3) == 2 && (ram[0x11] & ~3) == (story[0x11] & ~3));   /* flags 2 bits 0-1 survive, the rest is the story's */
     end();
 #endif
 }
@@ -331,6 +333,8 @@ static void test_save_restore(int version) {
     G->stack_ptr = G->stack_mem;                                              /* current stack: empty */
     odd = malloc(size);
     memcpy(odd, blob, size);
+    ram[0x11] = (uint8_t)((ram[0x11] & ~3) | 2);                              /* live: fixed pitch on, transcript off */
+    odd[0x11] = (uint8_t)((odd[0x11] & ~3) | 1);                              /* saved: the other way round */
     if (version == 4) { odd[0x1E] = 77; odd[0x20] = 99; odd[0x21] = 99; }     /* saved by an interpreter with other settings */
     else              { odd[1] = 0x00; }                                      /* saved flags1 without the status-line bit */
     CHECK(zvibe_restore_data(ctx, (const char *)odd, size) == ZVIBE_OK);
@@ -339,6 +343,8 @@ static void test_save_restore(int version) {
     CHECK(stack_word(0) == 7 && stack_word(1) == 9);
     if (version == 4) CHECK(ram[0x1E] == 1 && ram[0x20] == 24 && ram[0x21] == 80);   /* header describes THIS interpreter */
     else              CHECK(ram[1] == 0x10);
+    if (version == 4) CHECK((ram[0x11] & 3) == 2);                            /* live flags 2 bits win over the saved ones */
+    else              CHECK((ram[0x11] & 3) == 1);                            /* V3 behaviour unchanged */
     CHECK(zvibe_restore_completed(ctx, 1) == ZVIBE_OK);
     if (version == 3) CHECK(G->logical_pc == 0x108);                          /* at the save, which now "succeeded" */
     else              CHECK(global10() == 2 && global11() == 0);              /* the game sees "restored" in the SAVE's variable */

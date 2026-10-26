@@ -492,7 +492,9 @@ int z_restore_save_data(const void *data, size_t length) {
 #endif
 
     /* Validated: now restore dynamic memory, stack and base pointer */
+    Z_FLAGS2_KEEP();
     memcpy(G->memory_state.ram_buffer, data, ram_size);
+    Z_FLAGS2_RETURN();
     memcpy(G->stack_mem, ptr, stack_size * sizeof(zWord));
     ptr += stack_size * sizeof(zWord);
     memcpy(&G->base_ptr, ptr, sizeof(G->base_ptr));
