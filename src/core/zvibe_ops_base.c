@@ -162,10 +162,10 @@ void op_call(void) {
         return;
     }
     
-    /* Get routine address (packed in Version 3) */
+    /* Get routine address (packed: x2 in V3, x4 in V4) */
     const zByte *routine = z_unpack_addr(operands[0]);
     /* Calculate logical address for the routine */
-    zDWord routine_addr = operands[0] * 2;  /* In V3, addresses are scaled by 2 */
+    zDWord routine_addr = z_packed_to_byte(operands[0]);
     zDWord current_routine_offset = routine_addr;
     
     /* First byte of routine contains number of local variables */

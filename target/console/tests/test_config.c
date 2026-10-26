@@ -155,6 +155,7 @@ static void test_version_predicate(void) {
 }
 
 int main(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);                         /* show progress even if a test crashes */
     printf("config: ZVIBE_ENABLE_V4=%d operands=%d story limit=%d stack words=%d\n",
            ZVIBE_ENABLE_V4, Z_MAX_OPERANDS, (int)Z_STORY_MEM_SIZE, ZVIBE_STACK_WORDS);
     test_loading();

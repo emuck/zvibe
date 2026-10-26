@@ -35,6 +35,6 @@ static void make_story_static(uint8_t version, size_t size, unsigned static_base
     put16(24, 0x0100);         /* abbreviations */
 }
 
-static void make_story(uint8_t version, size_t size) { make_story_static(version, size, 0x0400); }
+__attribute__((unused)) static void make_story(uint8_t version, size_t size) { make_story_static(version, size, 0x0400); }
 
 #endif /* TEST_STORY_H */

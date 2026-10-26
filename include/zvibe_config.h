@@ -99,6 +99,22 @@
 #endif /* ZVIBE_ENABLE_V4 */
 
 /**
+ * @def Z_VERSION_HELPER
+ * @brief Declaration prefix for the tiny helpers that select between V3 and V4
+ *
+ * They exist so that version-dependent code is written once. In a V3-only
+ * build each one must compile to exactly the original V3 expression, at every
+ * optimization level, so on GCC-family compilers (GCC, XC32, the RISC-V
+ * toolchain, Clang) they are forced inline. Without that, -O0 builds call a
+ * real function for every object field access.
+ */
+#if defined(__GNUC__)
+#define Z_VERSION_HELPER static inline __attribute__((always_inline))
+#else
+#define Z_VERSION_HELPER static inline
+#endif
+
+/**
  * @brief Pick a value by version: v3 in a V3-only build, runtime choice in a
  *        dual build. Not usable for array dimensions or static initializers.
  */

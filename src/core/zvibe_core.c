@@ -83,9 +83,9 @@ zByte *z_get_mem_ptr(zWord offset) {
     return zmem_get_ptr(&G->memory_state, offset, 0); 
 }
 
-/* Unpack V3 packed address (multiply by 2) */
+/* Unpack a packed address (multiply by 2 in V3, by 4 in V4) */
 zByte *z_unpack_addr(zDWord addr) {
-    return zmem_get_ptr(&G->memory_state, addr * 2, 0);
+    return zmem_get_ptr(&G->memory_state, z_packed_to_byte(addr), 0);
 }
 
 /* Get variable address (stack/local/global) */

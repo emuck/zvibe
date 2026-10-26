@@ -292,6 +292,7 @@ static void test_delta_restore(void) {
 }
 
 int main(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);                         /* show progress even if a test crashes */
     printf("save/restore: ZVIBE_ENABLE_V4=%d stack words=%d\n", ZVIBE_ENABLE_V4, ZVIBE_STACK_WORDS);
     test_raw_restore();
     test_delta_restore();

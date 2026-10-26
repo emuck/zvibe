@@ -282,12 +282,22 @@ zByte *z_get_mem_ptr(zWord offset);
 /**
  * @brief Unpack packed address to byte address
  *
- * V3: Packed address × 2 = byte address
+ * Packed address × 2 (V3) or × 4 (V4) = byte address. See z_packed_to_byte().
  *
  * @param[in] addr Packed address
  * @return Pointer to memory at unpacked address
  */
 zByte *z_unpack_addr(zDWord addr);
+
+/**
+ * @brief Convert a packed address (a routine or a string) to a byte address
+ *
+ * × 2 in V3, × 4 in V4. Abbreviation table entries are word addresses and are
+ * always × 2 in every version; do not use this for them.
+ */
+Z_VERSION_HELPER zDWord z_packed_to_byte(zDWord packed) {
+    return packed << Z_VSEL(1, 2);
+}
 
 /**
  * @brief Get address of variable (stack/local/global)

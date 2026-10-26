@@ -20,7 +20,8 @@ BIN_DIR = $(BUILD_DIR)/bin
 
 # Test executables
 TEST_TARGETS = test_split_memory test_screen test_config_v3 test_config_v4 test_config_stack1024 \
-               test_save_restore test_save_restore_v4_stack1024 test_save_restore_san test_save_restore_san
+               test_save_restore test_save_restore_v4_stack1024 test_save_restore_san \
+               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_save_restore_san
 
 # Integration test scripts
 INTEGRATION_TESTS = test_czech.sh
@@ -65,6 +66,24 @@ test_save_restore: test_save_restore.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../..
 
 test_save_restore_v4_stack1024: test_save_restore.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../../same51/include/save_delta.h $(TEST_STAMP)
 	$(CC) $(CFLAGS) $(INCLUDES) $(DELTA_INC) -DZVIBE_ENABLE_V4=1 -DZVIBE_STACK_WORDS=1024 -o $@ test_save_restore.c $(ALL_SRCS) $(DELTA_SRC)
+
+# Object table, properties, packed addresses, verify: V3-only build, and a
+# dual build that runs the same V3 cases plus the V4 layouts.
+test_objects_v3: test_objects.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -o $@ test_objects.c $(ALL_SRCS)
+
+test_objects_v4: test_objects.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_objects.c $(ALL_SRCS)
+
+# Dictionary encoding, lookup and tokenizing. The test #includes zvibe_ops_text.c
+# to reach its static functions, so that file is left out of the link.
+DICT_SRCS = $(filter-out %zvibe_ops_text.c,$(ALL_SRCS))
+
+test_dict_v3: test_dict.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -o $@ test_dict.c $(DICT_SRCS)
+
+test_dict_v4: test_dict.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_dict.c $(DICT_SRCS)
 
 # The same test under AddressSanitizer and UBSan: exact-size inputs make an
 # over-read in the codec or the raw restore a hard failure.
@@ -143,6 +162,12 @@ test-unit: $(TEST_TARGETS)
 	@./test_save_restore
 	@./test_save_restore_v4_stack1024
 	@./test_save_restore_san
+	@echo
+	@echo "Running object/property/address tests (V3-only, then V3+V4)..."
+	@./test_objects_v3
+	@./test_objects_v4
+	@./test_dict_v3
+	@./test_dict_v4
 	@$(MAKE) --no-print-directory test-delta-copies
 	@echo
 	@echo "=== Unit Tests Complete ==="

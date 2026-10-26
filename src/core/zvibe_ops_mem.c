@@ -154,9 +154,9 @@ void op_storeb(void) {
  * the stored checksum in the header.
  */
 void op_verify(void) {
-    /* Use header file length (in words * 2), not actual file size */
+    /* Use header file length (scaled: x2 in V3, x4 in V4), not actual file size */
     /* This excludes any padding bytes as required by Z-machine spec */
-    const zDWord total = (zDWord)G->header.story_len * 2;
+    const zDWord total = (zDWord)G->header.story_len * Z_VSEL(2, 4);
     zDWord checksum = 0;
     
     /* Calculate checksum starting from address 0x40 using original story data */
