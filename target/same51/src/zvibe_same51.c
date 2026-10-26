@@ -15,6 +15,7 @@
 #if ZVIBE_ENABLE_V4
 #include "../../../include/zvibe_screen.h"
 #include "terminal_io.h"
+#include "save_delta.h"
 #endif
 
 /* External story data (generated at build time) */
@@ -451,21 +452,41 @@ static void v4_start(bool wait) {
     zvibe_initialized = init_zvibe();
 }
 
+/* A V4 story's full save (its dynamic memory plus the execution state) can be 20 KB or more,
+ * more than the SmartEEPROM holds. The save is packed against the story in flash, keeping
+ * only the bytes the game has changed (see save_delta.h): typically a few KB. */
+#define V4_BLOB_MAX    (ZVIBE_MEMORY_BUFFER_SIZE + 2 * ZVIBE_STACK_WORDS + 64)
+#define V4_PACKED_MAX  (SMARTEEPROM_SIZE - sizeof(save_header_t))
+
+static uint8_t v4_blob[V4_BLOB_MAX];        /* the core's save data, whole */
+static uint8_t v4_packed[V4_PACKED_MAX];    /* what goes to (or comes from) the SmartEEPROM */
+
+/* The story's dynamic memory size: the packing base is the first that many bytes of the story */
+static size_t v4_base_len(void) {
+    return ((size_t)story_data[14] << 8) | story_data[15];
+}
+
 static void v4_save(void) {
     size_t size = zvibe_get_save_size(g_zvibe_ctx);
     int ok = 0;
-    if (size > 0 && size <= MAX_SAVE_SIZE) {
-        char buffer[MAX_SAVE_SIZE];
-        size_t actual = zvibe_get_save_data(g_zvibe_ctx, buffer, MAX_SAVE_SIZE);
-        ok = actual > 0 && save_callback(buffer, actual);
+    if (size > 0 && size <= sizeof v4_blob && zvibe_get_save_data(g_zvibe_ctx, (char *)v4_blob, sizeof v4_blob) == size) {
+        size_t packed = delta_pack(v4_packed, sizeof v4_packed, v4_blob, size, story_data, v4_base_len());
+        if (packed == 0)
+            v4_puts("\n[Save failed: the changes do not fit the SmartEEPROM]\n");
+        else
+            ok = save_callback(v4_packed, packed);
     }
     zvibe_save_completed(g_zvibe_ctx, ok);
 }
 
 static void v4_restore(void) {
-    char buffer[MAX_SAVE_SIZE];
-    size_t size = restore_callback(buffer, MAX_SAVE_SIZE);
-    zvibe_restore_completed(g_zvibe_ctx, size > 0 && zvibe_restore_data(g_zvibe_ctx, buffer, size) == ZVIBE_OK);
+    int ok = 0;
+    size_t packed = restore_callback(v4_packed, sizeof v4_packed);
+    if (packed > 0) {
+        size_t size = delta_unpack(v4_blob, sizeof v4_blob, v4_packed, packed, story_data, v4_base_len());
+        ok = size > 0 && zvibe_restore_data(g_zvibe_ctx, (const char *)v4_blob, size) == ZVIBE_OK;
+    }
+    zvibe_restore_completed(g_zvibe_ctx, ok);
 }
 
 /* Read a command line with echo and backspace; the screen layer says what fits on the line. */

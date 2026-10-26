@@ -170,6 +170,9 @@ endif
 ifneq ($(filter 1,$(SCREEN_DEMO) $(V4)),)
     LOCAL_SOURCES += $(SRC_DIR)/terminal_io.c
 endif
+ifeq ($(V4),1)
+    LOCAL_SOURCES += $(SRC_DIR)/save_delta.c
+endif
 
 # zvibe core sources
 ZVIBE_ROOT = ../..

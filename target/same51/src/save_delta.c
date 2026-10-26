@@ -183,3 +183,109 @@ int delta_decode(
 
     return 0;
 }
+
+/* ---- packing a whole save blob against a base image ---- */
+
+#define PACK_HEADER    12     /* magic + total length + packed length */
+#define PACK_RUN_HEAD  6      /* offset(4) + count(2) */
+#define PACK_MAX_RUN   0xFFFFu
+#define PACK_MERGE_GAP 8      /* equal bytes this short between two runs are cheaper to include */
+
+static void put32(uint8_t *p, uint32_t v) {
+    p[0] = (uint8_t)v; p[1] = (uint8_t)(v >> 8); p[2] = (uint8_t)(v >> 16); p[3] = (uint8_t)(v >> 24);
+}
+
+static uint32_t get32(const uint8_t *p) {
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+static int differs(const uint8_t *data, const uint8_t *base, size_t base_len, size_t i) {
+    return i >= base_len || data[i] != base[i];
+}
+
+size_t delta_pack(uint8_t *out, size_t capacity, const uint8_t *data, size_t len,
+                  const uint8_t *base, size_t base_len)
+{
+    size_t used = PACK_HEADER;
+    size_t i = 0;
+
+    if (capacity < PACK_HEADER || len > 0xFFFFFFFFu) {
+        return 0;
+    }
+    put32(out, DELTA_PACK_MAGIC);
+    put32(out + 4, (uint32_t)len);
+    put32(out + 8, 0);
+
+    while (i < len) {
+        size_t end, j;
+        if (!differs(data, base, base_len, i)) {
+            i++;
+            continue;
+        }
+        end = i + 1;                    /* one past the last differing byte of this run */
+        for (j = end; j < len && j - end < PACK_MERGE_GAP; j++) {
+            if (differs(data, base, base_len, j)) {
+                end = j + 1;
+            }
+        }
+        if (end - i > PACK_MAX_RUN) {
+            end = i + PACK_MAX_RUN;
+        }
+        if (capacity - used < PACK_RUN_HEAD || capacity - used - PACK_RUN_HEAD < end - i) {
+            return 0;
+        }
+        put32(out + used, (uint32_t)i);
+        out[used + 4] = (uint8_t)(end - i);
+        out[used + 5] = (uint8_t)((end - i) >> 8);
+        memcpy(out + used + PACK_RUN_HEAD, data + i, end - i);
+        used += PACK_RUN_HEAD + (end - i);
+        i = end;
+    }
+    put32(out + 8, (uint32_t)used);     /* lets unpack notice a truncated save */
+    return used;
+}
+
+size_t delta_unpack(uint8_t *out, size_t capacity, const uint8_t *packed, size_t packed_len,
+                    const uint8_t *base, size_t base_len)
+{
+    size_t total, pos;
+
+    if (packed_len < PACK_HEADER || get32(packed) != DELTA_PACK_MAGIC || get32(packed + 8) != packed_len) {
+        return 0;
+    }
+    total = get32(packed + 4);
+    if (total == 0 || total > capacity) {
+        return 0;
+    }
+
+    /* Validate every run before writing anything */
+    for (pos = PACK_HEADER; pos < packed_len; ) {
+        size_t offset, count;
+        if (packed_len - pos < PACK_RUN_HEAD) {
+            return 0;
+        }
+        offset = get32(packed + pos);
+        count = (size_t)packed[pos + 4] | ((size_t)packed[pos + 5] << 8);
+        pos += PACK_RUN_HEAD;
+        if (packed_len - pos < count || offset > total || count > total - offset) {
+            return 0;
+        }
+        pos += count;
+    }
+
+    /* Apply: the base image first (zero past its end), then the runs */
+    if (base_len >= total) {
+        memcpy(out, base, total);
+    } else {
+        memcpy(out, base, base_len);
+        memset(out + base_len, 0, total - base_len);
+    }
+    for (pos = PACK_HEADER; pos < packed_len; ) {
+        size_t offset = get32(packed + pos);
+        size_t count = (size_t)packed[pos + 4] | ((size_t)packed[pos + 5] << 8);
+        pos += PACK_RUN_HEAD;
+        memcpy(out + offset, packed + pos, count);
+        pos += count;
+    }
+    return total;
+}

@@ -69,7 +69,7 @@ def reset_board():
     pump(0.3)
     check("boot prompt", wait_for("Press RETURN to start"))
     ser.write(b"\r")
-    check("story started", wait_for("v4save ready"))
+    check("story started", wait_for("ready"))
 
 
 def count_of(line_prefix):

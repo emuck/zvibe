@@ -241,13 +241,17 @@ make v4-program STORY_FILE=../console/tests/data/v4screen.z4
 python3 tests/test_v4_game.py                     # needs pyserial and pyte
 make v4-program STORY_FILE=../console/tests/data/v4save.z4
 python3 tests/test_v4_save.py                     # save/restore, also across a reset
+make v4-program STORY_FILE=../console/tests/data/v4bigsave.z4
+python3 tests/test_v4_bigsave.py                  # a 21 KB save, packed into the SmartEEPROM
 ```
 
 Connect at 115200 8N1 with an xterm-compatible terminal of at least 56 columns
 (the firmware asks the terminal for its size at boot). `V4_RAM` (default 32768)
 is the RAM given to the story's dynamic memory; a story needs its dynamic
-memory plus about 5 KB. Saves use the 16 KB SmartEEPROM, so a V4 story whose
-full save is larger (Bureaucracy, about 20 KB) cannot save here yet.
+memory plus about 5 KB. A V4 story's full save can be over 20 KB (Bureaucracy), more
+than the 16 KB SmartEEPROM, so the firmware stores it packed against the story in
+flash: only the bytes the game has changed (`delta_pack` in `save_delta.c`). If the
+changes still do not fit, the save fails cleanly and the previous save is kept.
 `terminal_io.c` holds the interrupt-driven receive ring and key decoding that
 the screen demo shares.
 
