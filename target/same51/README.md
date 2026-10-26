@@ -239,6 +239,8 @@ stays V3-only and unchanged.
 make v4-program                                   # Czech (V4) by default
 make v4-program STORY_FILE=../console/tests/data/v4screen.z4
 python3 tests/test_v4_game.py                     # needs pyserial and pyte
+make v4-program STORY_FILE=../console/tests/data/v4save.z4
+python3 tests/test_v4_save.py                     # save/restore, also across a reset
 ```
 
 Connect at 115200 8N1 with an xterm-compatible terminal of at least 56 columns
