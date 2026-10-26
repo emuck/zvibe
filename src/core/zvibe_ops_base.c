@@ -43,90 +43,88 @@
 
 /* ----------------- OPCODE TABLES ----------------- */
 
-static zOpcodeFn z_2op_table[Z3_2OP_COUNT];
-static zOpcodeFn z_1op_table[Z3_1OP_COUNT];
-static zOpcodeFn z_0op_table[Z3_0OP_COUNT];
-static zOpcodeFn z_var_table[Z3_VAR_COUNT];
-static int z_opcode_tables_initialized = 0;
+/* Dispatch tables live in flash as const data: nothing to initialize at run time
+ * and no RAM used. Unlisted slots are NULL (unsupported opcode). */
+/* 2OP (opcodes 0-127 and 192-223; index is the low 5 bits) */
+static const zOpcodeFn z_2op_table[Z3_2OP_COUNT] = {
+    [1] = op_je,
+    [2] = op_jl,
+    [3] = op_jg,
+    [4] = op_dec_chk,
+    [5] = op_inc_chk,
+    [6] = op_jin,
+    [7] = op_test,
+    [8] = op_or,
+    [9] = op_and,
+    [10] = op_test_attr,
+    [11] = op_set_attr,
+    [12] = op_clear_attr,
+    [13] = op_store,
+    [14] = op_insert_obj,
+    [15] = op_loadw,
+    [16] = op_loadb,
+    [17] = op_get_prop,
+    [18] = op_get_prop_addr,
+    [19] = op_get_next_prop,
+    [20] = op_add,
+    [21] = op_sub,
+    [22] = op_mul,
+    [23] = op_div,
+    [24] = op_mod,
+};
 
-void init_opcodes(void) {
-    if (z_opcode_tables_initialized) {
-        return;
-    }
+/* 1OP (opcodes 128-175; index is the low 4 bits) */
+static const zOpcodeFn z_1op_table[Z3_1OP_COUNT] = {
+    [0] = op_jz,
+    [1] = op_get_sibling,
+    [2] = op_get_child,
+    [3] = op_get_parent,
+    [4] = op_get_prop_len,
+    [5] = op_inc,
+    [6] = op_dec,
+    [7] = op_print_addr,
+    [9] = op_remove_obj,
+    [10] = op_print_obj,
+    [11] = op_ret,
+    [12] = op_jump,
+    [13] = op_print_paddr,
+    [14] = op_load,
+    [15] = op_not,
+};
 
-#define SET_OP(table, index, handler) table[index] = handler
-    SET_OP(z_2op_table, 1, op_je);
-    SET_OP(z_2op_table, 2, op_jl);
-    SET_OP(z_2op_table, 3, op_jg);
-    SET_OP(z_2op_table, 4, op_dec_chk);
-    SET_OP(z_2op_table, 5, op_inc_chk);
-    SET_OP(z_2op_table, 6, op_jin);
-    SET_OP(z_2op_table, 7, op_test);
-    SET_OP(z_2op_table, 8, op_or);
-    SET_OP(z_2op_table, 9, op_and);
-    SET_OP(z_2op_table, 10, op_test_attr);
-    SET_OP(z_2op_table, 11, op_set_attr);
-    SET_OP(z_2op_table, 12, op_clear_attr);
-    SET_OP(z_2op_table, 13, op_store);
-    SET_OP(z_2op_table, 14, op_insert_obj);
-    SET_OP(z_2op_table, 15, op_loadw);
-    SET_OP(z_2op_table, 16, op_loadb);
-    SET_OP(z_2op_table, 17, op_get_prop);
-    SET_OP(z_2op_table, 18, op_get_prop_addr);
-    SET_OP(z_2op_table, 19, op_get_next_prop);
-    SET_OP(z_2op_table, 20, op_add);
-    SET_OP(z_2op_table, 21, op_sub);
-    SET_OP(z_2op_table, 22, op_mul);
-    SET_OP(z_2op_table, 23, op_div);
-    SET_OP(z_2op_table, 24, op_mod);
+/* 0OP (opcodes 176-191; index is the low 4 bits) */
+static const zOpcodeFn z_0op_table[Z3_0OP_COUNT] = {
+    [0] = op_rtrue,
+    [1] = op_rfalse,
+    [2] = op_print,
+    [3] = op_print_ret,
+    [4] = op_nop,
+    [5] = op_save,
+    [6] = op_restore,
+    [7] = op_restart,
+    [8] = op_ret_popped,
+    [9] = op_pop,
+    [10] = op_quit,
+    [11] = op_new_line,
+    [12] = op_show_status,
+    [13] = op_verify,
+};
 
-    SET_OP(z_1op_table, 0, op_jz);
-    SET_OP(z_1op_table, 1, op_get_sibling);
-    SET_OP(z_1op_table, 2, op_get_child);
-    SET_OP(z_1op_table, 3, op_get_parent);
-    SET_OP(z_1op_table, 4, op_get_prop_len);
-    SET_OP(z_1op_table, 5, op_inc);
-    SET_OP(z_1op_table, 6, op_dec);
-    SET_OP(z_1op_table, 7, op_print_addr);
-    SET_OP(z_1op_table, 9, op_remove_obj);
-    SET_OP(z_1op_table, 10, op_print_obj);
-    SET_OP(z_1op_table, 11, op_ret);
-    SET_OP(z_1op_table, 12, op_jump);
-    SET_OP(z_1op_table, 13, op_print_paddr);
-    SET_OP(z_1op_table, 14, op_load);
-    SET_OP(z_1op_table, 15, op_not);
-
-    SET_OP(z_0op_table, 0, op_rtrue);
-    SET_OP(z_0op_table, 1, op_rfalse);
-    SET_OP(z_0op_table, 2, op_print);
-    SET_OP(z_0op_table, 3, op_print_ret);
-    SET_OP(z_0op_table, 4, op_nop);
-    SET_OP(z_0op_table, 5, op_save);
-    SET_OP(z_0op_table, 6, op_restore);
-    SET_OP(z_0op_table, 7, op_restart);
-    SET_OP(z_0op_table, 8, op_ret_popped);
-    SET_OP(z_0op_table, 9, op_pop);
-    SET_OP(z_0op_table, 10, op_quit);
-    SET_OP(z_0op_table, 11, op_new_line);
-    SET_OP(z_0op_table, 12, op_show_status);
-    SET_OP(z_0op_table, 13, op_verify);
-
-    SET_OP(z_var_table, 0, op_call);
-    SET_OP(z_var_table, 1, op_storew);
-    SET_OP(z_var_table, 2, op_storeb);
-    SET_OP(z_var_table, 3, op_put_prop);
-    SET_OP(z_var_table, 4, op_read);
-    SET_OP(z_var_table, 5, op_print_char);
-    SET_OP(z_var_table, 6, op_print_num);
-    SET_OP(z_var_table, 7, op_random);
-    SET_OP(z_var_table, 8, op_push);
-    SET_OP(z_var_table, 9, op_pull);
-    SET_OP(z_var_table, 10, op_split_window);
-    SET_OP(z_var_table, 11, op_set_window);
-#undef SET_OP
-
-    z_opcode_tables_initialized = 1;
-}
+/* VAR (opcodes 224-255; index is the low 5 bits) */
+static const zOpcodeFn z_var_table[Z3_VAR_COUNT] = {
+    [0] = op_call,
+    [1] = op_storew,
+    [2] = op_storeb,
+    [3] = op_put_prop,
+    [4] = op_read,
+    [5] = op_print_char,
+    [6] = op_print_num,
+    [7] = op_random,
+    [8] = op_push,
+    [9] = op_pull,
+    [10] = op_split_window,
+    [11] = op_set_window,
+};
 
 zOpcodeFn z_get_opcode_handler(zByte opcode) {
     if (opcode < Z3_1OP_BASE) {

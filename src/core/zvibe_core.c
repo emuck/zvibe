@@ -247,8 +247,6 @@ void z_init_machine(zState *state) {
     
     /* Initialize state */
     memset(G, 0, sizeof(zState));
-
-    init_opcodes();
 }
 
 /**

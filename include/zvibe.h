@@ -282,9 +282,6 @@ int z_load_story_data(const void *data, size_t size);
 /** @brief Execute one Z-machine instruction */
 void z_run_instruction(void);
 
-/** @brief Initialize opcode dispatch tables */
-void init_opcodes(void);
-
 /** @brief Get handler for a decoded opcode */
 zOpcodeFn z_get_opcode_handler(zByte opcode);
 
