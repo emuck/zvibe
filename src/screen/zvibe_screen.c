@@ -275,6 +275,12 @@ void zscreen_set_text_style(zscreen *s, uint16_t style) {
     else            s->style = (uint8_t)(s->style | (style & 0x0F));
 }
 
+void zscreen_get_cursor(zscreen *s, uint16_t *row, uint16_t *col) {
+    zscreen_flush(s);
+    if (s->cur_window == 1) { *row = s->upper_row; *col = s->upper_col; }
+    else                    { *row = (uint16_t)(s->lower_row - s->upper_lines); *col = s->lower_col; }
+}
+
 void zscreen_buffer_mode(zscreen *s, uint16_t on) {
     if (s->cur_window == 0 && !on) flush_lower(s);
     s->buffered = on ? 1 : 0;
@@ -316,3 +322,24 @@ int zscreen_echo(zscreen *s, char c) {
     }
     return 0;
 }
+
+/* ---- The screen as the interpreter's screen-operations table ---- */
+
+static void ops_split_window(void *u, uint16_t lines) { zscreen_split_window((zscreen *)u, lines > 255 ? 255 : (uint8_t)lines); }
+static void ops_set_window(void *u, uint16_t w)       { zscreen_set_window((zscreen *)u, (uint8_t)w); }
+static void ops_erase_window(void *u, int16_t w)      { zscreen_erase_window((zscreen *)u, w); }
+static void ops_erase_line(void *u, uint16_t v)       { zscreen_erase_line((zscreen *)u, v); }
+static void ops_set_cursor(void *u, uint16_t r, uint16_t c) { zscreen_set_cursor((zscreen *)u, r, c); }
+static void ops_get_cursor(void *u, uint16_t *r, uint16_t *c) { zscreen_get_cursor((zscreen *)u, r, c); }
+static void ops_set_text_style(void *u, uint16_t st)  { zscreen_set_text_style((zscreen *)u, st); }
+static void ops_buffer_mode(void *u, uint16_t on)     { zscreen_buffer_mode((zscreen *)u, on); }
+static void ops_get_size(void *u, uint8_t *rows, uint8_t *cols) {
+    *rows = ((zscreen *)u)->rows;
+    *cols = ((zscreen *)u)->cols;
+}
+
+const zvibeScreenOps zscreen_ops = {
+    ops_split_window, ops_set_window, ops_erase_window, ops_erase_line,
+    ops_set_cursor, ops_get_cursor, ops_set_text_style, ops_buffer_mode, ops_get_size,
+    ZVIBE_SCREEN_CAP_BOLD | ZVIBE_SCREEN_CAP_ITALIC | ZVIBE_SCREEN_CAP_FIXED
+};

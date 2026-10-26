@@ -51,7 +51,8 @@
  * V4: the game draws its own status line, so that bit means something else;
  *     clear the capability bits (bold 2, italic 3, fixed-space 4, timed input 7)
  *     because no screen is attached at this level, and write the interpreter
- *     number/version (0x1E, 0x1F) and screen size (0x20 rows, 0x21 columns).
+ *     number/version (0x1E, 0x1F), the screen size and capabilities reported by the
+ *     platform's screen operations (defaults if none), and the standard revision.
  *
  * Also called after a successful restore: the interpreter-owned header fields
  * describe THIS interpreter, so they must not be taken from the saved image.
@@ -62,15 +63,27 @@ void z_init_interpreter_header(void) {
     zmem_byte_t flags1 = G->header.flags1;
 #if ZVIBE_ENABLE_V4
     if (Z_IS_V4()) {
+        uint8_t rows = ZVIBE_SCREEN_ROWS, cols = ZVIBE_SCREEN_COLS, caps = 0;
+        if (G->screen) {
+            caps = G->screen->capabilities;
+            if (G->screen->get_size)
+                G->screen->get_size(G->screen_user, &rows, &cols);
+        }
+        /* Capability bits describe THIS interpreter's screen: bold 2, italic 3, fixed-space 4.
+         * Timed input (7) is never claimed: timers are not supported. */
         flags1 &= (zmem_byte_t)~((1 << 2) | (1 << 3) | (1 << 4) | (1 << 7));
+        if (caps & ZVIBE_SCREEN_CAP_BOLD)   flags1 |= (1 << 2);
+        if (caps & ZVIBE_SCREEN_CAP_ITALIC) flags1 |= (1 << 3);
+        if (caps & ZVIBE_SCREEN_CAP_FIXED)  flags1 |= (1 << 4);
         zmem_write_byte(&G->memory_state, 1, flags1);
         zmem_write_byte(&G->memory_state, 0x1E, (zmem_byte_t)ZVIBE_INTERPRETER_NUMBER);
         zmem_write_byte(&G->memory_state, 0x1F, (zmem_byte_t)ZVIBE_INTERPRETER_VERSION);
-        zmem_write_byte(&G->memory_state, 0x20, (zmem_byte_t)ZVIBE_SCREEN_ROWS);
-        zmem_write_byte(&G->memory_state, 0x21, (zmem_byte_t)ZVIBE_SCREEN_COLS);
-        /* The standard revision (0x32, 0x33) is deliberately NOT written: declaring 1.1
-         * claims every opcode of the standard, and this build is not there yet. Write it
-         * when the V4 opcode set is complete. */
+        zmem_write_byte(&G->memory_state, 0x20, (zmem_byte_t)rows);
+        zmem_write_byte(&G->memory_state, 0x21, (zmem_byte_t)cols);
+        /* The standard revision followed: 1.1. Every opcode a V4 story may use is implemented
+         * (timed input is not claimed, which the standard allows). */
+        zmem_write_byte(&G->memory_state, 0x32, 1);
+        zmem_write_byte(&G->memory_state, 0x33, 1);
         return;
     }
 #endif
@@ -523,6 +536,10 @@ int z_load_story_data(const void *data, size_t size) {
 
     /* Initialize state with new story */
     G->story_size = (zSize)size;
+#if ZVIBE_ENABLE_V4
+    z_reset_output_state();
+    G->char_requested = 0;
+#endif
     G->instr_count = 0;
     G->logical_pc = 0;
     G->quit_flag = 0;

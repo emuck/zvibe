@@ -21,7 +21,7 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Test executables
 TEST_TARGETS = test_split_memory test_screen test_config_v3 test_config_v4 test_config_stack1024 \
                test_save_restore test_save_restore_v4_stack1024 test_save_restore_san \
-               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_save_restore_san
+               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_v4_ops test_screen_v4 test_save_restore_san
 
 # Integration test scripts
 INTEGRATION_TESTS = test_czech.sh
@@ -33,8 +33,8 @@ all: $(TEST_TARGETS)
 test_split_memory: test_split_memory.c $(CORE_DIR)/zvibe_memory.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
-test_screen: test_screen.c $(CORE_DIR)/../screen/zvibe_screen.c
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
+test_screen: test_screen.c vt100_emu.h $(CORE_DIR)/../screen/zvibe_screen.c
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ test_screen.c $(CORE_DIR)/../screen/zvibe_screen.c
 
 # Build configuration and restore-safety tests. They link the whole core and
 # depend on every public header, so changing zvibe_config.h rebuilds them.
@@ -81,6 +81,14 @@ test_opcodes_v3: test_opcodes.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
 
 test_opcodes_v4: test_opcodes.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
 	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_opcodes.c $(ALL_SRCS)
+
+# V4 screen opcodes, output streams, read_char, scan_table (V4 builds only).
+test_v4_ops: test_v4_ops.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_v4_ops.c $(ALL_SRCS)
+
+# A real V4 story through the real ANSI screen layer into a VT100 emulator.
+test_screen_v4: test_screen_v4.c vt100_emu.h data/v4screen.z4 $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_screen_v4.c $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c
 
 # Dictionary encoding, lookup and tokenizing. The test #includes zvibe_ops_text.c
 # to reach its static functions, so that file is left out of the link.
@@ -196,6 +204,8 @@ test-unit: $(TEST_TARGETS)
 	@./test_dict_v4
 	@./test_opcodes_v3
 	@./test_opcodes_v4
+	@./test_v4_ops
+	@./test_screen_v4
 	@$(MAKE) --no-print-directory test-delta-copies
 	@echo
 	@echo "=== Unit Tests Complete ==="

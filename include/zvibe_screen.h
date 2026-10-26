@@ -20,6 +20,7 @@
 #define ZVIBE_SCREEN_H
 
 #include <stdint.h>
+#include "zvibe_screen_ops.h"
 
 #ifndef ZSCREEN_MAX_COLS
 #define ZSCREEN_MAX_COLS 80
@@ -86,6 +87,21 @@ void zscreen_set_cursor(zscreen *s, uint16_t row, uint16_t col);
 void zscreen_set_text_style(zscreen *s, uint16_t style);
 /** Lower window only: 1 = word-wrap, 0 = raw */
 void zscreen_buffer_mode(zscreen *s, uint16_t on);
+
+/**
+ * Report the cursor of the current window, 1-based (get_cursor). Pending
+ * wrapped text is flushed first so the column is where the next character goes.
+ * Coordinates are relative to the current window: row 1 is the top line of the
+ * upper window, or of the lower window (the line below the upper window).
+ */
+void zscreen_get_cursor(zscreen *s, uint16_t *row, uint16_t *col);
+
+/**
+ * This layer as the interpreter's screen-operations table (zvibe_set_screen).
+ * Pass the zscreen as the `user` pointer. Reports bold, italic (as underline)
+ * and fixed-pitch text as available.
+ */
+extern const zvibeScreenOps zscreen_ops;
 
 /* ---- Text output ---- */
 

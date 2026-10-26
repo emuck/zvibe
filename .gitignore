@@ -67,6 +67,8 @@ target/console/tests/test_dict_v3
 target/console/tests/test_dict_v4
 target/console/tests/test_opcodes_v3
 target/console/tests/test_opcodes_v4
+target/console/tests/test_v4_ops
+target/console/tests/test_screen_v4
 target/console/tests/test_save_restore_san.dSYM/
 target/riscv/serv_zvibe/common/sw/flash_boot_banner
 
@@ -189,6 +191,7 @@ save.dat
 # Exceptions: redistributable third-party assets / original works committed to the repo
 !games/catalog/czech.z3
 !games/catalog/czech.z4
+!target/console/tests/data/v4screen.z4
 !games/catalog/restaurant.z3
 
 # Vendor files (should not be in open source repo)

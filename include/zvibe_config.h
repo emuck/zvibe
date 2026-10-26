@@ -123,6 +123,17 @@
 #endif
 
 /**
+ * @def ZVIBE_STREAM3_DEPTH
+ * @brief How many times output stream 3 (the memory table) can be selected at once
+ *
+ * The standard (7.1.2.1) asks interpreters for at least 16 levels. Each level
+ * costs two bytes of RAM. V4 builds only.
+ */
+#ifndef ZVIBE_STREAM3_DEPTH
+#define ZVIBE_STREAM3_DEPTH 16
+#endif
+
+/**
  * @brief True when the loaded story is V4 (runtime test in a dual build)
  *
  * Internal to the core: needs zvibe.h (for G) and a loaded story context

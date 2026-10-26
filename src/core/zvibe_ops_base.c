@@ -132,6 +132,17 @@ static const zOpcodeFn z_var_table[Z3_VAR_COUNT] = {
     [11] = op_set_window,
 #if ZVIBE_ENABLE_V4
     [12] = op_call,                 /* call_vs2 (the decoder reads its second type byte) */
+    [13] = op_erase_window,
+    [14] = op_erase_line,
+    [15] = op_set_cursor,
+    [16] = op_get_cursor,
+    [17] = op_set_text_style,
+    [18] = op_buffer_mode,
+    [19] = op_output_stream,
+    [20] = op_input_stream,
+    [21] = op_sound_effect,
+    [22] = op_read_char,
+    [23] = op_scan_table,
 #endif
 };
 

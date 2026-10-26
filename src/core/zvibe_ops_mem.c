@@ -236,6 +236,12 @@ void op_set_window(void) {
     /* Handle set_window operation */
     zWord old_window = G->current_window;
     G->current_window = G->operands[0];
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        Z_SCREEN(set_window, G->operands[0]);
+        return;
+    }
+#endif
     
     /* Call callback if available */
     if (G->set_window) {
@@ -253,6 +259,12 @@ void op_split_window(void) {
     /* Handle split_window operation */
     zWord old_lines = G->upper_window_lines;
     G->upper_window_lines = G->operands[0];
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        Z_SCREEN(split_window, G->operands[0]);
+        return;
+    }
+#endif
     
     /* Call callback if available */
     if (G->split_window) {

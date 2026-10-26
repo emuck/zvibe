@@ -149,6 +149,11 @@ zvibeResult zvibe_run(zvibeContext *ctx) {
     zState *G = &ctx->z_state;
     
     while (1) {
+#if ZVIBE_ENABLE_V4
+        if (G->char_requested)
+            return ZVIBE_WAIT_FOR_CHAR;
+#endif
+
         if (G->input_requested) {
 #if ZVIBE_ENABLE_STATUS_LINE
             /* Update status line once per command cycle, right before waiting for input.
@@ -212,6 +217,7 @@ zvibeResult zvibe_run(zvibeContext *ctx) {
             memset(G->stack_mem, 0, sizeof(G->stack_mem));
             G->stack_ptr = G->stack_mem;
             G->base_ptr = 0;
+            z_reset_ui_state();
             continue;
         }
 #endif
@@ -230,6 +236,30 @@ zvibeResult zvibe_input(zvibeContext *ctx, const char *input) {
     
     return ZVIBE_OK;
 }
+
+#if ZVIBE_ENABLE_V4
+zvibeResult zvibe_input_char(zvibeContext *ctx, uint16_t zscii) {
+    if (!ctx) return ZVIBE_ERROR;
+
+    zState *G = &ctx->z_state;
+    if (!G->char_requested) return ZVIBE_ERROR;
+
+    z_process_char(zscii);
+    return ZVIBE_OK;
+}
+
+zvibeResult zvibe_set_screen(zvibeContext *ctx, const zvibeScreenOps *ops, void *user) {
+    if (!ctx) return ZVIBE_ERROR;
+
+    zState *G = &ctx->z_state;
+    G->screen = ops;
+    G->screen_user = user;
+    /* A V4 story already loaded: its header must describe this screen */
+    if (G->memory_state.flash_data && G->memory_state.ram_buffer && Z_IS_V4())
+        z_init_interpreter_header();
+    return ZVIBE_OK;
+}
+#endif
 
 zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,
                            char *name_buf, size_t name_buf_size) {
@@ -411,6 +441,7 @@ zvibeResult zvibe_restart_completed(zvibeContext *ctx) {
     memset(G->stack_mem, 0, sizeof(G->stack_mem));
     G->stack_ptr = G->stack_mem;
     G->base_ptr = 0;
+    z_reset_ui_state();
 
     return ZVIBE_OK;
 }

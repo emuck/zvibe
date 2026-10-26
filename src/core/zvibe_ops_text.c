@@ -91,9 +91,7 @@ static char z_alphabet_table[] =
  * Print a newline character (opcode: new_line)
  */
 void op_new_line(void) {
-    if (G->writestr) {
-        G->writestr("\n", 1);
-    }
+    Z_OUT("\n", 1);
 }
 
 /**
@@ -124,7 +122,7 @@ void op_print_num(void) {
         while (v) { buf[--n] = '0' + v % 10; v /= 10; }
         if (value < 0) buf[--n] = '-';
     }
-    if (G->writestr) G->writestr(buf + n, 6 - n);
+    Z_OUT(buf + n, 6 - n);
 }
 
 /**
@@ -133,6 +131,15 @@ void op_print_num(void) {
 void op_print_char(void) {
     char output_char = ' '; /* Default to space */
     const zWord zscii_value = G->operands[0];
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        if (zscii_value == 0) return;                      /* null prints nothing (3.8) */
+        if (G->stream3_depth && zscii_value >= 155 && zscii_value <= 251) {
+            z_stream3_zscii((zByte)zscii_value);           /* the table holds ZSCII, not display text */
+            return;
+        }
+    }
+#endif
     
     /* Handle ASCII printable range and newline */
     if ((zscii_value >= Z3_ZSCII_SPACE) && (zscii_value <= 126)) {
@@ -141,9 +148,7 @@ void op_print_char(void) {
         output_char = '\n';
     }
     
-    if (G->writestr) {
-        G->writestr(&output_char, 1);
-    }
+    Z_OUT(&output_char, 1);
 }
 
 /**
@@ -153,9 +158,7 @@ void op_print_ret(void) {
     const zByte *text_ptr = zmem_get_ptr(&G->memory_state, G->logical_pc, 0);
     zSize bytes_consumed = z_print_zscii(text_ptr, 0);
     G->logical_pc += bytes_consumed;
-    if (G->writestr) {
-        G->writestr("\n", 1);
-    }
+    Z_OUT("\n", 1);
     z_do_return(1);
 }
 
@@ -201,9 +204,7 @@ static void z_zscii_emit_buffer(char ch, void *userdata) {
 
 static void z_zscii_emit_output(char ch, void *userdata) {
     (void)userdata;
-    if (G->writestr) {
-        G->writestr(&ch, 1);
-    }
+    Z_OUT(&ch, 1);
 }
 
 static zSize z_walk_zscii(const zByte *encoded_text, int is_abbreviation,
@@ -232,6 +233,10 @@ static zSize z_walk_zscii(const zByte *encoded_text, int is_abbreviation,
                 zscii_collector--;
                 if (!zscii_collector) {
                     decoded = z_decode_zscii_char(zscii_code);
+#if ZVIBE_ENABLE_V4
+                    if (Z_IS_V4() && G->stream3_depth && zscii_code >= 155 && zscii_code <= 251)
+                        decoded = (char)zscii_code;        /* memory tables keep extended ZSCII */
+#endif
                     if (decoded && sink) {
                         sink(decoded, sink_userdata);
                     }

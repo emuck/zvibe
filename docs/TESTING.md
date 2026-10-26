@@ -36,8 +36,23 @@ erase, and auto-wrap. Covers split-window scrolling, word wrap, upper-window
 clipping, erase semantics, text styles, input echo at the right edge, and
 dimension validation.
 
-**Expected:** 66 checks pass. The board-side counterpart is
+**Expected:** 70 checks pass. The board-side counterpart is
 `make screen-demo` in `target/same51` (see [V4 Feasibility](V4_ANALYSIS.md)).
+
+### V4 screen and stream opcodes
+
+**Files:** `test_v4_ops.c` (92 checks), `test_screen_v4.c` (142 checks),
+`vt100_emu.h`, `data/v4screen.inf` / `v4screen.z4`.
+
+`test_v4_ops.c` drives the V4-only opcodes (erase, cursor, text style, buffer
+mode, output streams including nested stream 3, `read_char`, `scan_table`)
+with hand-assembled code. `test_screen_v4.c` runs a small Inform-built V4 story
+through the real ANSI screen layer into a VT100 emulator and compares the
+resulting screen. Rebuild the story with `inform -v4 v4screen.inf v4screen.z4`.
+Both run under `make validate-v4` only.
+
+`make v4term` builds a terminal player for hand testing:
+`target/console/build_v4/bin/zvibe_v4term story.z4`.
 
 ### Build configuration and restore safety (V3 / V4 switch)
 

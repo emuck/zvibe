@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "zvibe_config.h"
+#include "zvibe_screen_ops.h"
 
 /*
  * Compile-time feature flags:
@@ -109,7 +110,10 @@ typedef enum {
 #if ZVIBE_ENABLE_SAVE_RESTORE
     ZVIBE_SAVE_REQUESTED,       /**< Save requested, handle and resume with zvibe_save_completed() */
     ZVIBE_RESTORE_REQUESTED,    /**< Restore requested, handle and resume with zvibe_restore_completed() */
-    ZVIBE_RESTART_REQUESTED     /**< Restart requested, handle and resume with zvibe_restart_completed() */
+    ZVIBE_RESTART_REQUESTED,    /**< Restart requested, handle and resume with zvibe_restart_completed() */
+#endif
+#if ZVIBE_ENABLE_V4
+    ZVIBE_WAIT_FOR_CHAR,        /**< Waiting for one character via zvibe_input_char() (V4 read_char) */
 #endif
 } zvibeResult;
 
@@ -277,6 +281,31 @@ zvibeResult zvibe_run(zvibeContext *ctx);
  * @note Input is copied internally, buffer need not remain valid
  */
 zvibeResult zvibe_input(zvibeContext *ctx, const char *input);
+
+#if ZVIBE_ENABLE_V4
+/**
+ * @brief Provide a single character to a pending read_char (V4)
+ *
+ * Call after zvibe_run() returns ZVIBE_WAIT_FOR_CHAR. The character is ZSCII:
+ * ordinary characters are their ASCII codes, 13 is Return, 8 is Delete, 27 is
+ * Escape, 129-132 are the cursor keys.
+ *
+ * @return ZVIBE_OK on success, ZVIBE_ERROR if no character was requested
+ */
+zvibeResult zvibe_input_char(zvibeContext *ctx, uint16_t zscii);
+
+/**
+ * @brief Register the platform's screen operations (V4)
+ *
+ * A V4 story positions the cursor, splits windows, changes text style and so on;
+ * these calls are made on `ops` (see zvibe_screen_ops.h), with `user` passed back
+ * as their first argument. `ops` must stay valid while the context is in use.
+ * Pass NULL to remove it. Call before loading a story so the header reports the
+ * screen's size and styles; calling later refreshes the header of a loaded V4
+ * story. Text output still goes through the callback given to zvibe_create().
+ */
+zvibeResult zvibe_set_screen(zvibeContext *ctx, const zvibeScreenOps *ops, void *user);
+#endif
 
 /**
  * @brief Get the player's current location

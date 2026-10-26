@@ -265,9 +265,9 @@ each is a separate commit.
      (bold, italic, fixed-space, timed input) because no screen is attached at
      this level, and writes the interpreter number/version and screen size
      (compile-time defaults 24x80 until slice 5 supplies the real size). The
-     standard revision (0x32/0x33) is **deliberately not written** yet:
-     declaring 1.1 claims every opcode, and this build is not there. Write it
-     when slice 5 completes the opcode set.
+     standard revision (0x32/0x33) was **deliberately not written** in this
+     slice: declaring 1.1 claims every opcode. Slice 5 completed the set and
+     writes it.
    - The status-line callback is skipped for V4 stories (a V4 game draws its own).
    - A V4 story whose dynamic memory is smaller than the 64-byte header is
      refused at load.
@@ -309,7 +309,57 @@ each is a separate commit.
    - Public status and room queries still use V3 conventions.
    - Header screen size must come from the frontend, not compile-time defaults.
 5. **Screen table, output streams, `read_char`**, `zscreen_get_cursor`, target
-   adapters.
+   adapters. **Done (core, API, screen layer, console player).**
+
+   - `include/zvibe_screen_ops.h` is the one public screen interface: a table of
+     optional callbacks (`erase_window`, `erase_line`, `set_cursor`,
+     `get_cursor`, `set_text_style`, `set_buffer_mode`, `set_window`,
+     `split_window`) plus capability bits. `zvibe_set_screen()` attaches it.
+     `src/screen` (ANSI/VT100, scroll region for the lower window, word wrap,
+     no frame buffer) provides `zscreen_ops` as one implementation; a frontend
+     with its own display supplies a different table.
+   - `src/core/zvibe_ops_v4.c` holds the V4-only opcodes, so a V3-only build
+     does not compile them: `erase_window`, `erase_line`, `set_cursor`,
+     `get_cursor`, `set_text_style`, `buffer_mode`, `output_stream` with
+     stream 3 memory tables (nested to `ZVIBE_STREAM3_DEPTH`, text routed
+     exclusively while open, length word written on close), `input_stream` and
+     `sound_effect` as no-ops, `read_char`, `scan_table`.
+   - `read_char` suspends the interpreter with `ZVIBE_WAIT_FOR_CHAR`; the
+     frontend answers with `zvibe_input_char(ctx, zscii)`. Timed input is not
+     supported, and flags1 bit 7 is never set.
+   - The header now declares Standard 1.1 (0x32/0x33), since the V4 opcode set
+     is complete.
+   - `target/console/zvibe_v4term.c` (`make v4term`) is the reference
+     frontend: it sizes the screen from the terminal, edits input lines
+     itself, maps cursor keys to ZSCII and saves to `<story>.sav`.
+   - **Cost** of enabling V4 on top of V3 (SAM E51 `-O2`, RISC-V `-O1`): about
+     +2,036 B and +4,268 B of flash and +56 B of RAM. V3-only objects are
+     byte-identical to before the slice at every optimisation level.
+   - Review fixes: `get_cursor` checks every byte against dynamic memory;
+     stream 3 keeps extended ZSCII and drops null; `scan_table` treats a match at
+     address 0 as a match; restart re-enables buffering and clears the text
+     style; the player restores the terminal on SIGINT/SIGTERM/SIGTSTP, reports
+     Delete as ZSCII 8 and tells a lone Escape from a sequence by timeout.
+   - **Testing.** `test_screen_v4.c` runs `data/v4screen.z4` (built from
+     `v4screen.inf`, Inform 6.44) with the real ANSI layer feeding a VT100
+     emulator and checks the resulting screen cell by cell; `test_v4_ops.c`
+     covers the opcodes and streams directly; `test_screen.c` the layer alone.
+
+   **Deferred from this slice:**
+   - Frontend migrations are separate work: SAME51 firmware (replace the
+     firmware-side echo with the UART adapter; needs the board), RISC-V
+     firmware, webterm (128 KB and `.z3`-only limits).
+   - Flags 2 bits 0 and 1 (transcript, fixed-pitch) are still overwritten by
+     restore and restart.
+   - Public status and room queries are V3-shaped.
+   - `get_next_prop` on a property that does not exist.
+   - Timed input.
+   - `split_window` is clamped to `rows - 2` lines (DECSTBM needs a lower
+     window of at least two rows); a story that splits off all but one row gets
+     a shorter upper window than it asked for.
+   - The console player has no horizontal scrolling in its line editor and
+     plays version 4 stories only.
+   - A V4 madlibs story as an acceptance demo once the frontends are migrated.
 6. **Regression and playthroughs.**
 
 ### Proving "zero cost"

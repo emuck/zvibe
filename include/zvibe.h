@@ -38,6 +38,7 @@
 #include <stdint.h>
 #include "zvibe_config.h"
 #include "zvibe_memory.h"
+#include "zvibe_screen_ops.h"
 
 /* -------------------- BASIC TYPE DEFINITIONS -------------------- */
 
@@ -234,6 +235,16 @@ typedef struct {
     zWord current_window;         /**< Current output window (0=lower, 1=upper) */
     zWord upper_window_lines;     /**< Upper window height in lines */
 
+#if ZVIBE_ENABLE_V4
+    /* V4 screen and output streams */
+    const zvibeScreenOps *screen; /**< Platform screen operations (may be NULL) */
+    void *screen_user;            /**< Passed back to every screen operation */
+    int char_requested;           /**< 1 if waiting for a single character (read_char) */
+    zByte output_screen_off;      /**< 1 while output stream 1 (the screen) is deselected */
+    zByte stream3_depth;          /**< Output stream 3 (memory table) nesting depth; 0 = not selected */
+    zWord stream3_table[ZVIBE_STREAM3_DEPTH];   /**< Table address of each selected level */
+#endif
+
     /* Platform callbacks */
     void (*split_window)(zWord oldval, zWord newval);  /**< Split window callback */
     void (*set_window)(zWord oldval, zWord newval);    /**< Set window callback */
@@ -263,6 +274,35 @@ int z_load_story_data(const void *data, size_t size);
 
 /** @brief Execute one Z-machine instruction */
 void z_run_instruction(void);
+
+#if ZVIBE_ENABLE_V4
+/** @brief Call an optional screen operation, passing the platform's context pointer */
+#define Z_SCREEN(fn, ...) \
+    do { if (G->screen && G->screen->fn) G->screen->fn(G->screen_user, __VA_ARGS__); } while (0)
+#endif
+
+/**
+ * @def Z_OUT
+ * @brief Send game text to the current output stream(s)
+ *
+ * In a V3-only build this is exactly the original "if (G->writestr) G->writestr()".
+ * With V4 enabled it goes through z_out(), which honours the output-stream
+ * opcodes (screen on/off, the memory table).
+ */
+#if ZVIBE_ENABLE_V4
+void z_out(const char *text, zSize length);
+/** @brief Reset the output streams: screen on, no memory table selected */
+void z_reset_output_state(void);
+/** @brief Complete a pending read_char with the ZSCII character c */
+void z_process_char(zWord zscii);
+/** @brief Restart: output streams reset, windows unsplit, screen cleared */
+void z_reset_ui_state(void);
+void z_stream3_zscii(zByte code);
+#define Z_OUT(text, length) z_out((text), (length))
+#else
+#define Z_OUT(text, length) do { if (G->writestr) G->writestr((text), (length)); } while (0)
+#define z_reset_ui_state() ((void)0)
+#endif
 
 /** @brief Write the interpreter's capabilities into the story header (load and restart) */
 void z_init_interpreter_header(void);
@@ -507,6 +547,20 @@ void op_pull(void);
 void op_split_window(void);
 /** @brief Set current output window @ingroup OpcodesText */
 void op_set_window(void);
+#if ZVIBE_ENABLE_V4
+/* Opcodes that exist only from version 4 (src/core/zvibe_ops_v4.c) */
+void op_erase_window(void);
+void op_erase_line(void);
+void op_set_cursor(void);
+void op_get_cursor(void);
+void op_set_text_style(void);
+void op_buffer_mode(void);
+void op_output_stream(void);
+void op_input_stream(void);
+void op_sound_effect(void);
+void op_read_char(void);
+void op_scan_table(void);
+#endif
 
 
 #endif /* ZVIBE_H */

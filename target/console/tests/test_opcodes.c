@@ -114,7 +114,7 @@ static void test_header(void) {
     CHECK(ram[0x1E] == 1);                                  /* interpreter number */
     CHECK(ram[0x1F] == 'Z');
     CHECK(ram[0x20] == 24 && ram[0x21] == 80);              /* screen rows, columns */
-    CHECK(ram[0x32] == 0 && ram[0x33] == 0);                /* the standard revision is not claimed yet */
+    CHECK(ram[0x32] == 1 && ram[0x33] == 1);                /* standard 1.1: the V4 opcode set is complete */
 
     /* a restart restores dynamic memory (which holds the header) and must redo the setup */
     memset(ram + 0x1E, 0xEE, 4);
