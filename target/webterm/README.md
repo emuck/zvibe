@@ -178,6 +178,21 @@ Czech tests pass through the webterm session layer, the I/O wiring is correct.
 
 See `tests/README.md` for full details.
 
+## Version 4 stories
+
+Build with `-DZVIBE_ENABLE_V4=1` (the POSIX server: `make V4=1`; also add
+`zvibe_ops_v4.c` and a `ZVIBE_MEMORY_BUFFER_SIZE` of about 72 KB). The server then
+lists `.z4` files and accepts stories up to 256 KB; a V4 save can be over 24 KB, so
+the session's save buffer grows to 64 KB. A game that calls `read_char` sends an
+`output` frame with `"key":true` and waits for a `key` message (see `PROTOCOL.md`);
+the browser client does this on any key press. V4 stories are played as a text
+stream. The upper window, cursor addressing and styles are not rendered, so
+screen-driven stories (Bureaucracy's form) are only partly playable; full-screen
+rendering would need a terminal emulator in the browser. The cartographer follows
+version 3 stories only.
+
+`make test` also runs the session tests in a V4 build (`make test-v4`).
+
 ## Protocol
 
 See `PROTOCOL.md` for the complete WebSocket message specification.

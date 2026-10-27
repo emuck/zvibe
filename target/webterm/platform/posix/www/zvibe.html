@@ -226,7 +226,22 @@ function print(text, cls) {
     output.scrollTop = output.scrollHeight;
 }
 
+/* A version 4 game can wait for one key (read_char) instead of a line: the
+ * server marks that output frame "key":true and the next key goes back as
+ * {"type":"key","code":<ZSCII>}. */
+let keyMode = false;
+
+function setKey(on) {
+    keyMode = on;
+    if (on) {
+        inputEl.disabled = true;
+        promptEl.style.color = '#3a3';
+        inputEl.placeholder = 'press a key';
+    }
+}
+
 function setInput(on) {
+    keyMode = false;
     inputEl.disabled = !on;
     promptEl.style.color = on ? '#3a3' : '#333';
     if (on) { inputEl.placeholder = ''; inputEl.focus(); }
@@ -260,7 +275,7 @@ function connect() {
         switch (msg.type) {
             case 'output':
                 print(msg.text);
-                setInput(!!msg.prompt);
+                if (msg.key) setKey(true); else setInput(!!msg.prompt);
                 break;
 
             case 'room':
@@ -298,7 +313,7 @@ function connect() {
 
             case 'resumed':
                 print('\n-- session resumed --\n', 'msg-sys');
-                setInput(!!msg.prompt);
+                if (msg.key) setKey(true); else setInput(!!msg.prompt);
                 break;
 
             case 'saved':
@@ -313,6 +328,22 @@ function connect() {
         }
     });
 }
+
+const ZSCII_KEYS = { Enter: 13, Backspace: 8, Delete: 8, Escape: 27,
+                     ArrowUp: 129, ArrowDown: 130, ArrowLeft: 131, ArrowRight: 132 };
+
+document.addEventListener('keydown', e => {
+    if (!keyMode || e.ctrlKey || e.metaKey || e.altKey) return;
+    let code = ZSCII_KEYS[e.key];
+    if (code === undefined && e.key.length === 1) {
+        code = e.key.charCodeAt(0);
+        if (code < 32 || code > 126) return;
+    }
+    if (code === undefined) return;
+    e.preventDefault();
+    keyMode = false;
+    send({ type: 'key', code });
+});
 
 inputEl.addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;

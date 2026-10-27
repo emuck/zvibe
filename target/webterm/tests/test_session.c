@@ -533,6 +533,160 @@ TEST(test_czech_conformance) {
  * Main
  * ---------------------------------------------------------------------- */
 
+#if ZVIBE_ENABLE_V4
+/* ---- version 4: read_char arrives as a key message ---- */
+
+static char g_v4save_path[512];
+
+/* Deliver one key and run to the next wait. */
+static webterm_result_t send_key(webterm_session_t *s, unsigned code) {
+    webterm_session_on_char(s, code);
+    return run_to_stop(s);
+}
+
+static webterm_session_t *start_v4save(mock_platform_t *m) {
+    size_t size = 0;
+    uint8_t *data = load_game(g_v4save_path, &size);
+    webterm_session_t *s;
+    static uint8_t *keep;                    /* the story must outlive the session */
+    if (!data) return NULL;
+    free(keep);
+    keep = data;
+    s = webterm_session_create(&m->base);
+    if (!s) return NULL;
+    webterm_session_accept(s);
+    if (webterm_session_load(s, keep, size) != WEBTERM_OK) return NULL;
+    run_to_stop(s);
+    return s;
+}
+
+TEST(test_v4_key_wait) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = start_v4save(m);
+    ASSERT(s != NULL, "v4save did not start");
+    ASSERT(webterm_session_state(s) == WEBTERM_STATE_WAITING, "must wait for a key");
+    ASSERT(mock_last_frame_contains(m, "\"key\":true"), "output frame must carry key:true");
+    ASSERT(!mock_last_frame_has_prompt(m), "a key wait is not a line prompt");
+    ASSERT(mock_last_frame_contains(m, "v4save ready"), "banner missing");
+    ASSERT(!mock_any_frame_contains(m, "\"type\":\"room\""), "no cartographer events for V4");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+}
+
+TEST(test_v4_key_delivery) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = start_v4save(m);
+    ASSERT(s != NULL, "v4save did not start");
+
+    mock_clear_frames(m);
+    ASSERT(send_key(s, 'i') == WEBTERM_WAIT, "must wait again after a key");
+    ASSERT(mock_last_frame_contains(m, "counter=1"), "key i must add one");
+    /* the counter is global 0, which the cartographer would take for a room */
+    ASSERT(!mock_any_frame_contains(m, "\"type\":\"room\""), "no room events for a V4 story");
+    ASSERT(mock_last_frame_contains(m, "\"key\":true"), "still waiting for a key");
+
+    mock_clear_frames(m);
+    send_key(s, 'p');
+    ASSERT(mock_last_frame_contains(m, "counter=1"), "key p must show the counter");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+}
+
+TEST(test_v4_line_input_ignored_during_key_wait) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = start_v4save(m);
+    ASSERT(s != NULL, "v4save did not start");
+
+    mock_clear_frames(m);
+    webterm_session_on_input(s, "i", 1);
+    ASSERT(webterm_session_state(s) == WEBTERM_STATE_WAITING, "a line must not satisfy read_char");
+    ASSERT(run_to_stop(s) == WEBTERM_WAIT && m->frame_count == 0, "nothing must run");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+}
+
+TEST(test_v4_key_ignored_during_line_wait) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = webterm_session_create(&m->base);
+    size_t size = 0;
+    uint8_t *data = load_game(g_restaurant_path, &size);
+    ASSERT(s && data, "restaurant did not load");
+    webterm_session_accept(s);
+    webterm_session_load(s, data, size);
+    run_to_stop(s);
+    ASSERT(mock_last_frame_has_prompt(m), "a V3 story waits for a line");
+
+    mock_clear_frames(m);
+    webterm_session_on_char(s, 'x');
+    ASSERT(webterm_session_state(s) == WEBTERM_STATE_WAITING, "a key must not satisfy a line read");
+    ASSERT(m->frame_count == 0, "nothing must run");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+    free(data);
+}
+
+TEST(test_v4_resume_into_key_wait) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = start_v4save(m);
+    ASSERT(s != NULL, "v4save did not start");
+
+    webterm_session_disconnect(s);
+    mock_clear_frames(m);
+    ASSERT(webterm_session_accept(s) == 1, "reconnect must succeed");
+    ASSERT(mock_frame(m, 0) && strstr(mock_frame(m, 0), "\"type\":\"resumed\""), "resumed frame missing");
+    ASSERT(mock_any_frame_contains(m, "v4save ready"), "history must replay");
+    ASSERT(mock_last_frame_contains(m, "\"key\":true"), "replayed frame must keep key:true");
+
+    send_key(s, 'i');
+    ASSERT(mock_last_frame_contains(m, "counter=1"), "the key must work after resume");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+}
+
+TEST(test_v4_save_restore) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = start_v4save(m);
+    ASSERT(s != NULL, "v4save did not start");
+
+    send_key(s, 'i');
+    send_key(s, 'i');
+    mock_clear_frames(m);
+    send_key(s, 's');
+    ASSERT(m->save_calls == 1 && m->save_len > 0, "save must reach the platform");
+    ASSERT(mock_any_frame_contains(m, "\"type\":\"saved\""), "saved frame missing");
+    ASSERT(mock_any_frame_contains(m, "save result 1"), "save must report success");
+
+    send_key(s, 'i');
+    mock_clear_frames(m);
+    send_key(s, 'r');
+    ASSERT(m->restore_calls == 1, "restore must read the platform's save");
+    /* a V4 restore carries on after the save instruction, with result 2 */
+    ASSERT(mock_any_frame_contains(m, "save result 2"), "restore must resume after the save");
+    mock_clear_frames(m);
+    send_key(s, 'p');
+    ASSERT(mock_last_frame_contains(m, "counter=2"), "restore must bring the counter back");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+}
+
+TEST(test_v4_quit_finishes) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s = start_v4save(m);
+    ASSERT(s != NULL, "v4save did not start");
+    ASSERT(send_key(s, 'q') == WEBTERM_DONE, "q must end the game");
+    ASSERT(mock_any_frame_contains(m, "bye"), "farewell missing");
+
+    webterm_session_destroy(s);
+    mock_free(m);
+}
+#endif /* ZVIBE_ENABLE_V4 */
+
 int main(int argc, char *argv[]) {
     if (argc > 1) {
         strncpy(g_game_dir, argv[1], sizeof(g_game_dir) - 1);
@@ -548,6 +702,11 @@ int main(int argc, char *argv[]) {
 
     snprintf(g_czech_path,      sizeof(g_czech_path),      "%sczech.z3",      g_game_dir);
     snprintf(g_restaurant_path, sizeof(g_restaurant_path), "%srestaurant.z3", g_game_dir);
+
+#if ZVIBE_ENABLE_V4
+    snprintf(g_v4save_path, sizeof(g_v4save_path),
+             "%s../../target/console/tests/data/v4save.z4", g_game_dir);
+#endif
 
     printf("webterm session tests\n");
     printf("game dir: %s\n\n", g_game_dir);
@@ -569,6 +728,15 @@ int main(int argc, char *argv[]) {
     run_test_game_reset();
     run_test_game_restart_idempotent();
     run_test_czech_conformance();
+#if ZVIBE_ENABLE_V4
+    run_test_v4_key_wait();
+    run_test_v4_key_delivery();
+    run_test_v4_line_input_ignored_during_key_wait();
+    run_test_v4_key_ignored_during_line_wait();
+    run_test_v4_resume_into_key_wait();
+    run_test_v4_save_restore();
+    run_test_v4_quit_finishes();
+#endif
 
     printf("\n=== %d/%d tests passed", g_tests_passed, g_tests_run);
     if (g_tests_failed > 0) {

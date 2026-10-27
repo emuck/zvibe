@@ -32,7 +32,7 @@ TEST_SRCS = test_session.c mock_platform.c
 
 TEST_BIN = $(BIN_DIR)/test_session
 
-.PHONY: all test test-unit test-czech clean help
+.PHONY: all test test-unit test-czech test-v4 clean help
 
 all: $(TEST_BIN)
 
@@ -44,9 +44,23 @@ $(TEST_BIN): directories $(CORE_SRCS) $(SESSION_SRC) $(TEST_SRCS)
 		$(CORE_SRCS) $(SESSION_SRC) $(TEST_SRCS) \
 		-o $@
 
-test: $(TEST_BIN)
+# The same suite with version 4 built in, plus the V4 session tests (read_char
+# as a key message, saves over 24 KB, no cartographer events for V4 stories).
+V4_BIN = $(BIN_DIR)/test_session_v4
+
+$(V4_BIN): directories $(CORE_SRCS) $(CORE_DIR)/zvibe_ops_v4.c $(SESSION_SRC) $(TEST_SRCS)
+	$(CC) $(CFLAGS) -DZVIBE_ENABLE_V4=1 -DZVIBE_MEMORY_BUFFER_SIZE=73728 $(INCLUDES) \
+		$(CORE_SRCS) $(SESSION_SRC) $(TEST_SRCS) \
+		-o $@
+
+test-v4: $(V4_BIN)
+	@echo "=== Running webterm session tests (V4 build) ==="
+	@$(V4_BIN) $(GAMES_DIR)
+
+test: $(TEST_BIN) $(V4_BIN)
 	@echo "=== Running webterm session tests ==="
 	@$(TEST_BIN) $(GAMES_DIR)
+	@$(MAKE) --no-print-directory test-v4
 	@echo "=== Tests complete ==="
 
 test-unit: test

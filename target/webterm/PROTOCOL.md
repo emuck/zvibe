@@ -20,6 +20,16 @@ Delivers one line of input to the Z-machine. Must only be sent when the
 session is waiting for input (i.e. after the `prompt` field appears in an
 `output` frame). Sending input when not prompted has no effect.
 
+### Send a key (version 4 builds)
+```json
+{"type": "key", "code": 13}
+```
+Delivers one key to a game waiting in `read_char`, as a ZSCII code: 13 Return,
+8 Delete, 27 Escape, 129-132 up/down/left/right, or the character's code. Only
+valid after an `output` frame with `"key": true`; a `key` message at any other
+time, and an `input` message while a key is awaited, have no effect. The game
+prints whatever it wants to show for the key; nothing is echoed.
+
 ### Save game
 ```json
 {"type": "save"}
@@ -69,6 +79,18 @@ means one player input produces exactly one `output` frame in response.
 The `prompt` field is present and `true` on the output frame that immediately
 precedes the Z-machine blocking for input. The client uses this to show the
 input field and `>` cursor.
+
+### Key indicator (version 4 builds)
+```json
+{"type": "output", "text": "...", "key": true}
+```
+Sent instead of `prompt` when the game waits for one key rather than a line. A
+`resumed` replay ends the same way. Version 3 builds never send it.
+
+Version 4 stories are played as a text stream: the lower window's text is
+streamed, and the upper window, cursor positioning and text styles are not drawn.
+A story that depends on them (Bureaucracy's form, for example) is playable only
+as far as its text goes. A V4 story has no status line and no cartographer events.
 
 ### Status line update
 ```json

@@ -34,7 +34,11 @@
 /** Scratch buffer for save data extraction.
  *  Z-machine v3 saves are 2-14KB for known games; 24KB gives comfortable headroom. */
 #ifndef WEBTERM_SAVE_BUF_MAX
+#if ZVIBE_ENABLE_V4
+#define WEBTERM_SAVE_BUF_MAX 65536   /* a V4 story's save can be over 20 KB */
+#else
 #define WEBTERM_SAVE_BUF_MAX 24576
+#endif
 #endif
 
 /* -------------------------------------------------------------------------
@@ -47,6 +51,8 @@ struct webterm_session_t {
     webterm_state_t     state;
     int                 client_connected;
     int                 input_pending;   /* zvibe_input() was called, ready to run */
+    int                 key_wait;        /* waiting for one key (V4 read_char), not a line */
+    int                 has_rooms;       /* the cartographer can follow this story (V3) */
 
     /* Raw output accumulation — flushed as one JSON frame on each WAIT */
     char   out_buf[WEBTERM_OUT_BUF_SIZE];
@@ -116,6 +122,15 @@ static size_t json_escape(const char *in, size_t in_len,
  * Frame emission
  * ---------------------------------------------------------------------- */
 
+/** What the game waits for after an output frame (stored in history too). */
+enum { WAIT_NONE = 0, WAIT_LINE = 1, WAIT_KEY = 2 };
+
+static const char *frame_suffix(int wait) {
+    if (wait == WAIT_LINE) return "\",\"prompt\":true}";
+    if (wait == WAIT_KEY)  return "\",\"key\":true}";
+    return "\"}";
+}
+
 /**
  * Push raw output text into the history ring buffer.
  * Stores unencoded text so entries are compact and the prompt flag is
@@ -155,14 +170,11 @@ static void send_history_entry(webterm_session_t *s, int idx) {
     pos += json_escape(s->history_text[idx], s->history_text_lens[idx],
                        buf + pos, max - pos - 32);
 
-    if (s->history_prompt[idx]) {
-        const char *suffix = "\",\"prompt\":true}";
+    {
+        const char *suffix = frame_suffix(s->history_prompt[idx]);
         size_t slen = strlen(suffix);
         memcpy(buf + pos, suffix, slen);
         pos += slen;
-    } else {
-        buf[pos++] = '"';
-        buf[pos++] = '}';
     }
 
     s->platform->send(s->platform, buf, pos);
@@ -210,14 +222,11 @@ static void flush_output(webterm_session_t *s, int prompt) {
     pos += json_escape(s->out_buf, s->out_len, buf + pos, max - pos - 32);
 
     /* Frame suffix */
-    if (prompt) {
-        const char *suffix = "\",\"prompt\":true}";
+    {
+        const char *suffix = frame_suffix(prompt);
         size_t slen = strlen(suffix);
         memcpy(buf + pos, suffix, slen);
         pos += slen;
-    } else {
-        buf[pos++] = '"';
-        buf[pos++] = '}';
     }
 
     send_output_frame(s, buf, pos, s->out_buf, s->out_len, prompt);
@@ -294,6 +303,7 @@ static zvibeContext *create_zvibe(void) {
  * here, rather than the shared interpreter core, is sufficient.
  */
 static void cart_check_room_change(webterm_session_t *s) {
+    if (!s->has_rooms) return;
     uint16_t room_id = 0;
     char name[80];
 
@@ -335,6 +345,7 @@ static void send_story_id(webterm_session_t *s) {
  * move. No-op before the first room has ever been reported.
  */
 static void cart_resume_announce(webterm_session_t *s) {
+    if (!s->has_rooms) return;
     if (s->cart_room == 0) return;
 
     uint16_t room_id = 0;
@@ -399,9 +410,10 @@ int webterm_session_accept(webterm_session_t *s) {
 
         /* Signal reconnection */
         int prompt = (s->state == WEBTERM_STATE_WAITING);
-        const char *hdr = prompt
-            ? "{\"type\":\"resumed\",\"prompt\":true}"
-            : "{\"type\":\"resumed\"}";
+        const char *hdr = !prompt
+            ? "{\"type\":\"resumed\"}"
+            : s->key_wait ? "{\"type\":\"resumed\",\"key\":true}"
+                          : "{\"type\":\"resumed\",\"prompt\":true}";
         s->platform->send(s->platform, hdr, strlen(hdr));
 
         /* Let the client key/restore its persisted Cartographer map and
@@ -451,6 +463,8 @@ webterm_result_t webterm_session_load(webterm_session_t *s,
     s->history_head  = 0;
     s->history_count = 0;
     s->input_pending = 0;
+    s->key_wait      = 0;
+    s->has_rooms     = 0;
     s->cart_room     = 0;
     s->cart_cmd_valid = 0;
     memset(s->history_prompt, 0, sizeof(s->history_prompt));
@@ -461,6 +475,9 @@ webterm_result_t webterm_session_load(webterm_session_t *s,
         return WEBTERM_ERROR;
     }
 
+    /* The cartographer reads the player's room from global 0 and its object's
+     * name, which is the version 3 convention only. */
+    s->has_rooms = data[0] <= 3;
     s->state = WEBTERM_STATE_RUNNING;
     send_story_id(s);
     return WEBTERM_OK;
@@ -500,9 +517,20 @@ webterm_result_t webterm_session_run(webterm_session_t *s) {
              * before the output frame so output remains the last (and
              * prompt-bearing) frame of the turn. */
             cart_check_room_change(s);
-            flush_output(s, 1 /* prompt */);
+            flush_output(s, WAIT_LINE);
+            s->key_wait = 0;
             s->state = WEBTERM_STATE_WAITING;
             return WEBTERM_WAIT;
+
+#if ZVIBE_ENABLE_V4
+        case ZVIBE_WAIT_FOR_CHAR:
+            /* read_char: the client answers with one key, not a line. */
+            cart_check_room_change(s);
+            flush_output(s, WAIT_KEY);
+            s->key_wait = 1;
+            s->state = WEBTERM_STATE_WAITING;
+            return WEBTERM_WAIT;
+#endif
 
         case ZVIBE_GAME_FINISHED:
             cart_check_room_change(s);
@@ -570,7 +598,7 @@ webterm_result_t webterm_session_run(webterm_session_t *s) {
 void webterm_session_on_input(webterm_session_t *s,
                                const char *text, size_t len) {
     if (!s || !text) return;
-    if (s->state != WEBTERM_STATE_WAITING) return;
+    if (s->state != WEBTERM_STATE_WAITING || s->key_wait) return;
 
     if (len > WEBTERM_INPUT_MAX) len = WEBTERM_INPUT_MAX;
 
@@ -585,6 +613,19 @@ void webterm_session_on_input(webterm_session_t *s,
     s->input_pending = 1;
     s->state = WEBTERM_STATE_RUNNING;
 }
+
+#if ZVIBE_ENABLE_V4
+void webterm_session_on_char(webterm_session_t *s, unsigned zscii) {
+    if (!s) return;
+    if (s->state != WEBTERM_STATE_WAITING || !s->key_wait) return;
+
+    s->cart_cmd_valid = 0;
+    s->key_wait = 0;
+    zvibe_input_char(s->zvibe, (uint16_t)zscii);
+    s->input_pending = 1;
+    s->state = WEBTERM_STATE_RUNNING;
+}
+#endif
 
 void webterm_session_on_save(webterm_session_t *s) {
     /* Inject "save" as player input — the game triggers ZVIBE_SAVE_REQUESTED */
@@ -602,6 +643,8 @@ void webterm_session_on_reset(webterm_session_t *s) {
     s->history_head  = 0;
     s->history_count = 0;
     s->input_pending = 0;
+    s->key_wait      = 0;
+    s->has_rooms     = 0;
     s->cart_room     = 0;
     s->cart_cmd_valid = 0;
     s->state         = WEBTERM_STATE_IDLE;

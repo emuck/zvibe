@@ -371,9 +371,14 @@ static posix_platform_t g_platform = {
  * Game file management
  * ========================================================================= */
 
-/* Max Z-machine v3 story size (128 KB).  Game data must outlive the session,
- * so we keep a single static buffer for the currently loaded game. */
+/* Max story size: 128 KB for version 3, 256 KB when version 4 is built in.
+ * Game data must outlive the session, so we keep a single static buffer for the
+ * currently loaded game. */
+#if ZVIBE_ENABLE_V4
+#define MAX_Z3_SIZE (256 * 1024)
+#else
 #define MAX_Z3_SIZE (128 * 1024)
+#endif
 static uint8_t g_game_buf[MAX_Z3_SIZE];
 static size_t  g_game_size;
 
@@ -388,7 +393,11 @@ static int build_games_json(const char *dir, char *out, size_t max) {
         struct dirent *e;
         while ((e = readdir(d)) != NULL) {
             size_t nlen = strlen(e->d_name);
-            if (nlen > 3 && strcmp(e->d_name + nlen - 3, ".z3") == 0) {
+            if (nlen > 3 && (strcmp(e->d_name + nlen - 3, ".z3") == 0
+#if ZVIBE_ENABLE_V4
+                             || strcmp(e->d_name + nlen - 3, ".z4") == 0
+#endif
+                             )) {
                 pos += (size_t)snprintf(out + pos, max - pos,
                     "%s\"%s\"", count ? "," : "", e->d_name);
                 count++;
@@ -477,6 +486,12 @@ static void dispatch_frame(webterm_session_t *s, const char *game_dir,
         char text[WEBTERM_INPUT_MAX + 1];
         if (json_str(json, "text", text, sizeof(text)))
             webterm_session_on_input(s, text, strlen(text));
+
+#if ZVIBE_ENABLE_V4
+    } else if (strcmp(type, "key") == 0) {
+        const char *p = strstr(json, "\"code\":");
+        if (p) webterm_session_on_char(s, (unsigned)atoi(p + 7));
+#endif
 
     } else if (strcmp(type, "load") == 0) {
         char game[256];

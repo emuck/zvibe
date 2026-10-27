@@ -352,8 +352,7 @@ each is a separate commit.
      covers the opcodes and streams directly; `test_screen.c` the layer alone.
 
    **Deferred from this slice:**
-   - Frontend migrations are separate work: RISC-V firmware and webterm (128 KB
-     and `.z3`-only limits). The console and the SAME51 single-game firmware are
+   - Frontend migrations are separate work: RISC-V firmware. The console and the SAME51 single-game firmware are
      done, see below.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
@@ -380,7 +379,15 @@ each is a separate commit.
      `v4bigsave.z4` (21 KB save) pass their scripts; a save from another release
      of a story is refused.
    - Bureaucracy (r116) played on the board with a real save and restore: verified.
-   - Not yet done: the multi-game SAME51 firmware, RISC-V firmware and webterm.
+   - Not yet done: the multi-game SAME51 firmware and RISC-V firmware.
+8. **Webterm.** The session layer plays V4 stories as a text stream in a
+   `ZVIBE_ENABLE_V4` build: `ZVIBE_WAIT_FOR_CHAR` becomes an `output` frame with
+   `"key":true` and the client answers `{"type":"key","code":ZSCII}`
+   (`webterm_session_on_char`). The 64 KB save buffer, 256 KB story buffer and
+   `.z4` discovery are V4-only. The cartographer is limited to V3 stories (global 0
+   is not the location in V4). No upper window, cursor addressing or styles are
+   rendered in the browser; that needs a terminal emulator and is deferred.
+   `make -C target/webterm/tests test` runs the suite in both builds.
 7. **Regression and playthroughs.**
 
 ### Proving "zero cost"
