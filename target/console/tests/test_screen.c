@@ -304,10 +304,32 @@ static void test_upper_reselect_homes(void) {
     CHECK(grid[1][4] == ' ');
 }
 
-static void test_split_leaves_two_lower_lines(void) {
-    puts("== split clamps so DECSTBM stays valid ==");
+static void test_split_leaves_one_lower_line(void) {
+    puts("== a split may leave the lower window one row ==");
     fresh();
-    zscreen_split_window(&scr, 23);
+    zscreen_split_window(&scr, ROWS - 1);
+    CHECK(scr.upper_lines == ROWS - 1);              /* the requested height, not clamped to ROWS - 2 */
+    CHECK(bad_region == 0);
+    zscreen_set_window(&scr, 1);
+    zscreen_set_cursor(&scr, ROWS - 1, 1);
+    zscreen_puts(&scr, "UP");
+    zscreen_set_window(&scr, 0);
+    zscreen_puts(&scr, "a\nb\nc\n");
+    zscreen_flush(&scr);
+    CHECK(grid[ROWS - 2][0] == 'U' && grid[ROWS - 2][1] == 'P');   /* upper window untouched by lower output */
+    CHECK(grid[ROWS - 1][0] == ' ');                 /* the lower row was cleared by each newline */
+    zscreen_puts(&scr, "last");
+    zscreen_flush(&scr);
+    CHECK(grid[ROWS - 1][0] == 'l');
+    CHECK(grid[ROWS - 2][0] == 'U');
+    zscreen_split_window(&scr, 200);                 /* larger than the screen still keeps a lower row */
+    CHECK(scr.upper_lines == ROWS - 1);
+}
+
+static void test_split_leaves_two_lower_lines(void) {
+    puts("== a two-row lower window uses a valid scroll region ==");
+    fresh();
+    zscreen_split_window(&scr, ROWS - 2);
     CHECK(scr.upper_lines == ROWS - 2);
     CHECK(bad_region == 0);
     zscreen_puts(&scr, "a\nb\nc\n");
@@ -401,6 +423,7 @@ int main(void) {
     test_flush_midline_keeps_words_whole();
     test_upper_reselect_homes();
     test_split_leaves_two_lower_lines();
+    test_split_leaves_one_lower_line();
     test_echo_edges();
     test_bce_hygiene();
     test_dirty_init_and_bounds();

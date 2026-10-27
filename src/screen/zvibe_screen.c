@@ -48,8 +48,8 @@ static void sync_style(zscreen *s, uint8_t want) {
 
 /* DECSTBM homes the cursor, so callers must reposition afterwards */
 static void term_set_region(zscreen *s) {
-    if (s->upper_lines == 0) {
-        put_str(s, "\033[r");
+    if (s->upper_lines == 0 || s->rows - s->upper_lines < 2) {
+        put_str(s, "\033[r");           /* a one-row lower window cannot be a DECSTBM region */
     } else {
         s->put(ESC); s->put('[');
         put_num(s, (uint8_t)(s->upper_lines + 1)); s->put(';');
@@ -65,6 +65,15 @@ static void goto_current(zscreen *s) {
 
 static void lower_newline(zscreen *s) {
     sync_style(s, 0);              /* keep reverse out of scrolled-in blank lines */
+    if (s->rows - s->upper_lines < 2) {
+        /* One lower row and no scroll region: scrolling it is clearing it, and a
+         * real newline would scroll the upper window away. */
+        term_goto(s, s->lower_row, 1);
+        put_str(s, "\033[K");
+        s->lower_col = 1;
+        s->at_boundary = 1;
+        return;
+    }
     s->put('\r'); s->put('\n');    /* at the region's last row this scrolls */
     if (s->lower_row < s->rows) s->lower_row++;
     s->lower_col = 1;
@@ -205,7 +214,7 @@ void zscreen_flush(zscreen *s) {
 
 void zscreen_split_window(zscreen *s, uint8_t lines) {
     zscreen_flush(s);
-    if (lines > s->rows - 2) lines = (uint8_t)(s->rows - 2);   /* DECSTBM needs >= 2 lines */
+    if (lines > s->rows - 1) lines = (uint8_t)(s->rows - 1);   /* the lower window keeps a row */
     s->upper_lines = lines;
     term_set_region(s);
     if (s->lower_row < lines + 1) {              /* lower cursor swallowed by the new upper window */

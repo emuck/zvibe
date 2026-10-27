@@ -357,9 +357,8 @@ each is a separate commit.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
    - Timed input.
-   - `split_window` is clamped to `rows - 2` lines (DECSTBM needs a lower
-     window of at least two rows); a story that splits off all but one row gets
-     a shorter upper window than it asked for.
+   - (Done) `split_window` honors up to `rows - 1` lines; a one-row lower window
+     has no scroll region and clears its row instead of scrolling.
    - The console's V4 player has no horizontal scrolling in its line editor
      and is POSIX only.
    - A V4 madlibs story as an acceptance demo.
