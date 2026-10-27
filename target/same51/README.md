@@ -254,6 +254,7 @@ memory plus about 5 KB. A V4 story's full save can be over 20 KB (Bureaucracy), 
 than the 16 KB SmartEEPROM, so the firmware stores it packed against the story in
 flash: only the bytes the game has changed (`delta_pack` in `save_delta.c`). If the
 changes still do not fit, the save fails cleanly and the previous save is kept.
+Save and restore of Bureaucracy has been verified on the board.
 `terminal_io.c` holds the interrupt-driven receive ring and key decoding that
 the screen demo shares.
 

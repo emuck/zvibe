@@ -379,8 +379,8 @@ each is a separate commit.
      console; `v4screen.z4` (screen), `v4save.z4` (save/restore/reset) and
      `v4bigsave.z4` (21 KB save) pass their scripts; a save from another release
      of a story is refused.
-   - Not yet done: playing Bureaucracy through with a real save on the board;
-     the multi-game SAME51 firmware, RISC-V firmware and webterm.
+   - Bureaucracy (r116) played on the board with a real save and restore: verified.
+   - Not yet done: the multi-game SAME51 firmware, RISC-V firmware and webterm.
 7. **Regression and playthroughs.**
 
 ### Proving "zero cost"
