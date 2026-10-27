@@ -332,7 +332,9 @@ each is a separate commit.
    - `target/console/zvibe_v4term.c` is the reference frontend. `zvibe_console`
      hands a V4 story to it when stdin and stdout are terminals and no `-s`
      script is given (POSIX only; V3 stories and piped runs keep the plain
-     path, which also draws the V3 status bar over a V4 story). It sizes the
+     path; for a V4 story that path now draws no status bar or screen clearing
+     and `read_char` takes keys from the script, where a line is a run of keys and
+     an empty line is Return, or from stdin; `tests/test_v4_plain.sh`). It sizes the
      screen from the terminal, edits input lines itself, maps cursor keys to
      ZSCII, honours `-t`, `-c`, `-r`, and saves like the console.
    - **Cost** of enabling V4 on top of V3 (SAM E51 `-O2`, RISC-V `-O1`): about

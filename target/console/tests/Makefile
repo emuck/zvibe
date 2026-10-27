@@ -256,6 +256,10 @@ test-czech-v4: ensure-binaries
 	@echo "Running Czech V4 conformance test..."
 	./test_czech_v4.sh
 
+# V4 story on the plain (non-tty) console path; needs the V4 console build.
+test-v4-plain:
+	./test_v4_plain.sh
+
 test-plundered: ensure-binaries
 	@echo "Running Plundered Hearts integration test..."
 	./test_script.sh plunderedhearts
