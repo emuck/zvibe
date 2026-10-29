@@ -14,8 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `call_vs2`, `read_char`, `scan_table`, `erase_window`/`erase_line`, cursor,
   text style, buffering, output stream 3), V4 save and restore results, and the
   header fields a V4 story reads. See `docs/V4_DESIGN.md`.
-- Web terminal: V4 stories play as a text stream when built with `ZVIBE_ENABLE_V4=1`
-  (`read_char` as a `key` message, `.z4` discovery, larger story and save buffers).
+- Web terminal: V4 stories play with their own screen when built with `ZVIBE_ENABLE_V4=1`:
+  `screen` frames carry the ANSI screen layer's bytes and `zterm.js` draws them; `read_char`
+  is a `key` message; `.z4` discovery, larger story and save buffers.
 - An ANSI/VT100 screen layer (`src/screen`) and a public screen interface
   (`zvibe_screen_ops.h`, `zvibe_set_screen`) for split windows, cursor addressing and styles.
 - The console plays V4 stories full-screen on a terminal.

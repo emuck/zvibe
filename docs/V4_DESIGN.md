@@ -380,15 +380,16 @@ each is a separate commit.
      of a story is refused.
    - Bureaucracy (r116) played on the board with a real save and restore: verified.
    - Not yet done: the multi-game SAME51 firmware and RISC-V firmware.
-8. **Webterm.** The session layer plays V4 stories as a text stream in a
-   `ZVIBE_ENABLE_V4` build: `ZVIBE_WAIT_FOR_CHAR` becomes an `output` frame with
-   `"key":true` and the client answers `{"type":"key","code":ZSCII}`
-   (`webterm_session_on_char`). The 64 KB save buffer, 256 KB story buffer and
-   `.z4` discovery are V4-only. The cartographer is limited to V3 stories (global 0
-   is not the location in V4). No upper window, cursor addressing or styles are
-   rendered in the browser; that needs a terminal emulator and is deferred.
-   `make -C target/webterm/tests test` runs the suite in both builds.
-7. **Regression and playthroughs.**
+8. **Webterm.** In a `ZVIBE_ENABLE_V4` build a V4 story gets a 24x80 ANSI screen
+   layer in the session; its terminal bytes go to the browser in `screen` frames
+   and `zterm.js` (a small VT100 emulator, checked against the console tests' C
+   emulator) draws them, echoes typed characters and sends `input` and `key`
+   messages. The server echoes only the newline after a line, so both sides agree
+   on the cursor. Reconnecting replays the bytes since the last full clear. The
+   64 KB save buffer, 256 KB story buffer and `.z4` discovery are V4-only; the
+   cartographer follows V3 stories only. Not done: a keyboard for phones, window
+   resizing (the size is fixed by the server), scrollback of the lower window, and
+   `zvibe-duo.html`. `make -C target/webterm/tests test` runs everything.
 
 ### Proving "zero cost"
 

@@ -36,7 +36,7 @@ SRCS := \
 # V=4 builds version 4 support in (the story header picks 3 or 4 at run time).
 # The memory buffer must hold a V4 story's dynamic memory.
 ifeq ($(V4),1)
-SRCS    += $(ZVIBE_ROOT)/src/core/zvibe_ops_v4.c
+SRCS    += $(ZVIBE_ROOT)/src/core/zvibe_ops_v4.c $(ZVIBE_ROOT)/src/screen/zvibe_screen.c
 CFLAGS  += -DZVIBE_ENABLE_V4=1 -DZVIBE_MEMORY_BUFFER_SIZE=73728
 endif
 

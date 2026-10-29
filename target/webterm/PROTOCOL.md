@@ -20,13 +20,13 @@ Delivers one line of input to the Z-machine. Must only be sent when the
 session is waiting for input (i.e. after the `prompt` field appears in an
 `output` frame). Sending input when not prompted has no effect.
 
-### Send a key (version 4 builds)
+### Send a key (version 4 stories)
 ```json
 {"type": "key", "code": 13}
 ```
 Delivers one key to a game waiting in `read_char`, as a ZSCII code: 13 Return,
 8 Delete, 27 Escape, 129-132 up/down/left/right, or the character's code. Only
-valid after an `output` frame with `"key": true`; a `key` message at any other
+valid after a `screen` frame with `"key": true`; a `key` message at any other
 time, and an `input` message while a key is awaited, have no effect. The game
 prints whatever it wants to show for the key; nothing is echoed.
 
@@ -80,17 +80,34 @@ The `prompt` field is present and `true` on the output frame that immediately
 precedes the Z-machine blocking for input. The client uses this to show the
 input field and `>` cursor.
 
-### Key indicator (version 4 builds)
+### Screen frames (version 4 stories)
 ```json
-{"type": "output", "text": "...", "key": true}
+{"type": "screen", "reset": true, "rows": 24, "cols": 80}
+{"type": "screen", "data": "\u001b[1;1H...", "prompt": true}
+{"type": "screen", "data": "...", "key": true}
 ```
-Sent instead of `prompt` when the game waits for one key rather than a line. A
-`resumed` replay ends the same way. Version 3 builds never send it.
+A version 4 story draws its own screen (an upper window, cursor positioning,
+text styles), so it is not sent as `output` text. The server runs the ANSI
+screen layer (`src/screen/zvibe_screen.c`) on a `rows` x `cols` screen and sends
+its terminal bytes in `data`; the client draws them with a small VT100 emulator
+(`zterm.js`). The bytes use only cursor positioning (`CSI H`), erase (`CSI J`,
+`CSI K`), scroll regions (`CSI r`), SGR 0/1/4/7, auto-wrap switching (`CSI ?7h/l`),
+CR, LF and BS.
 
-Version 4 stories are played as a text stream: the lower window's text is
-streamed, and the upper window, cursor positioning and text styles are not drawn.
-A story that depends on them (Bureaucracy's form, for example) is playable only
-as far as its text goes. A V4 story has no status line and no cartographer events.
+- `reset` (no `data`) is sent when a story loads, and again on reconnect before
+  the replay: the client discards its screen, sizes a new one and draws what
+  follows. `story` and `resumed` frames work as for version 3.
+- A long run of output is split over several `screen` frames of at most 1024
+  bytes; an escape sequence may be split between frames.
+- `prompt` and `key` mark the last frame before the game waits for a line or for
+  one key, as for `output` frames.
+- **Echo:** the client echoes the characters the player types into its own screen
+  (a Return sends `{"type":"input","text":...}`); the server does not echo them
+  back but moves to the next line itself, so the first bytes after an `input` are
+  the newline. The client limits a line to the columns left on the cursor's row.
+- A reconnecting client is sent the bytes since the story last cleared the whole
+  screen (or the most recent history if that is longer than the history ring).
+- Version 3 stories still use `output` frames, `status` and `room`.
 
 ### Status line update
 ```json

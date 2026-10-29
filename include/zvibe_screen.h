@@ -74,7 +74,7 @@ void zscreen_shutdown(zscreen *s);
 
 /* ---- Opcode-level operations ---- */
 
-/** The lower window always keeps at least 2 lines (lines is clamped to rows-2) */
+/** The lower window always keeps at least 1 line (lines is clamped to rows-1) */
 void zscreen_split_window(zscreen *s, uint8_t lines);
 void zscreen_set_window(zscreen *s, uint8_t window);
 /** window: 0 lower, 1 upper, -1 unsplit + clear all, -2 clear all keep split */
