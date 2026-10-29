@@ -110,8 +110,8 @@ configs and the measured firmware sizes in `CODE_SIZE_ANALYSIS.md`.
   the used stack, and the changed dynamic bytes, and it must fit in 2,036 B.
   Restaurant fits. A V4 story that changes more state between start and save
   may not.
-- **Outlook:** a limited V4 target: small stories such as the madlibs piece and
-  `czech.z4`, not the Infocom V4 titles.
+- **Outlook:** a limited V4 target: small stories such as `czech.z4`; Bureaucracy
+  runs on the SAM E51 with `V4_RAM` 32 KB and packed saves.
 
 ## Cross-cutting issues
 

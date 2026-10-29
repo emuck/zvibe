@@ -56,14 +56,11 @@ fields (`zscreen`, 184 bytes).
    `target/same51/src/screen_demo.c`, `make screen-demo`). Built and passing on
    the host. Next step: run the exerciser on the SAME51 and check the criteria
    below.
-2. **Standalone Inform 6 `-v4` madlibs story** (form in the upper window,
-   answers reused for Douglas-Adams-style humour). Reassessed: it is an
-   acceptance demo for after the core work, **not a gate**. It would exercise
-   the screen opcodes, V4 `read`, and a few objects and properties end to end,
-   but it would not retire the risks that matter for real V4 games: object ids
-   above 255, 64-byte properties, output stream 3, restored-save result 2, or
-   memory fit. The V4 gate for the core is the **Czech conformance suite built
-   for V4** (below).
+2. **Acceptance demo.** A standalone madlibs story was considered and dropped:
+   Bureaucracy (a real V4 form game) plays through, saves and restores on the
+   SAM E51, which covers the screen opcodes, V4 `read` and `read_char` end to
+   end. The V4 gate for the core is the **Czech conformance suite built for V4**
+   (below).
 
 **V4 core gate:** `czech.z4` must run under zvibe with the same result as frotz.
 Czech 0.8 (IF Archive, `infocom/interpreters/tools/czech_0_8.zip`) compiles for
@@ -175,8 +172,7 @@ confirmed on 2026-10-25. Styles, wrapping, layout and the other phases behave
 the same as in terminal 1. Two terminal programs with different scroll-region
 handling now agree.
 
-Green-light status: every criterion above is met except the Stage 3 madlibs
-story transcript, which has not been written yet.
+Green-light status: every criterion above is met.
 
 ## UART requirements checklist (SAME51, 2026-10-25)
 
