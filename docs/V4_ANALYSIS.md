@@ -208,8 +208,10 @@ stops at the right edge instead of wrapping input).
 - `erase_window(-2)` resets the upper cursor; frotz preserves it. Upper-window
   newline at the last row stays on that row; frotz returns to the top-left.
   Both are compatibility choices to revisit against real V4 games.
-- The lower window keeps at least 2 lines (`split_window` is clamped to
-  rows-2) because DECSTBM rejects a one-line region.
+- The lower window keeps at least 1 line (`split_window` is clamped to
+  rows-1). A one-row lower window has no scroll region, because DECSTBM rejects
+  one, so the layer clears its row instead of scrolling. (This analysis first
+  clamped to rows-2; `docs/V4_DESIGN.md` has the current behavior.)
 - Minimum terminal width is 56 columns; maximum is `ZSCREEN_MAX_COLS` (80).
 
 ## Adversarial review (Codex, 2026-10-22)

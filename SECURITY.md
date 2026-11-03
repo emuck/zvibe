@@ -21,7 +21,8 @@ opcodes, but a deliberately corrupted story can still make it read outside its
 buffers (the dictionary and object-table lookups are not range-checked) or follow a
 null pointer. `scripts/fuzz_story.c` finds these; see "Corrupt stories" in
 [docs/V4_DESIGN.md](docs/V4_DESIGN.md) for what is fixed and what remains. Do not
-run story files from untrusted sources on a device that holds secrets.
+run story files from untrusted sources on a device that holds secrets. Range-checking
+those lookups is a possible future hardening step.
 
 Save file restoration validates a CRC32 before applying any delta. Corrupted
 saves are rejected.

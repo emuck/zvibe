@@ -36,7 +36,7 @@ erase, and auto-wrap. Covers split-window scrolling, word wrap, upper-window
 clipping, erase semantics, text styles, input echo at the right edge, and
 dimension validation.
 
-**Expected:** 70 checks pass. The board-side counterpart is
+**Expected:** 97 checks pass. The board-side counterpart is
 `make screen-demo` in `target/same51` (see [V4 Feasibility](V4_ANALYSIS.md)).
 
 ### V4 screen and stream opcodes

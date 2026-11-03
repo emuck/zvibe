@@ -97,7 +97,7 @@ The `RESTART` command resets the game to its initial state:
 
 The interpreter halts on:
 - Invalid story file format
-- Unsupported Z-machine version (only v3 supported)
+- Unsupported Z-machine version (version 3; version 4 only in a build with `ZVIBE_ENABLE_V4=1`)
 - Stack overflow
 - Memory access out of bounds
 

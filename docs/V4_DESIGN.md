@@ -378,7 +378,11 @@ each is a separate commit.
      object lookup reads past the memory buffer for a corrupt object table address) and
      null-pointer reads where `zmem_get_ptr` refuses an address (corrupt object,
      property and dictionary addresses, abbreviations). A well-formed story never
-     reaches any of these.
+     reaches any of these. **Future option:** range-check the dictionary and object
+     lookups and the `zmem_get_ptr` results (about 50 more bytes of flash in every
+     V3 build, by the earlier measurements), re-running the fuzzer until it is
+     clean. Deliberately left out of the first V4 release; stories are treated as
+     trusted input (see `SECURITY.md`).
    - (Done) The tests Codex proposed for this slice: nested stream limits, `scan_table`
      variants, restart under the real ANSI layer, a dirty-terminal init, and a
      pseudo-terminal test of the player (which found and fixed a lost key after Escape).
