@@ -249,5 +249,6 @@ See LICENSE and target/riscv/serv_zvibe/LICENSE for details.
 - Martin R. Raumann (primary developer)
 - Ryan C. Gordon (mojozork original implementation)
 
+[2.1.0]: https://github.com/emuck/zvibe/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/emuck/zvibe/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/emuck/zvibe/releases/tag/v1.0.0
