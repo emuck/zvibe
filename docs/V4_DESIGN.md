@@ -390,7 +390,7 @@ each is a separate commit.
    messages. The server echoes only the newline after a line, so both sides agree
    on the cursor. Reconnecting replays the bytes since the last full clear. The
    64 KB save buffer, 256 KB story buffer and `.z4` discovery are V4-only; the
-   cartographer follows V3 stories only. Not done: a keyboard for phones, window
+   cartographer follows V3 stories only. Future upgrade: phone keyboard (a hidden focused input and on-screen arrow/Escape keys; the page takes keys from `keydown`, so no keyboard appears on a phone). Not done: window
    resizing (the size is fixed by the server), scrollback of the lower window, and
    `zvibe-duo.html`. `make -C target/webterm/tests test` runs everything.
 

@@ -194,8 +194,10 @@ screen: it draws the bytes, echoes typed characters, and sends lines and
 `read_char` keys. The upper window, cursor addressing and styles all work, so
 Bureaucracy's form plays. A platform's page needs `<script src="zterm.js">`, a
 host element for `new ZTerm(el, send)`, and handling of `screen` frames as in
-`platform/posix/www/zvibe.html`. `zvibe-duo.html` is version 3 only. There is no
-keyboard for phones yet (keys come from the document's `keydown`). The cartographer follows version 3 stories only.
+`platform/posix/www/zvibe.html`. `zvibe-duo.html` is version 3 only. On a phone the
+keyboard does not appear yet: keys come from the document's `keydown`, and nothing is
+focused. Planned upgrade: a hidden input that takes focus on a tap and is read through
+`input` events, plus on-screen arrow and Escape keys. The cartographer follows version 3 stories only.
 
 `make test` also runs the session tests in a V4 build (`make test-v4`) and the
 screen tests (`make test-screen`: the screen frames drawn by the console tests'
