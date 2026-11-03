@@ -97,7 +97,7 @@
 #endif
 
 /** @brief Public API version string */
-#define ZVIBE_VERSION "0.1.0"
+#define ZVIBE_VERSION "2.1.0"
 
 /**
  * @brief Result codes for API functions

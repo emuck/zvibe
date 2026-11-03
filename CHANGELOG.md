@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-02
 
 ### Added
 - Z-machine version 4 support, selected at build time with `ZVIBE_ENABLE_V4=1`
@@ -24,7 +24,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   packed against the story so that saves larger than the SmartEEPROM fit.
 - Czech V4 conformance gate, and V4 test stories with hardware test scripts.
 
+### Changed
+- The opcode dispatch tables are `const`: a V3-only build is about 150 bytes smaller in
+  flash and 390 bytes smaller in RAM on the SAM E51 (`scripts/core_size.sh` measures it).
+  Apart from the dictionary fix below, a V3-only build contains no V4 code.
+- The interpreter stack is configurable with `ZVIBE_STACK_WORDS`; `restore` refuses a save
+  made with a larger stack instead of copying past it.
+- `make validate-v4` and the webterm tests run in CI; `make test-integration` skips the
+  optional downloaded games when they are not present.
+
 ### Fixed
+- Three bugs that V3 had as well as V4: a character outside the alphabets (such as `@`)
+  was dropped when a word was encoded for the dictionary, and a shift past the length limit
+  displaced a later letter; an empty dictionary made the lookup read far past its end; and
+  `print_obj` of an object with no short name ran on into the next property. The fixes cost
+  about 60 bytes of flash on the SAM E51 (200 on RISC-V).
 - Czech Z-machine test suite attribution and license. It was described as public
   domain and credited to another author; the upstream Czech v0.8 distribution
   says Copyright (C) 2003 Amir Karger, free to use, distribute and modify with

@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/emuck/zvibe/actions/workflows/ci.yml/badge.svg)](https://github.com/emuck/zvibe/actions/workflows/ci.yml)
 
-Z-machine version 3 interpreter for resource-constrained embedded systems.
+Z-machine version 3 interpreter for resource-constrained embedded systems, with optional version 4 support.
 
 **[Project page →](https://emuck.github.io/zvibe/)**
 
@@ -10,7 +10,7 @@ Z-machine version 3 interpreter for resource-constrained embedded systems.
 
 ## Description
 
-zVibe is a Z-machine v3 interpreter written in C targeting microcontrollers
+zVibe is a Z-machine v3 interpreter (with version 4 as a build option) written in C targeting microcontrollers
 and FPGA soft-cores. The Z-machine engine uses a 16KB static buffer; supported
 embedded targets require 32KB total RAM for firmware, engine, and stack. It uses a split memory model
 that keeps only the dynamic portion of a story file in RAM while reading static
@@ -26,7 +26,7 @@ The Z-machine core is derived from prior work; attribution in [THIRD_PARTY_NOTIC
 
 ## Goals
 
-- **Z-machine v3 only.** v3 is the last version where the full spec fits a static-allocation model. V5 and later add undo, extended opcodes, and larger tables that strain the static-allocation model. v4 does not need those and is under evaluation — *Bureaucracy* and *Trinity* are good reasons to revisit. See [docs/V4_ANALYSIS.md](docs/V4_ANALYSIS.md) and [docs/V4_DESIGN.md](docs/V4_DESIGN.md).
+- **Z-machine v3, and v4 as a build option.** v3 is the last version where the full spec fits a static-allocation model, so it stays the default and is as small as it ever was. v4 (*Bureaucracy*, *Trinity*, *A Mind Forever Voyaging*) needs no undo or extended opcodes, so it is compiled in with `ZVIBE_ENABLE_V4=1`; a V3-only build contains none of it. V5 and later add undo, extended opcodes, and larger tables that strain the static-allocation model and are out of scope. See [docs/V4_DESIGN.md](docs/V4_DESIGN.md).
 - **Minimal RAM.** The interpreter must run on targets with 32KB of working memory.
 - **No heap allocation.** All state is statically sized; no `malloc` at runtime.
 - **Single C library.** Platform-specific code is isolated to thin HAL layers.
@@ -37,16 +37,26 @@ The Z-machine core is derived from prior work; attribution in [THIRD_PARTY_NOTIC
 ```
 src/core/       Z-machine interpreter (platform-agnostic C99)
 src/api/        Public C API (zvibe_api.h)
+src/screen/     ANSI/VT100 screen layer for V4 split windows (optional)
 target/console/ Desktop frontend — Linux, macOS, Windows
 target/same51/  SAM E51 Cortex-M4 port
 target/riscv/   SERV RISC-V soft-core (MAX10 and Arty S7-50)
+target/webterm/ Web terminal session layer and POSIX server
 ```
+
+| Target | Version 3 | Version 4 |
+|---|---|---|
+| Console (Linux, macOS) | yes | yes — full-screen terminal player |
+| Console (Windows) | yes | plain line mode only |
+| SAM E51 | yes | yes — single-game firmware (`make v4`), saves packed against the story |
+| RISC-V (MAX10, Arty S7-50) | yes | not yet |
+| Web terminal | yes | yes — screen drawn in the browser (`zterm.js`) |
 
 Memory layout at runtime:
 
 ```
 ┌──────────────────────┐
-│   Dynamic memory     │  → RAM   (2–14 KB for v3 stories; all known titles fit in 16 KB)
+│   Dynamic memory     │  → RAM   (2–14 KB for v3 stories, all known titles fit in 16 KB; v4 stories need more, e.g. Bureaucracy about 18 KB)
 ├──────────────────────┤
 │   Static memory      │  → Flash / XIP (read in place)
 └──────────────────────┘
@@ -127,6 +137,20 @@ make test-czech
 
 # Console build + unit tests + czech suite (matches CI)
 make validate
+
+# The same with version 4 compiled in, plus the Czech V4 gate (386 tests, as frotz)
+make validate-v4
+
+# Web terminal session and screen tests
+make -C target/webterm/tests test
+```
+
+Playing a version 4 story needs a build with V4 enabled:
+
+```bash
+cd target/console
+make BUILD_DIR=build_v4 EXTRA_CFLAGS=-DZVIBE_ENABLE_V4=1
+./build_v4/bin/zvibe_console path/to/story.z4     # full-screen on a terminal
 ```
 
 RTL simulation for the RISC-V target requires Verilator and runs separately:
@@ -137,15 +161,19 @@ make sim-tier1    # Unit + SoC tests (~30 s)
 
 ## Status
 
-The interpreter is stable and handles the full Z-machine v3 opcode set.
-All four targets build and run end-to-end. The RISC-V targets have been
-validated on physical hardware.
+The interpreter is stable and handles the full Z-machine v3 opcode set, and
+version 4 when built with it. All targets build and run end-to-end. The RISC-V
+targets have been validated on physical hardware, and the SAM E51 V4 firmware on
+a Curiosity Nano (the Czech V4 gate, and *Bureaucracy* played through with save and
+restore). Known limits are listed in [docs/V4_DESIGN.md](docs/V4_DESIGN.md).
 
 **Active work:**
 - Regression suite expansion
+- Version 4 on the RISC-V targets, and a multi-game SAM E51 V4 firmware
 
 **Out of scope:**
-- Z-machine v5 and later (v4 is under evaluation; see docs/V4_ANALYSIS.md)
+- Z-machine v5 and later
+- Timed input (optional in the standard)
 - Networking or multiplayer
 
 ## License
@@ -164,7 +192,7 @@ Good starting points — no embedded hardware required for most:
 - **Unit test coverage** — `test_split_memory.c` covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet
 - **Console target improvements** — status line rendering, save file compatibility, platform edge cases
 - **New board port** — `docs/TARGETS.md` has a porting checklist; any target with 32 KB RAM and XIP-accessible flash is a candidate
-- **v4 groundwork** — *Bureaucracy* and *Trinity* are the motivation; the plan and ordered slices are in [docs/V4_DESIGN.md](docs/V4_DESIGN.md), and the first slice (const opcode tables) is independent of V4 itself
+- **v4 on more targets** — the plan, the slices already done and the deferred items are in [docs/V4_DESIGN.md](docs/V4_DESIGN.md); the RISC-V firmware and a phone keyboard for the web terminal are open
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and PR checklist.
 Bugs and feature requests: [GitHub Issues](https://github.com/emuck/zvibe/issues).
