@@ -230,11 +230,11 @@ test-integration: ensure-binaries
 	@echo "Running Czech Z3 functionality test..."
 	@./test_czech.sh
 	@echo
-	@echo "Running Plundered Hearts integration test..."
-	@./test_script.sh plunderedhearts
+	@echo "Running Plundered Hearts integration test (skipped if the game is not downloaded)..."
+	@./test_script.sh plunderedhearts --skip-missing
 	@echo
-	@echo "Running Seastalker integration test..."
-	@./test_script.sh seastalker
+	@echo "Running Seastalker integration test (skipped if the game is not downloaded)..."
+	@./test_script.sh seastalker --skip-missing
 	@echo
 	@echo "Running Restaurant at the End of the Universe integration test..."
 	@./test_script.sh restaurant

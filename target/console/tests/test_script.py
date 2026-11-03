@@ -381,6 +381,10 @@ def main():
     game_file   = os.path.join(CATALOG_DIR, cfg["file"])
     script_file = os.path.join(SCRIPTS_DIR, cfg["script"])
 
+    if not os.path.isfile(game_file) and "--skip-missing" in sys.argv[2:]:
+        print(f"SKIPPED {game_name}: {cfg['file']} is not in games/catalog (download it with games/get_games.py)")
+        sys.exit(0)
+
     if not os.path.isfile(game_file):
         die(f"Game file not found: {game_file}\n"
             f"Download it first: cd games && ./get_games.py browse")
