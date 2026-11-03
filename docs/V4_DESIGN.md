@@ -363,6 +363,18 @@ each is a separate commit.
      has no scroll region and clears its row instead of scrolling.
    - The console's V4 player has no horizontal scrolling in its line editor
      and is POSIX only.
+   - **Corrupt stories.** `scripts/fuzz_story.c` mutates a story and runs it under
+     ASan/UBSan. It found (all in code V3 shares, none specific to V4): the `random`
+     opcode's signed overflow (fixed, same sequence, same object code); null pointers
+     where `zmem_get_ptr` refuses an address (reads of a corrupt object table or
+     dictionary, a global variable outside dynamic memory); `z_var_addr` reading
+     `stack_mem[-1]` for a local variable in the main routine; a misaligned stack
+     store; and one AddressSanitizer **global-buffer-overflow in `op_call`** (a
+     corrupted `base_ptr`/`stack_ptr` after a bad return), reproduced with a mutated
+     `czech.z4`, root cause not yet found. A well-formed story never reaches these;
+     a corrupt or hostile one can crash the interpreter and, in the last case, write
+     outside the buffer. `SECURITY.md` says memory accesses are bounds-checked, which
+     is not yet true for that case.
    - (Done) The tests Codex proposed for this slice: nested stream limits, `scan_table`
      variants, restart under the real ANSI layer, a dirty-terminal init, and a
      pseudo-terminal test of the player (which found and fixed a lost key after Escape).
