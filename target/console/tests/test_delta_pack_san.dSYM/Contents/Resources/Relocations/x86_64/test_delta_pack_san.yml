@@ -1,5 +1,0 @@
----
-triple:          'x86_64-apple-darwin'
-binary-path:     test_delta_pack_san
-relocations:     []
-...

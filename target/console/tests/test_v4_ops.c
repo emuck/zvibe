@@ -19,6 +19,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/wait.h>
 #include "test_story.h"
 
 #ifndef EXPECT_V4
@@ -402,6 +405,140 @@ static void test_dual_v3_unchanged(void) {
     end();
 }
 
+/* A small assembler for building test programs at 0x100 */
+static unsigned pc;
+static void emit(const uint8_t *b, unsigned n) { put(pc, b, n); pc += n; }
+#define EMIT(...) do { static const uint8_t e_[] = { __VA_ARGS__ }; emit(e_, sizeof e_); } while (0)
+static void select_table(unsigned table) {                           /* output_stream 3, table */
+    uint8_t b[5] = { 0xF3, 0x4F, 3, (uint8_t)(table >> 8), (uint8_t)table };
+    emit(b, 5);
+}
+static void print_char(char c) { uint8_t b[3] = { 0xE5, 0x7F, (uint8_t)c }; emit(b, 3); }
+
+static void test_stream3_limits(void) {
+    unsigned i;
+    puts("== output stream 3: nesting limit, resuming, long tables, stream 1 ==");
+
+    /* sixteen nested captures work, and each table gets the text printed while it was innermost:
+     * its own letter when selected, then the letter printed after the next one closed */
+    begin(4);
+    pc = 0x100;
+    for (i = 0; i < 16; i++) { select_table(0x600 + 0x10 * i); print_char((char)('A' + i)); }
+    for (i = 16; i > 0; i--) { EMIT(0xF3, 0x3F, 0xFF, 0xFD); print_char((char)('a' + i - 1)); }
+    EMIT(0xBA);
+    start(&fake);
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    for (i = 0; i < 16; i++) {
+        unsigned t = 0x600 + 0x10 * i;
+        unsigned count = ((unsigned)ram[t] << 8) | ram[t + 1];
+        CHECK(ram[t + 2] == 'A' + i);
+        if (i < 15) { CHECK(count == 2); CHECK(ram[t + 3] == 'a' + i + 1); }
+        else        { CHECK(count == 1); }
+    }
+    EXPECT_LOG("T:a;");                                      /* what was printed after the outermost closed */
+    end();
+
+    /* the seventeenth selection is fatal: the interpreter aborts (checked in a child process) */
+    {
+        pid_t child;
+        int status = 0;
+        begin(4);
+        pc = 0x100;
+        for (i = 0; i < 17; i++) select_table(0x600 + 0x10 * i);
+        EMIT(0xBA);
+        fflush(stdout);
+        child = fork();
+        if (child == 0) {
+            freopen("/dev/null", "w", stderr);                 /* the diagnostic is expected */
+            start(&fake);
+            zvibe_run(ctx);
+            _exit(0);                                          /* reached only if nothing was fatal */
+        }
+        waitpid(child, &status, 0);
+        CHECK(WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT);
+        /* ...and sixteen are not */
+        begin(4);
+        pc = 0x100;
+        for (i = 0; i < 16; i++) select_table(0x600 + 0x10 * i);
+        EMIT(0xBA);
+        start(&fake);
+        CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+        end();
+    }
+
+    /* closing and reselecting re-zeroes the count (nesting level back to 15, then 16 again) */
+    begin(4);
+    pc = 0x100;
+    select_table(0x600); print_char('x'); EMIT(0xF3, 0x3F, 0xFF, 0xFD);
+    select_table(0x600); EMIT(0xF3, 0x3F, 0xFF, 0xFD);       /* same table, nothing printed: empty */
+    EMIT(0xBA);
+    start(&fake);
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    CHECK(ram[0x600] == 0 && ram[0x601] == 0);
+    end();
+
+    /* a table longer than 255 characters: the count crosses into the high byte (301 = 0x012D) */
+    begin(4);
+    pc = 0x100;
+    select_table(0x400);
+    EMIT(0xCD, 0x4F, 0x12, 0x01, 0x2C);                      /* store g2 = 300 */
+    EMIT(0xE5, 0x7F, 'a',  0x04, 0x12, 0x00, 0x3F, 0xFA);    /* loop: print_char 'a' ; dec_chk g2 0 ?~loop */
+    EMIT(0xF3, 0x3F, 0xFF, 0xFD, 0xBA);
+    start(&fake);
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    CHECK(ram[0x400] == 0x01 && ram[0x401] == 0x2D);
+    CHECK(ram[0x402] == 'a' && ram[0x402 + 300] == 'a' && ram[0x402 + 301] != 'a');
+    end();
+
+    /* stream 1 deselected before a capture stays deselected after it; deselecting during one counts too */
+    begin(4);
+    pc = 0x100;
+    EMIT(0xF3, 0x3F, 0xFF, 0xFF);                            /* screen off */
+    select_table(0x400); print_char('c');
+    EMIT(0xF3, 0x3F, 0xFF, 0xFD);
+    print_char('1');                                         /* still off: nothing shown */
+    EMIT(0xF3, 0x7F, 1);                                     /* screen on */
+    select_table(0x400);
+    EMIT(0xF3, 0x3F, 0xFF, 0xFF);                            /* screen off during the capture */
+    EMIT(0xF3, 0x3F, 0xFF, 0xFD);
+    print_char('2');                                         /* off: nothing shown */
+    EMIT(0xF3, 0x7F, 1);
+    print_char('3');
+    EMIT(0xBA);
+    start(&fake);
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    EXPECT_LOG("T:3;");
+    end();
+}
+
+static void test_scan_table_more(void) {
+    puts("== scan_table: inverted branch, stack store, static table ==");
+
+    /* branch on false (0x45 = on false, short, offset 5): found does not branch, missing does */
+    static const uint8_t inv_found[]   = { 0xF7, 0x47, 20, 0x05, 0x00, 3,  0x10, 0x45,  0x0D, 0x11, 0x01,  0xBA };
+    static const uint8_t inv_missing[] = { 0xF7, 0x47, 99, 0x05, 0x00, 3,  0x10, 0x45,  0x0D, 0x11, 0x01,  0xBA };
+    run_scan(inv_found,   sizeof inv_found,   0x502, 0, __LINE__);
+    run_scan(inv_missing, sizeof inv_missing, 0,     1, __LINE__);
+
+    /* the result goes to the stack when the store variable is 0 (branch offset 2 = fall through) */
+    begin(4);
+    PUT(0x100, 0xF7, 0x47, 30, 0x05, 0x00, 3,  0x00, 0xC2,  0xE9, 0x7F, 0x10,  0xBA);   /* ... -> (sp) ; pull g10 */
+    start(&fake);
+    ram[0x500] = 0; ram[0x501] = 10; ram[0x502] = 0; ram[0x503] = 20; ram[0x504] = 0; ram[0x505] = 30;
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    CHECK(global10() == 0x504);
+    end();
+
+    /* a table in static memory is read, never written */
+    begin(4);
+    PUT(0x3C10, 0x00, 7, 0x00, 8, 0x00, 9);
+    PUT(0x100, 0xF7, 0x07, 0x00, 8, 0x3C, 0x10, 3,  0x10, 0xC2,  0xBA);                 /* scan 8 in 0x3C10, len 3 */
+    start(&fake);
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    CHECK(global10() == 0x3C12);
+    end();
+}
+
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("v4 opcodes: ZVIBE_ENABLE_V4=%d\n", ZVIBE_ENABLE_V4);
@@ -411,6 +548,8 @@ int main(void) {
     test_output_streams();
     test_read_char();
     test_scan_table();
+    test_stream3_limits();
+    test_scan_table_more();
     test_header_from_screen();
     test_restart();
     test_dual_v3_unchanged();

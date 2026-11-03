@@ -1,7 +1,7 @@
 /* Copyright (c) 2025 Martin R. Raumann */
 /* SPDX-License-Identifier: BSD-3-Clause */
 /**
- * zvibe_v4term.c - Play a Z-machine V4 (or V3) story in an ANSI terminal
+ * zvibe_v4term.c - Play a Z-machine V4 story in an ANSI terminal
  *
  * The interpreter, the ANSI/VT100 screen layer (src/screen) and a small
  * terminal frontend: it asks the terminal how big it is, puts it in raw mode,
@@ -93,10 +93,13 @@ static void terminal_size(uint8_t *rows, uint8_t *cols) {
 
 /* ---- keys ---- */
 
+static int pushed_back = -1;                  /* a byte read past the end of an escape, to be read again */
+
 /** True if a key is already waiting, or arrives within 50 ms (an escape sequence's tail). */
 static int key_pending(void) {
     fd_set fds;
     struct timeval tv;
+    if (pushed_back >= 0) return 1;
     FD_ZERO(&fds);
     FD_SET(STDIN_FILENO, &fds);
     tv.tv_sec = 0; tv.tv_usec = 50000;
@@ -106,6 +109,7 @@ static int key_pending(void) {
 static int read_key_byte(void) {
     unsigned char c;
     ssize_t n;
+    if (pushed_back >= 0) { int b = pushed_back; pushed_back = -1; return b; }
     do { n = read(STDIN_FILENO, &c, 1); } while (n < 0 && errno == EINTR);
     return n == 1 ? c : -1;
 }
@@ -123,7 +127,10 @@ static int read_zscii_key(void) {
         if (c == 8 || c == 127) return 8;                 /* ZSCII delete (3.8) */
         if (c == 27) {
             int c2 = key_pending() ? read_key_byte() : -1;
-            if (c2 != '[' && c2 != 'O') return 27;            /* a lone Escape */
+            if (c2 != '[' && c2 != 'O') {                      /* a lone Escape; the next key is its own */
+                pushed_back = c2;
+                return 27;
+            }
             c2 = key_pending() ? read_key_byte() : -1;
             if (c2 == 'A') return 129;
             if (c2 == 'B') return 130;

@@ -26,6 +26,9 @@ static uint8_t  attr[ROWS][COLS];       /* 1=reverse 2=bold 4=underline */
 static int      cur_r, cur_c;           /* 0-based */
 static int      reg_top, reg_bot;       /* 0-based inclusive */
 static int      autowrap;
+static int      origin_mode;            /* DECOM: CSI H is relative to the scroll region */
+static int      insert_mode;            /* IRM: printing shifts the rest of the line right */
+static int      graphics;               /* G0 is the line-drawing set (ESC ( 0): letters print as '*' */
 static uint8_t  cur_attr;
 static int      st;                     /* 0 ground, 1 ESC, 2 CSI */
 static int      params[4], nparams;
@@ -38,7 +41,7 @@ static void em_reset(void) {
     memset(grid, ' ', sizeof grid);
     memset(attr, 0, sizeof attr);
     cur_r = cur_c = 0; reg_top = 0; reg_bot = ROWS - 1;
-    autowrap = 1; cur_attr = 0; st = 0; lf_scrolls = 0; bytes_out = 0; bad_region = 0;
+    autowrap = 1; origin_mode = insert_mode = graphics = 0; cur_attr = 0; st = 0; lf_scrolls = 0; bytes_out = 0; bad_region = 0;
 }
 
 static void em_scroll(void) {
@@ -58,11 +61,14 @@ static void em_csi(char f) {
     int i, c;
     if (private_mark) {
         if (p0 == 7) autowrap = (f == 'h');
+        if (p0 == 6) { origin_mode = (f == 'h'); cur_r = origin_mode ? reg_top : 0; cur_c = 0; }
         return;
     }
+    if ((f == 'h' || f == 'l') && p0 == 4) { insert_mode = (f == 'h'); return; }
     switch (f) {
     case 'H':
         cur_r = (p0 ? p0 : 1) - 1; cur_c = (p1 ? p1 : 1) - 1;
+        if (origin_mode) { cur_r += reg_top; if (cur_r > reg_bot) cur_r = reg_bot; }
         if (cur_r >= ROWS) cur_r = ROWS - 1;
         if (cur_c >= COLS) cur_c = COLS - 1;
         break;
@@ -70,7 +76,8 @@ static void em_csi(char f) {
         if (nparams == 0) { reg_top = 0; reg_bot = ROWS - 1; }
         else if (p0 >= 1 && p1 > p0 && p1 <= ROWS) { reg_top = p0 - 1; reg_bot = p1 - 1; }
         else { bad_region++; break; }            /* real terminals ignore top >= bottom */
-        cur_r = cur_c = 0;                       /* DECSTBM homes the cursor */
+        cur_r = origin_mode ? reg_top : 0;       /* DECSTBM homes the cursor */
+        cur_c = 0;
         break;
     case 'K':
         for (c = (p0 == 0 ? cur_c : 0); c < COLS; c++) { grid[cur_r][c] = ' '; attr[cur_r][c] = cur_attr; }
@@ -94,7 +101,13 @@ static void em_csi(char f) {
 
 static void em_put(uint8_t b) {
     bytes_out++;
-    if (st == 1) { if (b == '[') { st = 2; nparams = 0; params[0] = 0; private_mark = 0; } else st = 0; return; }
+    if (st == 3) { graphics = (b == '0'); st = 0; return; }          /* the byte after ESC ( names the set */
+    if (st == 1) {
+        if (b == '[') { st = 2; nparams = 0; params[0] = 0; private_mark = 0; }
+        else if (b == '(') st = 3;
+        else st = 0;
+        return;
+    }
     if (st == 2) {
         if (b == '?') { private_mark = 1; return; }
         if (b >= '0' && b <= '9') { if (nparams == 0) nparams = 1; params[nparams - 1] = params[nparams - 1] * 10 + (b - '0'); return; }
@@ -113,7 +126,11 @@ static void em_put(uint8_t b) {
         cur_c = 0;
         if (cur_r == reg_bot) em_scroll(); else if (cur_r < ROWS - 1) cur_r++;
     }
-    grid[cur_r][cur_c] = (char)b;
+    if (insert_mode) {
+        int k;
+        for (k = COLS - 1; k > cur_c; k--) { grid[cur_r][k] = grid[cur_r][k - 1]; attr[cur_r][k] = attr[cur_r][k - 1]; }
+    }
+    grid[cur_r][cur_c] = (graphics && b >= 0x60 && b <= 0x7E) ? '*' : (char)b;
     attr[cur_r][cur_c] = cur_attr;
     if (cur_c < COLS - 1 || autowrap) cur_c++;   /* autowrap off: pin to last column */
 }

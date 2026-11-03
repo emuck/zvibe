@@ -41,8 +41,9 @@ dimension validation.
 
 ### V4 screen and stream opcodes
 
-**Files:** `test_v4_ops.c` (92 checks), `test_screen_v4.c` (142 checks),
-`vt100_emu.h`, `data/v4screen.inf` / `v4screen.z4`.
+**Files:** `test_v4_ops.c` (169 checks), `test_screen_v4.c` (142 checks),
+`test_restart_screen.c` (91), `test_v4term_pty.py` (29), `test_v4_plain.sh`,
+`vt100_emu.h`, `data/v4screen.inf` / `v4screen.z4`, `data/v4keys.inf` / `v4keys.z4`.
 
 `test_v4_ops.c` drives the V4-only opcodes (erase, cursor, text style, buffer
 mode, output streams including nested stream 3, `read_char`, `scan_table`)
@@ -50,6 +51,23 @@ with hand-assembled code. `test_screen_v4.c` runs a small Inform-built V4 story
 through the real ANSI screen layer into a VT100 emulator and compares the
 resulting screen. Rebuild the story with `inform -v4 v4screen.inf v4screen.z4`.
 Both run under `make validate-v4` only.
+
+`test_v4_ops.c` also covers output stream 3 at its limits (sixteen nested captures
+each keeping its own text, a seventeenth that must abort, a 301-character table whose
+count crosses into the high byte, stream 1 switched off before and during a capture) and
+`scan_table` with an inverted branch, a stack store and a table in static memory.
+`test_restart_screen.c` runs a story that turns buffering off and picks reverse+bold,
+splits the screen and restarts, through the real ANSI layer: afterwards the screen is
+unsplit, buffered and unstyled. `test_screen.c` also checks that `zscreen_init` repairs
+a terminal left in origin mode, insert mode and the line-drawing set (the emulator models
+all three), a split that leaves one lower row, and `erase_window -2` with the upper window
+selected. `test_v4term_pty.py` runs the full-screen player on a real pseudo-terminal
+(`make test-v4term`): Return, Delete (8) from DEL and Ctrl-H, a lone Escape, Escape and
+another key arriving together (neither lost), cursor keys in both encodings, escape
+sequences with no key dropped whole, line editing, a line longer than the screen, and
+that Ctrl-C and a normal exit leave the terminal modes as they were. `test_v4_plain.sh`
+covers a V4 story on the plain path (piped keys, script lines, no escapes). Each was
+checked by reintroducing the bug it guards against.
 
 For hand testing, build with V4 enabled (`make validate-v4` leaves the binary at
 `target/console/build_v4/bin/zvibe_console`) and run a V4 story in a terminal:

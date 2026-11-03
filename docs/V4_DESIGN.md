@@ -363,6 +363,9 @@ each is a separate commit.
      has no scroll region and clears its row instead of scrolling.
    - The console's V4 player has no horizontal scrolling in its line editor
      and is POSIX only.
+   - (Done) The tests Codex proposed for this slice: nested stream limits, `scan_table`
+     variants, restart under the real ANSI layer, a dirty-terminal init, and a
+     pseudo-terminal test of the player (which found and fixed a lost key after Escape).
 6. **Frontends.** Console: `zvibe_console` hands a V4 story on a terminal to the
    full-screen player (see slice 5). **SAME51 single-game firmware: done**
    (`make v4` in `target/same51`):

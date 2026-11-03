@@ -21,7 +21,7 @@ BIN_DIR = $(BUILD_DIR)/bin
 # Test executables
 TEST_TARGETS = test_split_memory test_screen test_config_v3 test_config_v4 test_config_stack1024 \
                test_save_restore test_save_restore_v4_stack1024 test_save_restore_san \
-               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_v4_ops test_screen_v4 test_save_restore_san test_delta_pack test_delta_pack_san
+               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_v4_ops test_screen_v4 test_restart_screen test_save_restore_san test_delta_pack test_delta_pack_san
 
 # Integration test scripts
 INTEGRATION_TESTS = test_czech.sh
@@ -87,6 +87,9 @@ test_v4_ops: test_v4_ops.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
 	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_v4_ops.c $(ALL_SRCS)
 
 # A real V4 story through the real ANSI screen layer into a VT100 emulator.
+test_restart_screen: test_restart_screen.c vt100_emu.h $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_restart_screen.c $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c
+
 test_screen_v4: test_screen_v4.c vt100_emu.h data/v4screen.z4 $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c $(HEADERS) $(TEST_STAMP)
 	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_screen_v4.c $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c
 
@@ -214,6 +217,8 @@ test-unit: $(TEST_TARGETS)
 	@./test_opcodes_v4
 	@./test_v4_ops
 	@./test_screen_v4
+	@./test_restart_screen
+	@$(MAKE) --no-print-directory test-v4term
 	@$(MAKE) --no-print-directory test-delta-copies
 	@echo
 	@echo "=== Unit Tests Complete ==="
@@ -255,6 +260,12 @@ test-czech: ensure-binaries
 test-czech-v4: ensure-binaries
 	@echo "Running Czech V4 conformance test..."
 	./test_czech_v4.sh
+
+# The V4 terminal player on a pseudo-terminal (keys, Escape, Ctrl-C, long lines). Builds a
+# V4 console in ../build_v4; needs python3.
+test-v4term:
+	@$(MAKE) --no-print-directory -C .. BUILD_DIR=build_v4 EXTRA_CFLAGS=-DZVIBE_ENABLE_V4=1 >/dev/null
+	python3 test_v4term_pty.py
 
 # V4 story on the plain (non-tty) console path; needs the V4 console build.
 test-v4-plain:

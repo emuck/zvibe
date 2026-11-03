@@ -407,6 +407,93 @@ static void test_get_cursor(void) {
     CHECK(r == 3 && c == 1);
 }
 
+/* A terminal left in odd modes by an earlier program: origin mode, insert mode, the
+ * line-drawing character set, a scroll region, bold, auto-wrap on. zscreen_init must
+ * put all of that right (the emulator models each of those modes). */
+static void make_terminal_dirty(void) {
+    static const char dirty[] = "\033[5;20r\033[?6h\033[4h\033(0\033[1;7m\033[?7h\033[10;10H";
+    const char *p;
+    em_reset();
+    for (p = dirty; *p; p++) em_put((uint8_t)*p);
+    CHECK(origin_mode && insert_mode && graphics && autowrap && reg_top == 4);   /* the setup took effect */
+}
+
+static void test_dirty_terminal(void) {
+    puts("== init puts a terminal left in odd modes right ==");
+    make_terminal_dirty();
+    zscreen_init(&scr, em_put, ROWS, COLS);
+    scr.clear_to_bottom = 0;
+    zscreen_erase_window(&scr, -2);
+    CHECK(!origin_mode && !insert_mode && !graphics && !autowrap);
+    CHECK(reg_top == 0 && reg_bot == ROWS - 1);
+    zscreen_split_window(&scr, 3);
+    zscreen_set_window(&scr, 1);
+    zscreen_set_cursor(&scr, 1, 1);
+    zscreen_puts(&scr, "ABC");
+    zscreen_set_cursor(&scr, 1, 2);
+    zscreen_puts(&scr, "x");                             /* overwrites; nothing is shifted right */
+    zscreen_set_window(&scr, 0);
+    zscreen_puts(&scr, "plain `abc` text\n");
+    zscreen_flush(&scr);
+    CHECK(row_is(0, "AxC"));                             /* absolute addressing, not region-relative */
+    CHECK(row_attr_all(0, 0, 3, 0));                     /* not bold, not reverse */
+    CHECK(row_is(3, "plain `abc` text"));                /* real letters, not line-drawing glyphs */
+    CHECK(bad_region == 0);
+}
+
+/* A restart (erase_window -1 with style and buffering reset by the interpreter) puts the screen
+ * layer back to buffered, unstyled text on an unsplit screen. */
+static void test_restart_resets_screen_state(void) {
+    puts("== restart: buffering, style and split are reset ==");
+    fresh();
+    zscreen_split_window(&scr, 4);
+    zscreen_buffer_mode(&scr, 0);
+    zscreen_set_text_style(&scr, ZSCREEN_STYLE_REVERSE | ZSCREEN_STYLE_BOLD);
+    zscreen_puts(&scr, "styled");
+    zscreen_flush(&scr);
+    /* what the interpreter does on restart */
+    zscreen_buffer_mode(&scr, 1);
+    zscreen_set_text_style(&scr, 0);
+    zscreen_erase_window(&scr, -1);
+    CHECK(scr.upper_lines == 0 && scr.cur_window == 0);
+    CHECK(scr.buffered == 1 && scr.style == 0);
+    CHECK(reg_top == 0 && reg_bot == ROWS - 1);
+    scr.clear_to_bottom = 0;
+    zscreen_erase_window(&scr, -2);
+    zscreen_puts(&scr, "after restart: a line long enough to need a word wrap at the right edge of this eighty column screen\n");
+    zscreen_flush(&scr);
+    CHECK(row_attr_all(0, 0, COLS, 0));                  /* not reverse or bold */
+    CHECK(grid[0][COLS - 1] == ' ' || grid[1][0] != ' ');   /* wrapped at a word, buffered */
+    CHECK(memcmp(grid[0], "after restart: a line long", 25) == 0);
+}
+
+/* erase_window -2 clears both windows, keeps the split, and sets both cursors, whichever window is selected */
+static void test_erase_all_keeps_split(void) {
+    uint16_t r, c;
+    puts("== erase_window -2 with the upper window selected ==");
+    fresh();
+    zscreen_split_window(&scr, 3);
+    zscreen_set_window(&scr, 0);
+    zscreen_puts(&scr, "lower text\n");
+    zscreen_set_window(&scr, 1);
+    zscreen_set_cursor(&scr, 2, 5);
+    zscreen_puts(&scr, "upper");
+    zscreen_erase_window(&scr, -2);
+    CHECK(scr.upper_lines == 3 && scr.cur_window == 1);   /* still split, upper still selected */
+    CHECK(row_is(1, "") && row_is(3, ""));
+    zscreen_get_cursor(&scr, &r, &c);
+    CHECK(r == 1 && c == 1);                              /* the upper cursor is home */
+    zscreen_puts(&scr, "U");
+    CHECK(grid[0][0] == 'U');
+    zscreen_set_window(&scr, 0);
+    zscreen_get_cursor(&scr, &r, &c);
+    CHECK(r == 1 && c == 1);                              /* the lower cursor is at the top of its window */
+    zscreen_puts(&scr, "L");
+    zscreen_flush(&scr);
+    CHECK(grid[3][0] == 'L');                             /* terminal row 4, under the 3-line upper window */
+    CHECK(bad_region == 0);
+}
+
 int main(void) {
     test_init();
     test_status_bar_survives_scroll();
@@ -428,6 +515,9 @@ int main(void) {
     test_bce_hygiene();
     test_dirty_init_and_bounds();
     test_get_cursor();
+    test_dirty_terminal();
+    test_restart_resets_screen_state();
+    test_erase_all_keeps_split();
     test_shutdown();
     printf("\n%d/%d checks passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;

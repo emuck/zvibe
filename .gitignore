@@ -69,6 +69,11 @@ target/console/tests/test_opcodes_v3
 target/console/tests/test_opcodes_v4
 target/console/tests/test_v4_ops
 target/console/tests/test_screen_v4
+target/console/tests/test_restart_screen
+target/console/tests/test_delta_pack
+target/console/tests/test_delta_pack_san
+target/console/tests/*.dSYM/
+target/console/tests/v4_plain_script.tmp
 target/console/tests/test_save_restore_san.dSYM/
 target/riscv/serv_zvibe/common/sw/flash_boot_banner
 
