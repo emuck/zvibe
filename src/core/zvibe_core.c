@@ -156,11 +156,14 @@ zByte *z_var_addr(zByte var, int writing) {
             return (zByte *)--G->stack_ptr;
         }
     } else if ((var >= 1) && (var <= 15)) { /* Local var */
-        if (G->stack_mem[G->base_ptr-1] <= (var-1))
+        if (G->base_ptr == 0 || G->stack_mem[G->base_ptr-1] <= (var-1))   /* the main routine has no locals */
             G->die("Invalid local var #%u", (unsigned int)(var-1));
         return (zByte *)&G->stack_mem[G->base_ptr + (var-1)];
     } else { /* Global var */
-        return zmem_get_ptr(&G->memory_state, G->header.globals_addr + ((var-0x10) * 2), writing);
+        zByte *global = zmem_get_ptr(&G->memory_state, G->header.globals_addr + ((var-0x10) * 2), writing);
+        if (!global)
+            G->die("Invalid global variable");
+        return global;
     }
 }
 

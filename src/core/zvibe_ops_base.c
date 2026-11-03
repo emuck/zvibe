@@ -213,7 +213,7 @@ void op_call(void) {
     G->base_ptr = (zWord)(G->stack_ptr - G->stack_mem);
 
     /* Initialize local variables from routine header (Version 3 specific) */
-    zSByte i;
+    zByte i;                                 /* unsigned: local_count can be up to 255 */
     for (i = 0; i < local_count; i++, routine += 2) {
         /* NOTE: Despite Z-machine being big-endian, routine header defaults appear to be
          * stored in native (little-endian) format. This matches what the pointer cast does. */

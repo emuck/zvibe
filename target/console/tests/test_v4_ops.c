@@ -539,6 +539,24 @@ static void test_scan_table_more(void) {
     end();
 }
 
+/* A routine header byte above 127 (a corrupt story, or 200 locals) once made the signed loop
+ * counter wrap, so the locals were pushed without end and ran off the stack. The call must now
+ * complete, within the stack. */
+static void test_many_locals(void) {
+    puts("== a routine with 200 locals ==");
+    begin(4);
+    PUT(0x100, 0x98, 0xC0, 0x10,  0xBA);                      /* call_1s 0xC0 (=0x300 / 4) -> g10 ; quit */
+    story[0x300] = 200;                                       /* 200 locals, all default 0 */
+    story[0x300 + 1 + 400] = 0xB0;                            /* rtrue */
+    start(&fake);
+    alarm(20);                                                /* the old bug looped forever */
+    CHECK(zvibe_run(ctx) == ZVIBE_GAME_FINISHED);
+    alarm(0);
+    CHECK(global10() == 1);
+    CHECK(G->stack_ptr == G->stack_mem);                      /* the frame was popped again */
+    end();
+}
+
 int main(void) {
     setvbuf(stdout, NULL, _IONBF, 0);
     printf("v4 opcodes: ZVIBE_ENABLE_V4=%d\n", ZVIBE_ENABLE_V4);
@@ -550,6 +568,7 @@ int main(void) {
     test_scan_table();
     test_stream3_limits();
     test_scan_table_more();
+    test_many_locals();
     test_header_from_screen();
     test_restart();
     test_dual_v3_unchanged();

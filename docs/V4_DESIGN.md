@@ -364,17 +364,21 @@ each is a separate commit.
    - The console's V4 player has no horizontal scrolling in its line editor
      and is POSIX only.
    - **Corrupt stories.** `scripts/fuzz_story.c` mutates a story and runs it under
-     ASan/UBSan. It found (all in code V3 shares, none specific to V4): the `random`
-     opcode's signed overflow (fixed, same sequence, same object code); null pointers
-     where `zmem_get_ptr` refuses an address (reads of a corrupt object table or
-     dictionary, a global variable outside dynamic memory); `z_var_addr` reading
-     `stack_mem[-1]` for a local variable in the main routine; a misaligned stack
-     store; and one AddressSanitizer **global-buffer-overflow in `op_call`** (a
-     corrupted `base_ptr`/`stack_ptr` after a bad return), reproduced with a mutated
-     `czech.z4`, root cause not yet found. A well-formed story never reaches these;
-     a corrupt or hostile one can crash the interpreter and, in the last case, write
-     outside the buffer. `SECURITY.md` says memory accesses are bounds-checked, which
-     is not yet true for that case.
+     ASan/UBSan (about 1,800 mutations of Czech V3/V4 and Bureaucracy per round). All of
+     it is code V3 shares; none is specific to V4. Fixed: the `random` opcode's signed
+     overflow (same sequence, same object code); **an out-of-bounds write in `op_call`**
+     (a routine header byte above 127 made the signed 8-bit loop counter wrap, so the
+     locals were pushed without end past the stack; now unsigned, one line, smaller
+     object code, regression test `test_many_locals`); a write through a null pointer
+     when a global variable's address is outside memory (`z_var_addr` now stops); and
+     `z_var_addr` reading `stack_mem[-1]` for a local variable in the main routine.
+     Costs of the last two in a V3-only build: about 50 bytes of flash on SAM E51. Still
+     open, found by the fuzzer: out-of-bounds **reads** (the tokenizer reads dictionary
+     entries past the end of the story when the entry count or length is corrupt; the
+     object lookup reads past the memory buffer for a corrupt object table address) and
+     null-pointer reads where `zmem_get_ptr` refuses an address (corrupt object,
+     property and dictionary addresses, abbreviations). A well-formed story never
+     reaches any of these.
    - (Done) The tests Codex proposed for this slice: nested stream limits, `scan_table`
      variants, restart under the real ANSI layer, a dirty-terminal init, and a
      pseudo-terminal test of the player (which found and fixed a lost key after Escape).

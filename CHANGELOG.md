@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional downloaded games when they are not present.
 
 ### Fixed
+- A routine header claiming more than 127 locals overflowed the stack: the loop counter
+  in `op_call` was a signed byte. A global variable outside memory no longer causes a write
+  through a null pointer, and a local variable in the main routine is refused instead of
+  reading before the stack. The `random` opcode no longer overflows a signed integer (same
+  sequence). `scripts/fuzz_story.c` finds the remaining out-of-bounds reads on corrupt
+  stories; they are listed in `docs/V4_DESIGN.md` and `SECURITY.md`.
 - Three bugs that V3 had as well as V4: a character outside the alphabets (such as `@`)
   was dropped when a word was encoded for the dictionary, and a shift past the length limit
   displaced a later letter; an empty dictionary made the lookup read far past its end; and
