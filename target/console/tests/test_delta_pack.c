@@ -126,6 +126,22 @@ static void test_rejects(void) {
         CHECK(delta_unpack(out, sizeof out, packed, len, base, sizeof base) == 0);
         CHECK(memcmp(out, guard, sizeof out) == 0);
     }
+    /* every truncation again, with the recorded length rewritten to match so the checks inside the
+     * runs are the ones that must catch it; only a cut exactly between runs is a valid shorter save */
+    for (len = 12; len < n; len++) {
+        uint8_t *cut = (uint8_t *)malloc(len);                          /* exactly len bytes: an over-read is an ASan error */
+        int whole = (len == 12 || len == 12 + 7);                       /* header only; header + first run */
+        memcpy(cut, packed, len);
+        cut[8] = (uint8_t)len; cut[9] = 0; cut[10] = 0; cut[11] = 0;
+        memset(out, 0x77, sizeof out);
+        if (whole) {
+            CHECK(delta_unpack(out, sizeof out, cut, len, base, sizeof base) == 300);
+        } else {
+            CHECK(delta_unpack(out, sizeof out, cut, len, base, sizeof base) == 0);
+            CHECK(memcmp(out, guard, sizeof out) == 0);
+        }
+        free(cut);
+    }
     {   uint8_t bad[700];
         memcpy(bad, packed, n); bad[0] ^= 1;                            /* magic */
         REJECT(delta_unpack(out, sizeof out, bad, n, base, sizeof base), "magic");
@@ -201,7 +217,27 @@ static void test_real_save(void) {
     zvibe_destroy(ctx);
 }
 
+/* save_crc32: the checksum of a stored save. The sum it replaced kept only the last 32 bytes. */
+static void test_crc(void) {
+    uint8_t blob[4096];
+    size_t i;
+    uint32_t good;
+    puts("== save checksum ==");
+    CHECK(save_crc32("123456789", 9) == 0xCBF43926UL);                  /* the standard CRC-32 check value */
+    CHECK(save_crc32("", 0) == 0);
+    for (i = 0; i < sizeof blob; i++) blob[i] = (uint8_t)(i * 7 + 3);
+    good = save_crc32(blob, sizeof blob);
+    for (i = 0; i < sizeof blob; i++) {                                 /* any single bit, anywhere, changes it */
+        blob[i] ^= 0x10;
+        if (save_crc32(blob, sizeof blob) == good) { printf("  byte %zu not covered\n", i); CHECK(0); }
+        blob[i] ^= 0x10;
+    }
+    CHECK(save_crc32(blob, sizeof blob) == good);
+    CHECK(save_crc32(blob, sizeof blob - 1) != good);                   /* and so does a missing last byte */
+}
+
 int main(void) {
+    test_crc();
     test_roundtrip();
     test_capacity();
     test_rejects();

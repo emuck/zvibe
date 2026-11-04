@@ -209,3 +209,4 @@ save.dat
 
 # Log files
 *.logtarget/webterm/platform/posix/zvibe_webterm
+target/same51/src/.story_data.stamp

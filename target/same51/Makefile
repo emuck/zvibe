@@ -231,7 +231,15 @@ directories:
 # Story data generation - single game mode
 story_data: $(SRC_DIR)/story_data.c
 
-$(SRC_DIR)/story_data.c: $(STORY_FILE) tools/z3_to_c_array.py
+# The array is rebuilt whenever the story named on the command line changes (a V4 build and
+# a V3 build share this file), not only when the story file is newer.
+STORY_STAMP = $(SRC_DIR)/.story_data.stamp
+$(STORY_STAMP): FORCE
+	@echo "$(STORY_FILE)" | cmp -s - $@ || echo "$(STORY_FILE)" > $@
+
+FORCE:
+
+$(SRC_DIR)/story_data.c: $(STORY_FILE) $(STORY_STAMP) tools/z3_to_c_array.py
 	@echo "Converting story file $(STORY_FILE) to C array..."
 	python3 tools/z3_to_c_array.py --single-game $(STORY_FILE) $(SRC_DIR)/story_data.c
 
@@ -314,7 +322,7 @@ v4-program:
 # Clean target - removes both single-game and multi-game generated files
 clean:
 	rm -rf $(BUILD_DIR) build_screen_demo build_v4
-	rm -f $(SRC_DIR)/game_registry.c $(SRC_DIR)/*_data.c $(SRC_DIR)/story_data.c
+	rm -f $(SRC_DIR)/game_registry.c $(SRC_DIR)/*_data.c $(SRC_DIR)/story_data.c $(STORY_STAMP)
 
 # Help target
 help:
@@ -367,4 +375,4 @@ endif
 -include $(LOCAL_OBJECTS:.o=.d)
 -include $(ZVIBE_OBJECTS:.o=.d)
 
-.PHONY: all platform_info directories clean program help story_data screen-demo screen-demo-program v4 v4-program
+.PHONY: all platform_info directories clean program help story_data screen-demo screen-demo-program v4 v4-program FORCE

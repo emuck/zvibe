@@ -63,7 +63,10 @@ void term_probe_size(void) {
         else if (state == 2 && c == ';') state = 3;
         else if (state == 3 && c >= '0' && c <= '9') col = col * 10 + (c - '0');
         else if (state == 3 && c == 'R') {
-            if (row >= 10 && row <= 250 && col >= 56) { term_rows = (uint8_t)row; term_cols = (uint8_t)col; }
+            if (row >= 10 && row <= 250 && col >= 56) {
+                term_rows = (uint8_t)row;
+                term_cols = (uint8_t)(col > 255 ? 255 : col);     /* the screen layer caps it at 80 */
+            }
             return;
         }
         else state = 0;
@@ -96,15 +99,21 @@ static int rx_soon(void) {
 
 int term_next_zscii(void) {
     static int last_cr = 0;
+    static int pending = -1;       /* a byte read past the end of an Escape, to be delivered next */
     for (;;) {
-        int c = term_rx_wait();
+        int c;
+        if (pending >= 0) { c = pending; pending = -1; }
+        else c = term_rx_wait();
         if (c == '\n' && last_cr) { last_cr = 0; continue; }       /* the LF of CR+LF */
         last_cr = (c == '\r');
         if (c == '\r' || c == '\n') return 13;
         if (c == 8 || c == 127) return 8;
         if (c == 27) {
             c = rx_soon();
-            if (c != '[' && c != 'O') return 27;                  /* a lone Escape (the byte after it is dropped) */
+            if (c != '[' && c != 'O') {                           /* a lone Escape; the next key is its own */
+                pending = c;
+                return 27;
+            }
             c = rx_soon();
             if (c == 'A') return 129;
             if (c == 'B') return 130;

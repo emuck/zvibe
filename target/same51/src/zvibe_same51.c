@@ -15,8 +15,8 @@
 #if ZVIBE_ENABLE_V4
 #include "../../../include/zvibe_screen.h"
 #include "terminal_io.h"
-#include "save_delta.h"
 #endif
+#include "save_delta.h"             /* save_crc32 (header only); the delta code itself is V4 only */
 
 /* External story data (generated at build time) */
 extern const uint8_t story_data[];
@@ -165,14 +165,11 @@ static bool smarteeprom_init(void) {
     return true;
 }
 
-/* Calculate checksum */
+/* A save's checksum is a CRC-32 (save_crc32). The earlier shift-and-xor sum kept only the
+ * last 32 bytes, so a change anywhere before them went unnoticed; a save written by an older
+ * firmware therefore fails this check and is ignored. */
 static uint32_t calculate_checksum(const void *data, size_t size) {
-    const uint8_t *bytes = (const uint8_t*)data;
-    uint32_t checksum = 0;
-    for (size_t i = 0; i < size; i++) {
-        checksum = (checksum << 1) ^ bytes[i];
-    }
-    return checksum;
+    return save_crc32(data, size);
 }
 
 /* Write data to SmartEEPROM using optimized 32-bit word writes */
@@ -469,15 +466,29 @@ static size_t v4_base_len(void) {
     return ((size_t)story_data[14] << 8) | story_data[15];
 }
 
+/* A packed save leaves out every byte that equals the flashed story, including the story's own
+ * release, serial and checksum, and unpacking fills them in from whatever story is flashed
+ * now. So the save carries the identity of the story it was made for, and a restore compares it
+ * first (release 0x02, serial 0x12-0x17, checksum 0x1C). */
+#define V4_ID_LEN 10
+static void v4_story_id(uint8_t id[V4_ID_LEN]) {
+    id[0] = story_data[2];  id[1] = story_data[3];
+    memcpy(id + 2, story_data + 0x12, 6);
+    id[8] = story_data[0x1C];  id[9] = story_data[0x1D];
+}
+
 static void v4_save(void) {
     size_t size = zvibe_get_save_size(g_zvibe_ctx);
     int ok = 0;
     if (size > 0 && size <= sizeof v4_blob && zvibe_get_save_data(g_zvibe_ctx, (char *)v4_blob, sizeof v4_blob) == size) {
-        size_t packed = delta_pack(v4_packed, sizeof v4_packed, v4_blob, size, story_data, v4_base_len());
-        if (packed == 0)
+        size_t packed = delta_pack(v4_packed + V4_ID_LEN, sizeof v4_packed - V4_ID_LEN, v4_blob, size,
+                                   story_data, v4_base_len());
+        if (packed == 0) {
             v4_puts("\n[Save failed: the changes do not fit the SmartEEPROM]\n");
-        else
-            ok = save_callback(v4_packed, packed);
+        } else {
+            v4_story_id(v4_packed);
+            ok = save_callback(v4_packed, packed + V4_ID_LEN);
+        }
     }
     zvibe_save_completed(g_zvibe_ctx, ok);
 }
@@ -485,9 +496,14 @@ static void v4_save(void) {
 static void v4_restore(void) {
     int ok = 0;
     size_t packed = restore_callback(v4_packed, sizeof v4_packed);
-    if (packed > 0) {
-        size_t size = delta_unpack(v4_blob, sizeof v4_blob, v4_packed, packed, story_data, v4_base_len());
+    uint8_t id[V4_ID_LEN];
+    v4_story_id(id);
+    if (packed > V4_ID_LEN && memcmp(v4_packed, id, V4_ID_LEN) == 0) {
+        size_t size = delta_unpack(v4_blob, sizeof v4_blob, v4_packed + V4_ID_LEN, packed - V4_ID_LEN,
+                                   story_data, v4_base_len());
         ok = size > 0 && zvibe_restore_data(g_zvibe_ctx, (const char *)v4_blob, size) == ZVIBE_OK;
+    } else if (packed > 0) {
+        v4_puts("\n[That save is from a different story or release]\n");
     }
     zvibe_restore_completed(g_zvibe_ctx, ok);
 }

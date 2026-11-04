@@ -1,0 +1,39 @@
+! v4huge.inf - a version 4 story with ~65 KB of dynamic memory: its save is larger than 64 KB
+!
+! Keys: s = save (from 24 calls deep, so the stack adds to the size), r = restore, i = add one to the counter, p = show it, q = quit.
+! A terminal player must save and restore a state this big (once it read at most 64 KB).
+!
+! Build:  inform -v4 v4huge.inf v4huge.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+Array big -> 32100;
+Array big2 -> 32100;
+Global counter = 0;
+
+[ Deep n r;
+    if (n > 0) { Deep(n - 1); return; }
+    @save -> r;
+    print "save result ", r, "^";
+];
+
+[ Main c r;
+    big->0 = 1;
+    print "v4huge ready^";
+    for (::) {
+        print "key? ";
+        @read_char 1 -> c;
+        print (char) c, "^";
+        switch (c) {
+          'i': counter++;
+               print "counter=", counter, "^";
+          'p': print "counter=", counter, "^";
+          's': Deep(24);
+          'r': @restore -> r;
+               print "restore result ", r, "^";
+          'q': print "bye^";
+               quit;
+        }
+    }
+];

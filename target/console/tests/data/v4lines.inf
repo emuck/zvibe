@@ -1,0 +1,25 @@
+! v4lines.inf - a tiny version 4 story that asks for line after line
+!
+! Echoes each line ("you said: ...") and stops when a line starts with q. The text buffer
+! takes 39 characters. For testing line input in terminal frontends.
+!
+! Build:  inform -v4 v4lines.inf v4lines.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+Array buf -> 42;
+Array parse -> 20;
+
+[ Main i;
+    print "lines ready^";
+    for (::) {
+        print "> ";
+        buf->0 = 40;
+        read buf parse;
+        print "you said: ";
+        for (i = 1 : buf->i ~= 0 : i++) print (char) buf->i;
+        print "^";
+        if (buf->1 == 'q') quit;
+    }
+];

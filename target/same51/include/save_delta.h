@@ -124,4 +124,22 @@ size_t delta_unpack(uint8_t *out, size_t capacity,
                     const uint8_t *packed, size_t packed_len,
                     const uint8_t *base, size_t base_len);
 
+/*
+ * CRC-32 (IEEE 802.3, the zlib one: "123456789" gives 0xCBF43926). Every byte of the
+ * data counts, whatever its position. Defined here, not in save_delta.c, so a V3-only
+ * firmware that does not link the delta code can use it.
+ */
+static inline uint32_t save_crc32(const void *data, size_t len) {
+    const uint8_t *p = (const uint8_t *)data;
+    uint32_t crc = 0xFFFFFFFFUL;
+    size_t i;
+    for (i = 0; i < len; i++) {
+        int bit;
+        crc ^= p[i];
+        for (bit = 0; bit < 8; bit++)
+            crc = (crc >> 1) ^ (0xEDB88320UL & (0UL - (crc & 1UL)));
+    }
+    return ~crc;
+}
+
 #endif /* SAVE_DELTA_H */
