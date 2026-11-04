@@ -94,6 +94,74 @@ static int matches_reference(const char *path) {
     return ok;
 }
 
+/* Copy of the emulator's screen, to compare a replay with what the live client had */
+static char s_grid[ROWS][COLS];
+static uint8_t s_attr[ROWS][COLS];
+static int s_r, s_c;
+static void snapshot(void) { memcpy(s_grid, grid, sizeof s_grid); memcpy(s_attr, attr, sizeof s_attr); s_r = cur_r; s_c = cur_c; }
+static int same_as_snapshot(void) {
+    return memcmp(s_grid, grid, sizeof s_grid) == 0 && memcmp(s_attr, attr, sizeof s_attr) == 0 && s_r == cur_r && s_c == cur_c;
+}
+
+/* The browser echoes the typed characters into its own screen */
+static void browser_types(const char *line) {
+    int i;
+    for (i = 0; line[i]; i++) { em_put(0x1B); em_put('['); em_put('0'); em_put('m'); em_put((uint8_t)line[i]); }
+}
+
+/* v4lines.z4 reads line after line: the story's input limit reaches the client, and a client that
+ * reconnects after a command still sees that command on its row. */
+static void scenario_lines(const char *path) {
+    mock_platform_t *m = mock_create();
+    webterm_session_t *s;
+    FILE *sf = fopen(path, "rb");
+    uint8_t *story;
+    long size;
+    int seen;
+    if (!sf) { printf("cannot open %s\n", path); tests_run++; return; }
+    fseek(sf, 0, SEEK_END); size = ftell(sf); fseek(sf, 0, SEEK_SET);
+    story = malloc((size_t)size);
+    if (fread(story, 1, (size_t)size, sf) != (size_t)size) { fclose(sf); free(story); return; }
+    fclose(sf);
+
+    s = webterm_session_create(&m->base);
+    webterm_session_accept(s);
+    em_reset();
+    CHECK(webterm_session_load(s, story, (size_t)size) == WEBTERM_OK);
+    CHECK(run_to_stop(s) == WEBTERM_WAIT);
+    CHECK(mock_last_frame_contains(m, "\"prompt\":true,\"max\":39}"));       /* the buffer takes 39 characters */
+    feed_frames(m, 0);
+
+    seen = m->frame_count;
+    browser_types("look around");
+    webterm_session_on_input(s, "look around", 11);
+    CHECK(run_to_stop(s) == WEBTERM_WAIT);
+    feed_frames(m, seen);
+    CHECK(memcmp(grid[ROWS - 3], "> look around", 13) == 0 || memcmp(grid[ROWS - 2], "> look around", 13) == 0);
+    snapshot();
+
+    /* reconnect: the replay must draw the same screen, command included */
+    webterm_session_disconnect(s);
+    mock_clear_frames(m);
+    CHECK(webterm_session_accept(s) == 1);
+    em_reset();
+    feed_frames(m, 0);
+    CHECK(same_as_snapshot());
+    CHECK(mock_last_frame_contains(m, "\"max\":39"));                          /* and the limit is repeated */
+
+    /* a line longer than the buffer is cut to 39 characters, as the game reads it */
+    seen = m->frame_count;
+    browser_types("0123456789012345678901234567890123456789012");        /* 43 characters typed */
+    webterm_session_on_input(s, "0123456789012345678901234567890123456789012", 43);
+    CHECK(run_to_stop(s) == WEBTERM_WAIT);
+    CHECK(mock_any_frame_contains(m, "you said: 012345678901234567890123456789012345678"));
+    CHECK(!mock_any_frame_contains(m, "you said: 0123456789012345678901234567890123456789"));
+
+    webterm_session_destroy(s);
+    mock_free(m);
+    free(story);
+}
+
 int main(int argc, char **argv) {
     mock_platform_t *m = mock_create();
     webterm_session_t *s;
@@ -173,6 +241,14 @@ int main(int argc, char **argv) {
     webterm_session_destroy(s);
     mock_free(m);
     free(story);
+
+    {   /* the line story sits next to the screen story */
+        char lines[1024];
+        char *slash;
+        snprintf(lines, sizeof lines, "%s", argv[2]);
+        slash = strrchr(lines, '/');
+        if (slash) { snprintf(slash + 1, sizeof lines - (size_t)(slash + 1 - lines), "v4lines.z4"); scenario_lines(lines); }
+    }
 
     printf("\n%d/%d checks passed\n", tests_passed, tests_run);
     return tests_passed == tests_run ? 0 : 1;

@@ -86,7 +86,7 @@ This target is designed for embedded devices where one interactive session
 at a time is the natural model (a clock, a handheld, a kiosk). The policy is:
 
 - **One active client.** A second client that connects while a session is in
-  use receives `{"type":"busy"}` and the connection is immediately closed.
+  use receives `{"type":"busy"}` and the connection is immediately closed. (The POSIX reference server handles one connection at a time, so there a second client waits until the first leaves; see `PROTOCOL.md`.)
 - **Sessions survive disconnects.** If the client drops, the session pauses —
   the zvibe context and all game state remain in RAM. The next client to
   connect resumes the session from where it was.

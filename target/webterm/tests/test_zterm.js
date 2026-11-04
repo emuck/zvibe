@@ -86,13 +86,28 @@ for (let seed = 1; seed <= 200; seed++) dump("fuzz", String(seed), "fuzz" + seed
   key("Enter");
   ok(sent[1].text.length === 78, "a line stops at the right edge (78 of 80 columns after a 2-column prompt)");
 
+  // a prompt that already fills the row: there is no room, as the screen layer sees it
+  t.write("\x1b[?7l\r\n\x1b[24;1H" + "p".repeat(80));        // auto-wrap off, as the screen layer sets it
+  t.setWait("line");
+  key("x"); key("y");
+  key("Enter");
+  ok(sent[2].type === "input" && sent[2].text === "", "nothing is accepted after a prompt that fills the row");
+  ok(t.engine.lines()[23] === "p".repeat(80), "and the prompt's last column was not overwritten");
+
+  // the story's text buffer: the server says how many characters it takes
+  t.write("\r\n\x1b[24;1H> ");
+  t.setWait("line", 5);
+  for (let i = 0; i < 12; i++) key("a");
+  key("Enter");
+  ok(sent[3].text === "aaaaa", "a line stops at the story's input limit (5), not the width of the screen");
+
   // read_char
   t.setWait("key");
-  ok(key("ArrowUp") && sent[2].code === 129, "arrow up is ZSCII 129");
-  t.setWait("key"); key("Escape"); ok(sent[3].code === 27, "Escape is 27");
-  t.setWait("key"); key("Enter"); ok(sent[4].code === 13, "Return is 13");
-  t.setWait("key"); key("Backspace"); ok(sent[5].code === 8, "Backspace is 8");
-  t.setWait("key"); key("Q"); ok(sent[6].code === 81 && sent[6].type === "key", "a letter is its code");
+  ok(key("ArrowUp") && sent[4].code === 129, "arrow up is ZSCII 129");
+  t.setWait("key"); key("Escape"); ok(sent[5].code === 27, "Escape is 27");
+  t.setWait("key"); key("Enter"); ok(sent[6].code === 13, "Return is 13");
+  t.setWait("key"); key("Backspace"); ok(sent[7].code === 8, "Backspace is 8");
+  t.setWait("key"); key("Q"); ok(sent[8].code === 81 && sent[8].type === "key", "a letter is its code");
   t.setWait("key"); key("Shift");  ok(t.wait === "key", "a modifier key alone does not answer read_char");
 }
 

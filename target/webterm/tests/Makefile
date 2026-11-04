@@ -32,7 +32,7 @@ TEST_SRCS = test_session.c mock_platform.c
 
 TEST_BIN = $(BIN_DIR)/test_session
 
-.PHONY: all test test-unit test-czech test-v4 test-screen clean help
+.PHONY: all test test-unit test-czech test-v4 test-screen test-server clean help
 
 all: $(TEST_BIN)
 
@@ -80,11 +80,23 @@ test-screen: $(DUMP_BIN) $(SCREEN_BIN)
 	@if command -v node >/dev/null 2>&1; then node test_zterm.js $(DUMP_BIN) $(SCREEN_STORY); \
 	 else echo "(node not found: skipping the zterm.js check)"; fi
 
+# The POSIX server's game list, run under AddressSanitizer (needs python3)
+SERVER_SRCS = ../platform/posix/main.c ../webterm_session.c ../cartographer.c $(CORE_SRCS) $(SCREEN_SRC)
+SERVER_SAN  = $(BIN_DIR)/zvibe_webterm_san
+
+$(SERVER_SAN): directories $(SERVER_SRCS) ../platform/posix/main.c
+	$(CC) -g -O1 -fsanitize=address,undefined $(V4_DEFS) $(INCLUDES) $(SERVER_SRCS) -o $@
+
+test-server: $(SERVER_SAN)
+	@echo "=== Running the POSIX server game-list test (ASan) ==="
+	@python3 test_server_games.py $(SERVER_SAN)
+
 test: $(TEST_BIN) $(V4_BIN)
 	@echo "=== Running webterm session tests ==="
 	@$(TEST_BIN) $(GAMES_DIR)
 	@$(MAKE) --no-print-directory test-v4
 	@$(MAKE) --no-print-directory test-screen
+	@$(MAKE) --no-print-directory test-server
 	@echo "=== Tests complete ==="
 
 test-unit: test

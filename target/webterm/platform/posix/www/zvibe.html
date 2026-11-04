@@ -299,7 +299,7 @@ function connect() {
                 if (msg.reset) { showScreen(true); statusEl.textContent = ''; term.reset(msg.rows, msg.cols); }
                 if (msg.data) term.write(msg.data);
                 if (msg.key) term.setWait('key');
-                else if (msg.prompt) term.setWait('line');
+                else if (msg.prompt) term.setWait('line', msg.max);
                 break;
 
             case 'output':

@@ -41,6 +41,8 @@ class ZTermEngine {
     this.r = 0; this.c = 0;
     this.top = 0; this.bot = this.rows - 1;
     this.autowrap = true;
+    this.over = false;         // a character was written in the last column with auto-wrap off: the
+                               // logical cursor is one past the pinned one (the screen layer counts it)
     this.attr = 0;
     this.state = 0;            // 0 ground, 1 after ESC, 2 CSI, 3 ESC + intermediate
     this.params = [0]; this.priv = false;
@@ -77,12 +79,14 @@ class ZTermEngine {
       case "H": case "f":
         this.r = Math.min((p0 || 1) - 1, this.rows - 1);
         this.c = Math.min((p1 || 1) - 1, w - 1);
+        this.over = false;
         break;
       case "r":
         if (p.length === 1 && p[0] === 0) { this.top = 0; this.bot = this.rows - 1; }
         else if (p0 >= 1 && p1 > p0 && p1 <= this.rows) { this.top = p0 - 1; this.bot = p1 - 1; }
         else break;                                  // terminals ignore an empty region
         this.r = 0; this.c = 0;                      // DECSTBM homes the cursor
+        this.over = false;
         break;
       case "K":
         if (p0 === 0) this._blank(this.r * w + this.c, (this.r + 1) * w);
@@ -128,8 +132,8 @@ class ZTermEngine {
         continue;
       }
       if (code === 0x1b) { this.state = 1; continue; }
-      if (b === "\r") { this.c = 0; continue; }
-      if (b === "\b") { if (this.c > 0) this.c--; continue; }
+      if (b === "\r") { this.c = 0; this.over = false; continue; }
+      if (b === "\b") { if (this.c > 0) this.c--; this.over = false; continue; }
       if (b === "\n") { this._linefeed(); continue; }
       if (code < 0x20 || code === 0x7f) continue;
       if (this.c >= w) {                             // only reachable with auto-wrap on
@@ -139,7 +143,8 @@ class ZTermEngine {
       const idx = this.r * w + this.c;
       this.ch[idx] = b;
       this.at[idx] = this.attr;
-      if (this.c < w - 1 || this.autowrap) this.c++;
+      if (this.c < w - 1 || this.autowrap) { this.c++; this.over = false; }
+      else this.over = true;
     }
     this.dirty = true;
   }
@@ -188,11 +193,13 @@ class ZTerm {
     this._schedule();
   }
 
-  /** "line" while the game waits for a command, "key" for read_char, else null. */
-  setWait(kind) {
+  /** "line" while the game waits for a command, "key" for read_char, else null. For a line, `max` is
+   *  how many characters the story's text buffer takes (0 if unknown). */
+  setWait(kind, max) {
     this.wait = kind;
     this.typed = "";
-    if (kind === "line" && this.engine) this.startCol = this.engine.c;
+    this.max = max || 0;
+    if (kind === "line" && this.engine) this.startCol = this.engine.c + (this.engine.over ? 1 : 0);
     this._schedule();
   }
 
@@ -261,7 +268,9 @@ class ZTerm {
       }
     } else if (e.key.length === 1 && e.key >= " " && e.key <= "~") {
       e.preventDefault();
-      if (this.typed.length < eng.cols - this.startCol) {      // the screen layer's limit
+      // the room left on the row (the screen layer's limit) and in the story's text buffer
+      const room = Math.min(eng.cols - this.startCol, this.max > 0 ? this.max : Infinity);
+      if (this.typed.length < room) {
         this.typed += e.key;
         eng.write("\x1b[0m" + e.key);
       }

@@ -398,14 +398,28 @@ static int build_games_json(const char *dir, char *out, size_t max) {
                              || strcmp(e->d_name + nlen - 3, ".z4") == 0
 #endif
                              )) {
-                pos += (size_t)snprintf(out + pos, max - pos,
-                    "%s\"%s\"", count ? "," : "", e->d_name);
+                /* "name" with JSON escapes, never past the buffer (leave room for the closing "]}") */
+                char item[2 * 256 + 8];
+                size_t n = 0;
+                const char *c;
+                if (count) item[n++] = ',';
+                item[n++] = '"';
+                for (c = e->d_name; *c && n + 8 < sizeof item; c++) {
+                    unsigned char ch = (unsigned char)*c;
+                    if (ch == '"' || ch == '\\') { item[n++] = '\\'; item[n++] = (char)ch; }
+                    else if (ch < 0x20) n += (size_t)snprintf(item + n, 7, "\\u%04x", ch);
+                    else item[n++] = (char)ch;
+                }
+                item[n++] = '"';
+                if (pos + n + 3 > max) continue;          /* the list is full: leave this one out */
+                memcpy(out + pos, item, n);
+                pos += n;
                 count++;
             }
         }
         closedir(d);
     }
-    snprintf(out + pos, max - pos, "]}");
+    if (pos + 3 <= max) memcpy(out + pos, "]}", 3);
     return count;
 }
 

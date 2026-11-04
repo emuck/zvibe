@@ -73,7 +73,9 @@ struct webterm_session_t {
     int                 has_rooms;       /* the cartographer can follow this story (V3) */
 #if ZVIBE_ENABLE_V4
     int                 screen_mode;     /* a V4 story: output is terminal bytes from the screen layer */
-    int                 muted;           /* drop screen-layer output (input echo the browser already drew) */
+    int                 muted;           /* collect screen-layer output into echo_buf, not out_buf (input echo the browser already drew) */
+    char                echo_buf[256];
+    size_t              echo_len;
     zscreen             scr;
 #endif
 
@@ -158,10 +160,20 @@ static const char *frame_prefix(const webterm_session_t *s) {
     return "{\"type\":\"output\",\"text\":\"";
 }
 
-static const char *frame_suffix(int wait) {
-    if (wait == WAIT_LINE) return "\",\"prompt\":true}";
-    if (wait == WAIT_KEY)  return "\",\"key\":true}";
-    return "\"}";
+/** The end of a text frame. `wait` is a WAIT_* kind; a line wait may carry the story's input limit
+ *  in the bits above the kind, sent as "max" so the browser stops typing where the story stops reading. */
+static size_t write_suffix(char *dst, int wait) {
+    const int kind = wait & 0xFF;
+    const unsigned max = (unsigned)wait >> 8;
+    const char *fixed = "\"}";
+    if (kind == WAIT_LINE) {
+        if (max) return (size_t)sprintf(dst, "\",\"prompt\":true,\"max\":%u}", max);
+        fixed = "\",\"prompt\":true}";
+    } else if (kind == WAIT_KEY) {
+        fixed = "\",\"key\":true}";
+    }
+    memcpy(dst, fixed, strlen(fixed));
+    return strlen(fixed);
 }
 
 /**
@@ -203,12 +215,7 @@ static void send_history_entry(webterm_session_t *s, int idx) {
     pos += json_escape(s->history_text[idx], s->history_text_lens[idx],
                        buf + pos, max - pos - 32);
 
-    {
-        const char *suffix = frame_suffix(s->history_prompt[idx]);
-        size_t slen = strlen(suffix);
-        memcpy(buf + pos, suffix, slen);
-        pos += slen;
-    }
+    pos += write_suffix(buf + pos, s->history_prompt[idx]);
 
     s->platform->send(s->platform, buf, pos);
 }
@@ -255,12 +262,7 @@ static void flush_output(webterm_session_t *s, int prompt) {
     pos += json_escape(s->out_buf, s->out_len, buf + pos, max - pos - 32);
 
     /* Frame suffix */
-    {
-        const char *suffix = frame_suffix(prompt);
-        size_t slen = strlen(suffix);
-        memcpy(buf + pos, suffix, slen);
-        pos += slen;
-    }
+    pos += write_suffix(buf + pos, prompt);
 
     send_output_frame(s, buf, pos, s->out_buf, s->out_len, prompt);
     s->out_len = 0;
@@ -276,7 +278,11 @@ static void flush_output(webterm_session_t *s, int prompt) {
 /** The screen layer's byte sink: collect terminal bytes, sending full chunks. */
 static void screen_put(uint8_t b) {
     webterm_session_t *s = g_session;
-    if (!s || s->muted) return;
+    if (!s) return;
+    if (s->muted) {                          /* the browser drew this already: keep it for the history only */
+        if (s->echo_len < sizeof s->echo_buf) s->echo_buf[s->echo_len++] = (char)b;
+        return;
+    }
     s->out_buf[s->out_len++] = (char)b;
     if (s->out_len >= WEBTERM_SCREEN_CHUNK) flush_output(s, WAIT_NONE);
 }
@@ -614,6 +620,12 @@ webterm_result_t webterm_session_run(webterm_session_t *s) {
              * before the output frame so output remains the last (and
              * prompt-bearing) frame of the turn. */
             cart_check_room_change(s);
+#if ZVIBE_ENABLE_V4
+            if (s->screen_mode) {
+                size_t limit = zvibe_get_input_limit(s->zvibe);
+                flush_output(s, WAIT_LINE | (int)((limit < 0xFFFF ? limit : 0xFFFF) << 8));
+            } else
+#endif
             flush_output(s, WAIT_LINE);
             s->key_wait = 0;
             s->state = WEBTERM_STATE_WAITING;
@@ -717,10 +729,14 @@ void webterm_session_on_input(webterm_session_t *s,
          * the next line for real. Characters it would not have echoed are dropped. */
         size_t i, kept = 0;
         s->muted = 1;
+        s->echo_len = 0;
         for (i = 0; i < len; i++) {
             if (zscreen_echo(&s->scr, buf[i]) && buf[i] >= 32) buf[kept++] = buf[i];
         }
         s->muted = 0;
+        /* A client that reconnects must see the command on its row: record the echo in the history
+         * (it is not sent, the browser already shows it). */
+        if (s->echo_len) history_push(s, s->echo_buf, s->echo_len, WAIT_NONE);
         buf[kept] = '\0';
         zscreen_echo(&s->scr, '\n');
     }
