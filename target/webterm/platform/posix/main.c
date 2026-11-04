@@ -410,6 +410,7 @@ static int build_games_json(const char *dir, char *out, size_t max) {
                     else if (ch < 0x20) n += (size_t)snprintf(item + n, 7, "\\u%04x", ch);
                     else item[n++] = (char)ch;
                 }
+                if (*c) continue;                         /* the escaped name does not fit: leave it out, never cut it */
                 item[n++] = '"';
                 if (pos + n + 3 > max) continue;          /* the list is full: leave this one out */
                 memcpy(out + pos, item, n);

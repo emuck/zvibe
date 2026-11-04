@@ -95,5 +95,15 @@ except ValueError:
     got = []
 check(sorted(got) == sorted(names), f"names with quotes, backslashes and control characters round-trip, got {got}")
 
+# 3. a name that is too long once escaped (a hundred tabs) is left out, never published cut short
+names = ["tab" + "\t" * 100 + ".z3", "ok.z3"]
+frame, err = run(names, 18103)
+try:
+    got = json.loads(frame)["list"]
+except ValueError:
+    got = []
+check("ok.z3" in got, f"the other games are listed, got {got}")
+check(all(n in names for n in got), f"no name is published that is not a real file name, got {[g[:12] for g in got]}")
+
 print(f"{checks - failed}/{checks} checks passed")
 sys.exit(1 if failed else 0)

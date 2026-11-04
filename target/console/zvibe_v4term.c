@@ -200,6 +200,10 @@ static int read_line(char *buf, size_t size) {
 
 static void story_text(const char *text, size_t len) {
     size_t i;
+    if (need_resume) {                           /* continued after Ctrl-Z: modes first, before any output */
+        need_resume = 0;
+        zscreen_resume(&scr);
+    }
     for (i = 0; i < len; i++) zscreen_putc(&scr, text[i]);
     if (transcript) fwrite(text, 1, len, transcript);
 }

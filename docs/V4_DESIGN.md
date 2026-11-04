@@ -397,7 +397,9 @@ each is a separate commit.
      SmartEEPROM slot, no second copy; a half-written save is now always rejected, never loaded);
      the web terminal's replay after the history ring wraps can start in the wrong place; the POSIX
      reference server serves one connection at a time; the stop/continue handling does not redraw
-     the screen.
+     the screen (it restores the modes before the next output or key; the pty test cannot make
+     the kernel stop its orphaned process group, so it checks the handler's effects, not a real
+     stop).
    - (Done) The tests Codex proposed for this slice: nested stream limits, `scan_table`
      variants, restart under the real ANSI layer, a dirty-terminal init, and a
      pseudo-terminal test of the player (which found and fixed a lost key after Escape).
