@@ -34,6 +34,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional downloaded games when they are not present.
 
 ### Fixed
+- SAM E51 saves (V3 and V4): the SmartEEPROM does not persist a single-byte store, nor zero words
+  at the end of a write over older non-zero data, so a save written after an earlier, larger one
+  could come back after a reset with its last bytes wrong (the old checksum covered only the last
+  32 bytes and mostly hid it). A save is now written as whole words, padded with ones, in one
+  flush, and ends with a non-zero marker word.
 - SAM E51 saves: the stored checksum is now a CRC-32 (the old one covered only the last 32
   bytes, so a damaged save could be accepted; saves made by an older firmware are ignored once),
   and a V4 save records the story's release, serial and checksum, so another release of the

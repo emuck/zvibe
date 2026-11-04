@@ -172,45 +172,44 @@ static uint32_t calculate_checksum(const void *data, size_t size) {
     return save_crc32(data, size);
 }
 
-/* Write data to SmartEEPROM using optimized 32-bit word writes */
-static bool smarteeprom_write_data(uint32_t offset, const void *data, size_t size) {
-    if (offset + size > SMARTEEPROM_SIZE) return false;
-    
+/* Write data into the SmartEEPROM page buffer with 32-bit word writes only. Nothing is stored for
+ * good until smarteeprom_flush() runs.
+ *
+ * Two things the SmartEEPROM does not do, found on the board: a single-byte store is not
+ * persisted, and zero words at the END of a write are not persisted over older non-zero data (the
+ * tail of a save came back as whatever an earlier, larger save had left there; the old checksum
+ * mostly hid it). So the last, partial word is padded with ones and written whole, and the caller
+ * ends every write with a non-zero word (smarteeprom_write_end_mark). The padding and the mark land
+ * after the data, in space the save does not use. */
+static bool smarteeprom_write_raw(uint32_t offset, const void *data, size_t size) {
     const uint8_t *src = (const uint8_t*)data;
+    size_t words = (size + 3) / 4;
     
-    // Handle word-aligned portion with 32-bit writes
-    if (size >= 4 && (offset & 3) == 0) {
-        volatile uint32_t *smarteeprom_words = (volatile uint32_t*)(SMARTEEPROM_BASE_ADDR + offset);
-        const uint32_t *src_words = (const uint32_t*)data;
-        size_t word_count = size / 4;
-        
-        for (size_t i = 0; i < word_count; i++) {
-            smarteeprom_words[i] = src_words[i];
-        }
-        
-        // Handle remaining bytes
-        size_t remaining = size % 4;
-        if (remaining > 0) {
-            volatile uint8_t *smarteeprom_bytes = (volatile uint8_t*)(SMARTEEPROM_BASE_ADDR + offset + (word_count * 4));
-            const uint8_t *src_bytes = src + (word_count * 4);
-            
-            for (size_t i = 0; i < remaining; i++) {
-                smarteeprom_bytes[i] = src_bytes[i];
-            }
-        }
-    } else {
-        // Fall back to byte writes for unaligned data
-        volatile uint8_t *smarteeprom = (volatile uint8_t*)(SMARTEEPROM_BASE_ADDR + offset);
-        
-        for (size_t i = 0; i < size; i++) {
-            smarteeprom[i] = src[i];
-        }
+    if ((offset & 3) != 0 || offset + words * 4 > SMARTEEPROM_SIZE) return false;
+    
+    volatile uint32_t *smarteeprom_words = (volatile uint32_t*)(SMARTEEPROM_BASE_ADDR + offset);
+    for (size_t i = 0; i < words; i++) {
+        uint32_t word = 0xFFFFFFFFUL;
+        size_t n = size - i * 4;
+        memcpy(&word, src + i * 4, n < 4 ? n : 4);
+        smarteeprom_words[i] = word;
     }
     
+    return true;
+}
+
+/* A non-zero word right after a save's data, so that the last words of the data (which may be zero)
+ * are not the tail of the write. Needs room for one word after the data's padded end. */
+#define SAVE_END_MARK_BYTES 4
+static bool smarteeprom_write_end_mark(uint32_t data_end_offset) {
+    static const uint32_t mark = 0xA55A5AA5UL;
+    return smarteeprom_write_raw((data_end_offset + 3) & ~3UL, &mark, sizeof mark);
+}
+
+/* Commit what was written (SEEFLUSH in BUFFERED mode) and wait until the SmartEEPROM is done. */
+static bool smarteeprom_flush(void) {
     __DSB();
     __ISB();
-    
-    // Use SEEFLUSH command for BUFFERED mode
     NVMCTRL_REGS->NVMCTRL_CTRLB = NVMCTRL_CTRLB_CMD_SEEFLUSH | NVMCTRL_CTRLB_CMDEX_KEY;
     
     volatile uint32_t timeout = 1000000;
@@ -219,6 +218,11 @@ static bool smarteeprom_write_data(uint32_t offset, const void *data, size_t siz
     }
     
     return timeout > 0;
+}
+
+/* Write and commit */
+static bool smarteeprom_write_data(uint32_t offset, const void *data, size_t size) {
+    return smarteeprom_write_raw(offset, data, size) && smarteeprom_flush();
 }
 
 /* Read data from SmartEEPROM using optimized 32-bit word reads */
@@ -267,7 +271,7 @@ static bool smarteeprom_read_data(uint32_t offset, void *buffer, size_t size) {
 
 /* Save callback - save to both RAM and SmartEEPROM */
 static int save_callback(const void *data, size_t size) {
-    size_t total_size = sizeof(save_header_t) + size;
+    size_t total_size = sizeof(save_header_t) + size + SAVE_END_MARK_BYTES + 3;
     
     if (total_size > SMARTEEPROM_SIZE) {
         printf("\n[ERROR: save data requires %zu bytes, SmartEEPROM size is %d]\n", total_size, SMARTEEPROM_SIZE);
@@ -281,13 +285,18 @@ static int save_callback(const void *data, size_t size) {
         .checksum = calculate_checksum(data, size)
     };
     
-    if (!smarteeprom_write_data(0, &header, sizeof(header))) {
-        printf("\n[ERROR: failed to write save header to flash]\n");
+    /* Header and data go into the page buffer together and are committed with one flush. Committing
+     * the header first and the data after it was not reliable once a larger save had been stored
+     * before: the data written after the first flush could be lost at the next reset, and the
+     * header was left describing data that was not there (the CRC now rejects such a save). */
+    if (!smarteeprom_write_raw(0, &header, sizeof(header)) ||
+        !smarteeprom_write_raw(sizeof(header), data, size) ||
+        !smarteeprom_write_end_mark((uint32_t)(sizeof(header) + size))) {
+        printf("\n[ERROR: failed to write the save to flash]\n");
         return 0;
     }
-    
-    if (!smarteeprom_write_data(sizeof(header), data, size)) {
-        printf("\n[ERROR: failed to write save data to flash]\n");
+    if (!smarteeprom_flush()) {
+        printf("\n[ERROR: the SmartEEPROM did not finish the save]\n");
         return 0;
     }
     
@@ -456,7 +465,7 @@ static void v4_start(bool wait) {
  * more than the SmartEEPROM holds. The save is packed against the story in flash, keeping
  * only the bytes the game has changed (see save_delta.h): typically a few KB. */
 #define V4_BLOB_MAX    (ZVIBE_MEMORY_BUFFER_SIZE + 2 * ZVIBE_STACK_WORDS + 64)
-#define V4_PACKED_MAX  (SMARTEEPROM_SIZE - sizeof(save_header_t))
+#define V4_PACKED_MAX  (SMARTEEPROM_SIZE - sizeof(save_header_t) - SAVE_END_MARK_BYTES - 3)
 
 static uint8_t v4_blob[V4_BLOB_MAX];        /* the core's save data, whole */
 static uint8_t v4_packed[V4_PACKED_MAX];    /* what goes to (or comes from) the SmartEEPROM */

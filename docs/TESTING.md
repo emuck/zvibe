@@ -77,7 +77,8 @@ Ctrl-backslash and hangup (terminal restored), Ctrl-Z followed by `fg`, and a sa
 standard CRC-32 test value and that every bit of a 4 KB blob counts, and cuts a packed save at
 every length with the recorded length rewritten to match (so the checks inside the runs, not the
 length check, must reject it; the cut copy is exactly sized, so an over-read is an ASan error).
-`target/same51/tests/test_v4_identity.py` flashes release 1 and release 2 of a story, saves on
+`target/same51/tests/test_v4_save_over_big.py` stores a large save, flashes a small story, saves and restores it
+after a reset (this failed before the SmartEEPROM tail fix). `target/same51/tests/test_v4_identity.py` flashes release 1 and release 2 of a story, saves on
 release 1 and checks that release 2 refuses the save and release 1 still restores it.
 
 **Web terminal.** `make test` in `target/webterm/tests` also runs `test_server_games.py` (the

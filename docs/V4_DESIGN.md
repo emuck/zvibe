@@ -390,7 +390,10 @@ each is a separate commit.
      restore a save over 64 KB, left the terminal raw on abort, and mishandled Ctrl-Z/`fg` and a
      half-received escape sequence; the web terminal's game list overflowed its buffer, replayed
      without the typed command, ignored the story's input limit and accepted a character on a
-     full row. Known and left: a power cut during a save can still lose the previous save (one
+     full row. Hardware testing of the fixes also found, in the V3 save path as well, that the
+     SmartEEPROM does not persist single-byte stores or trailing zero words over older non-zero
+     data (the tail of a save came back stale after a reset); saves are now whole words, padded
+     with ones, one flush, and a non-zero end marker. Known and left: a power cut during a save can still lose the previous save (one
      SmartEEPROM slot, no second copy; a half-written save is now always rejected, never loaded);
      the web terminal's replay after the history ring wraps can start in the wrong place; the POSIX
      reference server serves one connection at a time; the stop/continue handling does not redraw
