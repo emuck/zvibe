@@ -72,6 +72,13 @@ void zscreen_init(zscreen *s, zscreen_put_fn put, uint8_t rows, uint8_t cols);
 /** Restore terminal defaults (attributes, scroll region, auto-wrap). */
 void zscreen_shutdown(zscreen *s);
 
+/**
+ * Put the terminal modes back after something else used it (a job-control stop and
+ * continue, say): attributes, no auto-wrap, the scroll region and the cursor. The screen's
+ * contents are not redrawn.
+ */
+void zscreen_resume(zscreen *s);
+
 /* ---- Opcode-level operations ---- */
 
 /** The lower window always keeps at least 1 line (lines is clamped to rows-1) */

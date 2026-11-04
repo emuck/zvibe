@@ -39,7 +39,9 @@ static zscreen scr;
 static FILE *transcript;                  /* -t: the story's text, as printed */
 static FILE *commands;                    /* -c: every command line typed */
 static struct termios saved_tio;
-static int raw_on;
+static struct termios raw_tio;
+static volatile sig_atomic_t raw_on;
+static volatile sig_atomic_t need_resume;   /* set by SIGTSTP/continue: re-establish the screen's modes */
 
 /* ---- terminal ---- */
 
@@ -54,15 +56,36 @@ static void restore_terminal(void) {
     raw_mode(0);
 }
 
+static const char reset_seq[] = "\033[0m\033[?7h\033[r\r\n";
+
+/** Fatal signals (and abort): put the terminal back, then die of the same signal. */
 static void on_signal(int sig) {
-    static const char reset[] = "\033[0m\033[?7h\033[r\r\n";
     if (raw_on) {
-        ssize_t n = write(STDOUT_FILENO, reset, sizeof reset - 1);
+        ssize_t n = write(STDOUT_FILENO, reset_seq, sizeof reset_seq - 1);
         (void)n;
         tcsetattr(STDIN_FILENO, TCSANOW, &saved_tio);
     }
     signal(sig, SIG_DFL);
     raise(sig);
+}
+
+/** Ctrl-Z: give the shell a sane terminal, stop, and take the terminal back when continued. */
+static void on_tstp(int sig) {
+    ssize_t n = write(STDOUT_FILENO, reset_seq, sizeof reset_seq - 1);
+    (void)n;
+    tcsetattr(STDIN_FILENO, TCSANOW, &saved_tio);
+    signal(sig, SIG_DFL);
+    {   /* SIGTSTP is blocked while its own handler runs; unblock it so the stop happens here,
+         * after the terminal was given back and before it is taken again */
+        sigset_t unblock;
+        sigemptyset(&unblock);
+        sigaddset(&unblock, sig);
+        sigprocmask(SIG_UNBLOCK, &unblock, NULL);
+    }
+    raise(sig);                                  /* stops here until SIGCONT */
+    signal(sig, on_tstp);
+    tcsetattr(STDIN_FILENO, TCSANOW, &raw_tio);
+    need_resume = 1;                             /* the main loop repairs the screen's modes */
 }
 
 static void raw_mode(int on) {
@@ -75,6 +98,7 @@ static void raw_mode(int on) {
         t.c_iflag &= ~(ICRNL | IXON);
         t.c_cc[VMIN] = 1;
         t.c_cc[VTIME] = 0;
+        raw_tio = t;
         tcsetattr(STDIN_FILENO, TCSANOW, &t);
     } else {
         tcsetattr(STDIN_FILENO, TCSANOW, &saved_tio);
@@ -111,6 +135,11 @@ static int read_key_byte(void) {
     ssize_t n;
     if (pushed_back >= 0) { int b = pushed_back; pushed_back = -1; return b; }
     do { n = read(STDIN_FILENO, &c, 1); } while (n < 0 && errno == EINTR);
+    if (need_resume) {                           /* continued after Ctrl-Z */
+        need_resume = 0;
+        zscreen_resume(&scr);
+        fflush(stdout);
+    }
     return n == 1 ? c : -1;
 }
 
@@ -136,7 +165,8 @@ static int read_zscii_key(void) {
             if (c2 == 'B') return 130;
             if (c2 == 'D') return 131;
             if (c2 == 'C') return 132;
-            while (c2 >= 0 && !(c2 >= 0x40 && c2 <= 0x7E)) c2 = read_key_byte();   /* skip the rest */
+            /* skip the rest of an unknown sequence; if it stops short, the next key is not part of it */
+            while (c2 >= 0 && !(c2 >= 0x40 && c2 <= 0x7E)) c2 = key_pending() ? read_key_byte() : -1;
             continue;
         }
         if (c >= 32 && c < 127) return c;
@@ -194,12 +224,16 @@ static void do_restore(zvibeContext *ctx) {
     int ok = 0;
     FILE *f = fopen(save_path, "rb");
     if (f) {
-        size_t cap = 1 << 16, n;
-        void *data = malloc(cap);
-        n = data ? fread(data, 1, cap, f) : 0;
+        long cap = -1;
+        if (fseek(f, 0, SEEK_END) == 0) cap = ftell(f);
+        rewind(f);
+        if (cap > 0 && cap <= (1L << 20)) {          /* a V4 save can be over 64 KB */
+            void *data = malloc((size_t)cap);
+            size_t n = data ? fread(data, 1, (size_t)cap, f) : 0;
+            if (n == (size_t)cap) ok = zvibe_restore_data(ctx, data, n) == ZVIBE_OK;
+            free(data);
+        }
         fclose(f);
-        if (n) ok = zvibe_restore_data(ctx, data, n) == ZVIBE_OK;
-        free(data);
     }
     zvibe_restore_completed(ctx, ok);
 }
@@ -238,7 +272,10 @@ int zvibe_v4term_play(const char *story_file, int seed, const char *save_file, F
     atexit(restore_terminal);
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
-    signal(SIGTSTP, on_signal);
+    signal(SIGHUP, on_signal);
+    signal(SIGQUIT, on_signal);
+    signal(SIGABRT, on_signal);                  /* abort() skips atexit handlers */
+    signal(SIGTSTP, on_tstp);
     raw_mode(1);
     while (!finished) {
         zvibeResult r = zvibe_run(ctx);

@@ -261,6 +261,13 @@ zvibeResult zvibe_set_screen(zvibeContext *ctx, const zvibeScreenOps *ops, void 
         z_init_interpreter_header();
     return ZVIBE_OK;
 }
+
+size_t zvibe_get_input_limit(zvibeContext *ctx) {
+    zmem_byte_t max;
+    if (!ctx || !ctx->z_state.input_requested) return 0;
+    if (zmem_read_byte(&ctx->z_state.memory_state, ctx->z_state.input_buffer_addr, &max) != 0 || max < 2) return 0;
+    return (size_t)max - 1;               /* the first byte is the buffer size, one of it is the terminator */
+}
 #endif
 
 zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,

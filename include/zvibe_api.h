@@ -305,6 +305,18 @@ zvibeResult zvibe_input_char(zvibeContext *ctx, uint16_t zscii);
  * story. Text output still goes through the callback given to zvibe_create().
  */
 zvibeResult zvibe_set_screen(zvibeContext *ctx, const zvibeScreenOps *ops, void *user);
+
+/**
+ * @brief How many characters the pending line read (read) can take
+ *
+ * Valid after zvibe_run() returned ZVIBE_WAIT_FOR_INPUT: the story's text buffer
+ * holds this many characters, and zvibe_input() cuts a longer line to fit. A
+ * frontend that edits the line itself can stop the player there instead of
+ * showing characters the story will not see.
+ *
+ * @return The limit, or 0 if no line is being read
+ */
+size_t zvibe_get_input_limit(zvibeContext *ctx);
 #endif
 
 /**

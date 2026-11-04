@@ -201,6 +201,14 @@ void zscreen_init(zscreen *s, zscreen_put_fn put, uint8_t rows, uint8_t cols) {
     term_goto(s, s->lower_row, 1);
 }
 
+void zscreen_resume(zscreen *s) {
+    zscreen_flush(s);
+    put_str(s, "\033[0m\033[?7l\033[?25h");   /* attributes, no auto-wrap, cursor */
+    s->hw_style = 0;
+    term_set_region(s);
+    goto_current(s);
+}
+
 void zscreen_shutdown(zscreen *s) {
     zscreen_flush(s);
     put_str(s, "\033[0m\033[?7h\033[r");

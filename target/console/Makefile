@@ -97,7 +97,13 @@ $(SCREEN_OBJ) $(V4TERM_OBJ): $(CONFIG_STAMP)
 -include $(wildcard $(OBJ_DIR)/*.d)
 
 # Console target
-$(CONSOLE_TARGET): $(CORE_OBJS) $(API_OBJ) $(API_FILE_OBJ) $(CONSOLE_OBJ) $(SCREEN_OBJ) $(V4TERM_OBJ)
+# The V4 player and the screen layer are linked only into a V4-enabled build (a V3-only console
+# carries none of it).
+ifneq (,$(findstring ZVIBE_ENABLE_V4=1,$(EXTRA_CFLAGS)))
+V4_LINK_OBJS = $(SCREEN_OBJ) $(V4TERM_OBJ)
+endif
+
+$(CONSOLE_TARGET): $(CORE_OBJS) $(API_OBJ) $(API_FILE_OBJ) $(CONSOLE_OBJ) $(V4_LINK_OBJS)
 	$(CC) $(CFLAGS) $^ -o $@
 
 # Minimal target
