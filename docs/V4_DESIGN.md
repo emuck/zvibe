@@ -383,6 +383,18 @@ each is a separate commit.
      V3 build, by the earlier measurements), re-running the fuzzer until it is
      clean. Deliberately left out of the first V4 release; stories are treated as
      trusted input (see `SECURITY.md`).
+   - **Final review (Codex, three scoped passes over the SAM E51 firmware and saves, the web
+     terminal, and the console and core changes).** Fixed: the SAM E51 save checksum (a shift sum
+     that kept 32 bytes) is a CRC-32, a V4 save carries the story's identity, the Escape key and
+     the column count on the SAM E51, the shared `story_data.c`; the console player could not
+     restore a save over 64 KB, left the terminal raw on abort, and mishandled Ctrl-Z/`fg` and a
+     half-received escape sequence; the web terminal's game list overflowed its buffer, replayed
+     without the typed command, ignored the story's input limit and accepted a character on a
+     full row. Known and left: a power cut during a save can still lose the previous save (one
+     SmartEEPROM slot, no second copy; a half-written save is now always rejected, never loaded);
+     the web terminal's replay after the history ring wraps can start in the wrong place; the POSIX
+     reference server serves one connection at a time; the stop/continue handling does not redraw
+     the screen.
    - (Done) The tests Codex proposed for this slice: nested stream limits, `scan_table`
      variants, restart under the real ANSI layer, a dirty-terminal init, and a
      pseudo-terminal test of the player (which found and fixed a lost key after Escape).

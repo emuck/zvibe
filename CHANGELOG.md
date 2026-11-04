@@ -34,6 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   optional downloaded games when they are not present.
 
 ### Fixed
+- SAM E51 saves: the stored checksum is now a CRC-32 (the old one covered only the last 32
+  bytes, so a damaged save could be accepted; saves made by an older firmware are ignored once),
+  and a V4 save records the story's release, serial and checksum, so another release of the
+  story refuses it instead of loading it against the wrong memory. Escape no longer swallows the
+  next key on the SAM E51, and a terminal wider than 255 columns no longer becomes one column wide.
+  A V3 build after a V4 build no longer reuses the V4 story array.
+- Console V4 player: a save over 64 KB can be restored; abort, Ctrl-backslash and hangup restore the
+  terminal; Ctrl-Z and `fg` keep working; an unfinished escape sequence no longer blocks or eats
+  the next key. A V3-only console no longer links the screen layer.
+- Web terminal: the game list no longer overflows its buffer or breaks on file names with quotes;
+  the command a player typed is part of the replay on reconnect; typing stops where the story's
+  text buffer ends (`max`) and a prompt that fills the row takes no input.
 - A routine header claiming more than 127 locals overflowed the stack: the loop counter
   in `op_call` was a signed byte. A global variable outside memory no longer causes a write
   through a null pointer, and a local variable in the main routine is refused instead of

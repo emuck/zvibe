@@ -66,8 +66,24 @@ selected. `test_v4term_pty.py` runs the full-screen player on a real pseudo-term
 another key arriving together (neither lost), cursor keys in both encodings, escape
 sequences with no key dropped whole, line editing, a line longer than the screen, and
 that Ctrl-C and a normal exit leave the terminal modes as they were. `test_v4_plain.sh`
-covers a V4 story on the plain path (piped keys, script lines, no escapes). Each was
-checked by reintroducing the bug it guards against.
+covers a V4 story on the plain path (piped keys, script lines, no escapes; Return is key 13, not
+10). Each was checked by reintroducing the bug it guards against.
+
+The pty test also covers: a truncated escape sequence (the next key is not lost), abort,
+Ctrl-backslash and hangup (terminal restored), Ctrl-Z followed by `fg`, and a save over 64 KB
+(`data/v4huge.z4`, saved from 24 calls deep so the stack adds to the size).
+
+**SAM E51 saves.** `test_delta_pack.c` (335 checks) now also checks `save_crc32` against the
+standard CRC-32 test value and that every bit of a 4 KB blob counts, and cuts a packed save at
+every length with the recorded length rewritten to match (so the checks inside the runs, not the
+length check, must reject it; the cut copy is exactly sized, so an over-read is an ASan error).
+`target/same51/tests/test_v4_identity.py` flashes release 1 and release 2 of a story, saves on
+release 1 and checks that release 2 refuses the save and release 1 still restores it.
+
+**Web terminal.** `make test` in `target/webterm/tests` also runs `test_server_games.py` (the
+POSIX server's game list under ASan: a crowded directory, names with quotes and backslashes) and,
+in `test_screen_session.c`, a story that reads line after line (`data/v4lines.z4`): the story's
+input limit reaches the client and a reconnect after a command replays that command.
 
 For hand testing, build with V4 enabled (`make validate-v4` leaves the binary at
 `target/console/build_v4/bin/zvibe_console`) and run a V4 story in a terminal:
