@@ -11,11 +11,17 @@ INCLUDES = -I../../../include
 # Source directories
 CORE_DIR = ../../../src/core
 TEST_DIR = .
-BUILD_DIR = ../build
+# Console build directory under test. Override to test another build, e.g. the
+# V4-enabled one: make test-czech ZVIBE_BUILD=build_v4
+ZVIBE_BUILD ?= build
+BUILD_DIR = ../$(ZVIBE_BUILD)
+export ZVIBE_BUILD
 BIN_DIR = $(BUILD_DIR)/bin
 
 # Test executables
-TEST_TARGETS = test_split_memory
+TEST_TARGETS = test_split_memory test_screen test_config_v3 test_config_v4 test_config_stack1024 \
+               test_save_restore test_save_restore_v4_stack1024 test_save_restore_san \
+               test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_v4_ops test_screen_v4 test_restart_screen test_save_restore_san test_delta_pack test_delta_pack_san
 
 # Integration test scripts
 INTEGRATION_TESTS = test_czech.sh
@@ -27,16 +33,152 @@ all: $(TEST_TARGETS)
 test_split_memory: test_split_memory.c $(CORE_DIR)/zvibe_memory.c
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^
 
+test_screen: test_screen.c vt100_emu.h $(CORE_DIR)/../screen/zvibe_screen.c
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ test_screen.c $(CORE_DIR)/../screen/zvibe_screen.c
+
+# Build configuration and restore-safety tests. They link the whole core and
+# depend on every public header, so changing zvibe_config.h rebuilds them.
+# Each config binary states what it must be (EXPECT_*), so a wrong -D fails the
+# build instead of silently testing the wrong configuration.
+# Test binaries also depend on a stamp of the compiler and flags, so changing
+# CC/CFLAGS (not just a source or header) rebuilds them.
+TEST_STAMP = .test_build_flags
+$(TEST_STAMP): FORCE
+	@echo '$(CC) $(CFLAGS) $(INCLUDES)' | cmp -s - $@ || echo '$(CC) $(CFLAGS) $(INCLUDES)' > $@
+FORCE:
+
+ALL_SRCS = $(wildcard $(CORE_DIR)/*.c) $(CORE_DIR)/../api/zvibe_api.c $(CORE_DIR)/../api/zvibe_api_file.c
+HEADERS = $(wildcard ../../../include/*.h) test_story.h
+DELTA_INC = -I../../same51/include
+DELTA_SRC = ../../same51/src/save_delta.c
+
+test_config_v3: test_config.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -DEXPECT_STACK_WORDS=512 -o $@ test_config.c $(ALL_SRCS)
+
+test_config_v4: test_config.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -DEXPECT_STACK_WORDS=512 -o $@ test_config.c $(ALL_SRCS)
+
+test_config_stack1024: test_config.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_STACK_WORDS=1024 -DEXPECT_V4=0 -DEXPECT_STACK_WORDS=1024 -o $@ test_config.c $(ALL_SRCS)
+
+test_save_restore: test_save_restore.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../../same51/include/save_delta.h $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) $(DELTA_INC) -o $@ test_save_restore.c $(ALL_SRCS) $(DELTA_SRC)
+
+test_save_restore_v4_stack1024: test_save_restore.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../../same51/include/save_delta.h $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) $(DELTA_INC) -DZVIBE_ENABLE_V4=1 -DZVIBE_STACK_WORDS=1024 -o $@ test_save_restore.c $(ALL_SRCS) $(DELTA_SRC)
+
+# Object table, properties, packed addresses, verify: V3-only build, and a
+# dual build that runs the same V3 cases plus the V4 layouts.
+test_objects_v3: test_objects.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -o $@ test_objects.c $(ALL_SRCS)
+
+test_objects_v4: test_objects.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_objects.c $(ALL_SRCS)
+
+# Loading, header setup, instruction decoding, call forms, save/restore results.
+test_opcodes_v3: test_opcodes.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -o $@ test_opcodes.c $(ALL_SRCS)
+
+test_opcodes_v4: test_opcodes.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_opcodes.c $(ALL_SRCS)
+
+# V4 screen opcodes, output streams, read_char, scan_table (V4 builds only).
+test_v4_ops: test_v4_ops.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_v4_ops.c $(ALL_SRCS)
+
+# A real V4 story through the real ANSI screen layer into a VT100 emulator.
+test_restart_screen: test_restart_screen.c vt100_emu.h $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_restart_screen.c $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c
+
+test_screen_v4: test_screen_v4.c vt100_emu.h data/v4screen.z4 $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_screen_v4.c $(ALL_SRCS) $(CORE_DIR)/../screen/zvibe_screen.c
+
+# Dictionary encoding, lookup and tokenizing. The test #includes zvibe_ops_text.c
+# to reach its static functions, so that file is left out of the link.
+DICT_SRCS = $(filter-out %zvibe_ops_text.c,$(ALL_SRCS))
+
+test_dict_v3: test_dict.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DEXPECT_V4=0 -o $@ test_dict.c $(DICT_SRCS)
+
+test_dict_v4: test_dict.c $(ALL_SRCS) $(HEADERS) $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) -DZVIBE_ENABLE_V4=1 -DEXPECT_V4=1 -o $@ test_dict.c $(DICT_SRCS)
+
+# The same test under AddressSanitizer and UBSan: exact-size inputs make an
+# over-read in the codec or the raw restore a hard failure.
+test_save_restore_san: test_save_restore.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../../same51/include/save_delta.h $(TEST_STAMP)
+	$(CC) $(CFLAGS) -g -fsanitize=address,undefined -fno-sanitize-recover=undefined $(INCLUDES) $(DELTA_INC) -o $@ test_save_restore.c $(ALL_SRCS) $(DELTA_SRC)
+
+test_delta_pack: test_delta_pack.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../../same51/include/save_delta.h $(TEST_STAMP)
+	$(CC) $(CFLAGS) $(INCLUDES) $(DELTA_INC) -DZVIBE_ENABLE_V4=1 -o $@ test_delta_pack.c $(ALL_SRCS) $(DELTA_SRC)
+
+test_delta_pack_san: test_delta_pack.c $(ALL_SRCS) $(DELTA_SRC) $(HEADERS) ../../same51/include/save_delta.h $(TEST_STAMP)
+	$(CC) $(CFLAGS) -g -fsanitize=address,undefined -fno-sanitize-recover=undefined $(INCLUDES) $(DELTA_INC) -DZVIBE_ENABLE_V4=1 -o $@ test_delta_pack.c $(ALL_SRCS) $(DELTA_SRC)
+
+# The delta codec exists as two identical copies (SAM E51 and RISC-V); they
+# must not drift apart.
+test-delta-copies:
+	@cmp ../../same51/src/save_delta.c ../../riscv/serv_zvibe/common/sw/save_delta.c
+	@cmp ../../same51/include/save_delta.h ../../riscv/serv_zvibe/common/sw/save_delta.h
+	@echo "save_delta copies identical"
+
+# ZVIBE_VERIFY_SAVE_IDENTITY defaults: on for hosted builds and any V4 build,
+# off for freestanding / minimal V3-only firmware (and overridable)
+test-config-identity:
+	@check() { \
+	  want=$$1; shift; \
+	  got=$$(printf '#include "zvibe_config.h"\nint v = ZVIBE_VERIFY_SAVE_IDENTITY;\n' | $(CC) -I../../../include "$$@" -E -x c - | tail -1 | sed 's/.*= \([01]\);/\1/'); \
+	  [ "$$got" = "$$want" ] || { echo "FAIL: ZVIBE_VERIFY_SAVE_IDENTITY with [$$*] is $$got, expected $$want"; exit 1; }; \
+	}; \
+	check 1; \
+	check 1 -DZVIBE_ENABLE_V4=1; \
+	check 0 -DZVIBE_FREESTANDING=1; \
+	check 0 -DZVIBE_MINIMAL_FEATURES; \
+	check 1 -DZVIBE_ENABLE_V4=1 -DZVIBE_FREESTANDING=1; \
+	check 1 -DZVIBE_ENABLE_V4=1 -DZVIBE_MINIMAL_FEATURES; \
+	check 1 -DZVIBE_FREESTANDING=1 -DZVIBE_VERIFY_SAVE_IDENTITY=1; \
+	check 0 -DZVIBE_VERIFY_SAVE_IDENTITY=0
+	@echo "ZVIBE_VERIFY_SAVE_IDENTITY defaults OK"
+
+# zvibe_config.h must reject anything but a literal 0 or 1 for ZVIBE_ENABLE_V4
+test-config-defines:
+	@for v in yes 2 -1 "" 0x1 true 01 1L "(1)" "1+0" "1&&0" "0||1"; do \
+	  if $(CC) -fsyntax-only -x c -I../../../include "-DZVIBE_ENABLE_V4=$$v" ../../../include/zvibe_config.h 2>/dev/null; then \
+	    echo "FAIL: ZVIBE_ENABLE_V4='$$v' was accepted"; exit 1; fi; \
+	done
+	@for v in 0 1; do \
+	  $(CC) -fsyntax-only -x c -I../../../include -DZVIBE_ENABLE_V4=$$v ../../../include/zvibe_config.h || { echo "FAIL: ZVIBE_ENABLE_V4=$$v rejected"; exit 1; }; \
+	done
+	@echo "ZVIBE_ENABLE_V4 validation OK"
+
 # Ensure zvibe binaries are built before running integration tests
 ensure-binaries:
+	@if [ "$(ZVIBE_BUILD)" != "build" ] && { [ ! -f "$(BIN_DIR)/zvibe_minimal" ] || [ ! -f "$(BIN_DIR)/zvibe_console" ]; }; then \
+		echo "$(BIN_DIR) is missing binaries. Build it first, e.g.:"; \
+		echo "  make -C .. BUILD_DIR=$(ZVIBE_BUILD) EXTRA_CFLAGS=-DZVIBE_ENABLE_V4=1"; \
+		exit 1; \
+	fi
 	@if [ ! -f "$(BIN_DIR)/zvibe_minimal" ]; then \
 		echo "Building zvibe_minimal..."; \
-		cd .. && $(MAKE) minimal; \
+		cd .. && $(MAKE) BUILD_DIR=$(ZVIBE_BUILD) minimal; \
 	fi
 	@if [ ! -f "$(BIN_DIR)/zvibe_console" ]; then \
 		echo "Building zvibe_console..."; \
-		cd .. && $(MAKE) console; \
+		cd .. && $(MAKE) BUILD_DIR=$(ZVIBE_BUILD) console; \
 	fi
+	@$(MAKE) --no-print-directory verify-console-config
+
+# The console binaries carry a marker of the configuration they were built
+# with. Integration tests must run against the configuration they claim:
+# V3-only (EXPECT_V4=0, the default) or V4-enabled (EXPECT_V4=1).
+EXPECT_V4 ?= 0
+EXPECT_STACK ?= 512
+verify-console-config:
+	@for b in zvibe_minimal zvibe_console; do \
+	  strings -a "$(BIN_DIR)/$$b" | grep -q "zvibe-build:v4=$(EXPECT_V4):stack=$(EXPECT_STACK)$$" || { \
+	    echo "FAIL: $(BIN_DIR)/$$b is not a ZVIBE_ENABLE_V4=$(EXPECT_V4), stack=$(EXPECT_STACK) build"; \
+	    strings -a "$(BIN_DIR)/$$b" | grep "zvibe-build:" ; exit 1; }; \
+	done
+	@echo "console binaries in $(ZVIBE_BUILD)/ are ZVIBE_ENABLE_V4=$(EXPECT_V4), stack=$(EXPECT_STACK) builds"
 
 # Run all tests (unit tests and integration tests)
 test: test-unit test-integration
@@ -49,6 +191,36 @@ test-unit: $(TEST_TARGETS)
 	@echo "Running split memory unit tests..."
 	@./test_split_memory
 	@echo
+	@echo "Running V4 screen layer unit tests..."
+	@./test_screen
+	@echo
+	@echo "Running build configuration tests (V3-only, then V3+V4)..."
+	@./test_config_v3
+	@./test_config_v4
+	@./test_config_stack1024
+	@$(MAKE) --no-print-directory test-config-defines
+	@$(MAKE) --no-print-directory test-config-identity
+	@echo
+	@echo "Running restore safety tests (raw and delta saves)..."
+	@./test_save_restore
+	@./test_save_restore_v4_stack1024
+	@./test_save_restore_san
+	@./test_delta_pack
+	@./test_delta_pack_san
+	@echo
+	@echo "Running object/property/address tests (V3-only, then V3+V4)..."
+	@./test_objects_v3
+	@./test_objects_v4
+	@./test_dict_v3
+	@./test_dict_v4
+	@./test_opcodes_v3
+	@./test_opcodes_v4
+	@./test_v4_ops
+	@./test_screen_v4
+	@./test_restart_screen
+	@$(MAKE) --no-print-directory test-v4term
+	@$(MAKE) --no-print-directory test-delta-copies
+	@echo
 	@echo "=== Unit Tests Complete ==="
 
 # Run integration tests only
@@ -58,11 +230,11 @@ test-integration: ensure-binaries
 	@echo "Running Czech Z3 functionality test..."
 	@./test_czech.sh
 	@echo
-	@echo "Running Plundered Hearts integration test..."
-	@./test_script.sh plunderedhearts
+	@echo "Running Plundered Hearts integration test (skipped if the game is not downloaded)..."
+	@./test_script.sh plunderedhearts --skip-missing
 	@echo
-	@echo "Running Seastalker integration test..."
-	@./test_script.sh seastalker
+	@echo "Running Seastalker integration test (skipped if the game is not downloaded)..."
+	@./test_script.sh seastalker --skip-missing
 	@echo
 	@echo "Running Restaurant at the End of the Universe integration test..."
 	@./test_script.sh restaurant
@@ -82,6 +254,22 @@ test-split-memory: test_split_memory
 test-czech: ensure-binaries
 	@echo "Running Czech Z3 functionality test..."
 	./test_czech.sh
+
+# V4 conformance gate: Czech built for V4, against a V4-enabled console build.
+# Run with: make test-czech-v4 ZVIBE_BUILD=build_v4 EXPECT_V4=1
+test-czech-v4: ensure-binaries
+	@echo "Running Czech V4 conformance test..."
+	./test_czech_v4.sh
+
+# The V4 terminal player on a pseudo-terminal (keys, Escape, Ctrl-C, long lines). Builds a
+# V4 console in ../build_v4; needs python3.
+test-v4term:
+	@$(MAKE) --no-print-directory -C .. BUILD_DIR=build_v4 EXTRA_CFLAGS=-DZVIBE_ENABLE_V4=1 >/dev/null
+	python3 test_v4term_pty.py
+
+# V4 story on the plain (non-tty) console path; needs the V4 console build.
+test-v4-plain:
+	./test_v4_plain.sh
 
 test-plundered: ensure-binaries
 	@echo "Running Plundered Hearts integration test..."
@@ -169,4 +357,4 @@ help:
 	@echo "  make coverage                # Run unit tests with coverage analysis"
 
 # Phony targets
-.PHONY: all test test-unit test-integration test-verbose clean test-split-memory test-czech test-plundered test-seastalker test-restaurant coverage debug memcheck profile help ensure-binaries
+.PHONY: test-config-identity test-czech-v4 verify-console-config test-delta-copies test-config-defines all test test-unit test-integration test-verbose clean test-split-memory test-czech test-plundered test-seastalker test-restaurant coverage debug memcheck profile help ensure-binaries

@@ -11,8 +11,10 @@ tests/*.z3
 *.z8
 *.dat
 
-# Exceptions: public domain / original works committed to the repo
+# Exceptions: freely redistributable / original works committed to the repo
+# (czech: Czech v0.8 by Amir Karger, see THIRD_PARTY_NOTICES.md)
 !catalog/czech.z3
+!catalog/czech.z4
 !catalog/restaurant.z3
 
 # Ignore download caches and temp files

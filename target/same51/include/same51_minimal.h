@@ -72,12 +72,12 @@ typedef enum IRQn
   DMAC_2_IRQn               =  33,
   DMAC_3_IRQn               =  34,
   DMAC_4_IRQn               =  35,
-  NVMCTRL_0_IRQn            =  37,
-  NVMCTRL_1_IRQn            =  38,
-  SERCOM5_0_IRQn            =  80,
-  SERCOM5_1_IRQn            =  81,
-  SERCOM5_2_IRQn            =  82,
-  SERCOM5_3_IRQn            =  83,
+  NVMCTRL_0_IRQn            =  29,
+  NVMCTRL_1_IRQn            =  30,
+  SERCOM5_0_IRQn            =  66,  /* DRE */
+  SERCOM5_1_IRQn            =  67,  /* TXC */
+  SERCOM5_2_IRQn            =  68,  /* RXC */
+  SERCOM5_3_IRQn            =  69,  /* OTHER: ERROR, RXBRK, CTSIC... */
   
   PERIPH_MAX_IRQn           =  136  /* Maximum peripheral ID */
 } IRQn_Type;

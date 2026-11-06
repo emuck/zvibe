@@ -5,7 +5,69 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.1.0] - 2026-11-02
+
+### Added
+- Z-machine version 4 support, selected at build time with `ZVIBE_ENABLE_V4=1`
+  (default off: V3-only builds are unchanged in behavior and size). Covers the V4
+  object, property and dictionary layouts, the V4 opcodes (`call_1s`, `call_2s`,
+  `call_vs2`, `read_char`, `scan_table`, `erase_window`/`erase_line`, cursor,
+  text style, buffering, output stream 3), V4 save and restore results, and the
+  header fields a V4 story reads. See `docs/V4_DESIGN.md`.
+- Web terminal: V4 stories play with their own screen when built with `ZVIBE_ENABLE_V4=1`:
+  `screen` frames carry the ANSI screen layer's bytes and `zterm.js` draws them; `read_char`
+  is a `key` message; `.z4` discovery, larger story and save buffers.
+- An ANSI/VT100 screen layer (`src/screen`) and a public screen interface
+  (`zvibe_screen_ops.h`, `zvibe_set_screen`) for split windows, cursor addressing and styles.
+- The console plays V4 stories full-screen on a terminal.
+- SAM E51 V4 firmware (`make v4`): terminal input ring, key decoding, and saves
+  packed against the story so that saves larger than the SmartEEPROM fit.
+- Czech V4 conformance gate, and V4 test stories with hardware test scripts.
+
+### Changed
+- The opcode dispatch tables are `const`: a V3-only build is about 150 bytes smaller in
+  flash and 390 bytes smaller in RAM on the SAM E51 (`scripts/core_size.sh` measures it).
+  Apart from the dictionary fix below, a V3-only build contains no V4 code.
+- The interpreter stack is configurable with `ZVIBE_STACK_WORDS`; `restore` refuses a save
+  made with a larger stack instead of copying past it.
+- `make validate-v4` and the webterm tests run in CI; `make test-integration` skips the
+  optional downloaded games when they are not present.
+
+### Fixed
+- SAM E51 saves (V3 and V4): the SmartEEPROM does not persist a single-byte store, nor zero words
+  at the end of a write over older non-zero data, so a save written after an earlier, larger one
+  could come back after a reset with its last bytes wrong (the old checksum covered only the last
+  32 bytes and mostly hid it). A save is now written as whole words, padded with ones, in one
+  flush, and ends with a non-zero marker word.
+- SAM E51 saves: the stored checksum is now a CRC-32 (the old one covered only the last 32
+  bytes, so a damaged save could be accepted; saves made by an older firmware are ignored once),
+  and a V4 save records the story's release, serial and checksum, so another release of the
+  story refuses it instead of loading it against the wrong memory. Escape no longer swallows the
+  next key on the SAM E51, and a terminal wider than 255 columns no longer becomes one column wide.
+  A V3 build after a V4 build no longer reuses the V4 story array.
+- Console V4 player: a save over 64 KB can be restored; abort, Ctrl-backslash and hangup restore the
+  terminal; Ctrl-Z and `fg` keep working; an unfinished escape sequence no longer blocks or eats
+  the next key. A V3-only console no longer links the screen layer.
+- Web terminal: the game list no longer overflows its buffer or breaks on file names with quotes;
+  the command a player typed is part of the replay on reconnect; typing stops where the story's
+  text buffer ends (`max`) and a prompt that fills the row takes no input.
+- A routine header claiming more than 127 locals overflowed the stack: the loop counter
+  in `op_call` was a signed byte. A global variable outside memory no longer causes a write
+  through a null pointer, and a local variable in the main routine is refused instead of
+  reading before the stack. The `random` opcode no longer overflows a signed integer (same
+  sequence). `scripts/fuzz_story.c` finds the remaining out-of-bounds reads on corrupt
+  stories; they are listed in `docs/V4_DESIGN.md` and `SECURITY.md`.
+- Three bugs that V3 had as well as V4: a character outside the alphabets (such as `@`)
+  was dropped when a word was encoded for the dictionary, and a shift past the length limit
+  displaced a later letter; an empty dictionary made the lookup read far past its end; and
+  `print_obj` of an object with no short name ran on into the next property. The fixes cost
+  about 60 bytes of flash on the SAM E51 (200 on RISC-V).
+- Czech Z-machine test suite attribution and license. It was described as public
+  domain and credited to another author; the upstream Czech v0.8 distribution
+  says Copyright (C) 2003 Amir Karger, free to use, distribute and modify with
+  the license and notice preserved. `THIRD_PARTY_NOTICES.md` and `NOTICE` now carry
+  the real notice, `games/catalog/CZECH-NOTICE.txt` and `CZECH-README.txt` travel
+  with the story files, and every public-domain claim was corrected.
 
 ## [2.0.0] - 2026-06-22
 
@@ -104,7 +166,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-platform support (Linux, macOS, Windows/WSL2)
 
 **Testing**
-- Czech Z-machine test suite integration (368 tests, public domain)
+- Czech Z-machine test suite integration (368 tests; freely redistributable, Copyright (C) 2003 Amir Karger)
 - 119 unit tests for memory subsystem
 - Hardware validation suite for RISC-V FPGA
 - Automated UART testing with latency metrics
@@ -204,5 +266,6 @@ See LICENSE and target/riscv/serv_zvibe/LICENSE for details.
 - Martin R. Raumann (primary developer)
 - Ryan C. Gordon (mojozork original implementation)
 
+[2.1.0]: https://github.com/emuck/zvibe/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/emuck/zvibe/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/emuck/zvibe/releases/tag/v1.0.0

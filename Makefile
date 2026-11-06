@@ -4,13 +4,14 @@
 #
 # Convenience targets for common tasks across all targets
 
-.PHONY: help validate test ci-source clean clean-all docs sim-tier1 sim-questa sim-xsim sim-all
+.PHONY: help validate validate-v4 test ci-source clean clean-all docs sim-tier1 sim-questa sim-xsim sim-all
 
 help:
 	@echo "ZVibe Repository Makefile"
 	@echo ""
 	@echo "Validation:"
 	@echo "  make validate       - Console build + unit tests (matches CI)"
+	@echo "  make validate-v4    - Same checks on a V3+V4 (ZVIBE_ENABLE_V4=1) console build"
 	@echo "  make ci-source      - Full source-change gate (skips missing toolchains)"
 	@echo "  make sim-tier1      - Verilator RTL tests (requires verilator)"
 	@echo ""
@@ -43,7 +44,21 @@ validate:
 	@echo "Running console unit tests..."
 	@cd target/console/tests && make test-unit
 	@echo "Running czech conformance suite..."
-	@cd target/console/tests && make test-czech
+	@$(MAKE) -C target/console/tests test-czech ZVIBE_BUILD=build EXPECT_V4=0
+
+# Same checks against a build with V4 compiled in (V3 stories must behave
+# identically). Builds into target/console/build_v4, leaving the default build alone.
+validate-v4:
+	@echo "Building console target with ZVIBE_ENABLE_V4=1..."
+	@cd target/console && make clean BUILD_DIR=build_v4 >/dev/null && make BUILD_DIR=build_v4 EXTRA_CFLAGS=-DZVIBE_ENABLE_V4=1
+	@echo "Running console unit tests..."
+	@cd target/console/tests && make test-unit
+	@echo "Running czech conformance suite (V3-only story on the V4-enabled build)..."
+	@$(MAKE) -C target/console/tests test-czech ZVIBE_BUILD=build_v4 EXPECT_V4=1
+	@echo "Running Czech built for V4 (the V4 conformance gate)..."
+	@$(MAKE) -C target/console/tests test-czech-v4 ZVIBE_BUILD=build_v4 EXPECT_V4=1
+	@echo "Running Restaurant playthrough on the V4-enabled build..."
+	@$(MAKE) -C target/console/tests test-restaurant ZVIBE_BUILD=build_v4 EXPECT_V4=1
 
 # Source-change validation: host tests always, embedded builds when toolchains exist.
 ci-source:

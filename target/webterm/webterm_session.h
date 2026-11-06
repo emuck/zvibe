@@ -47,6 +47,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "webterm_platform.h"
+#include "zvibe_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -216,6 +217,19 @@ webterm_result_t webterm_session_run(webterm_session_t *s);
  */
 void webterm_session_on_input(webterm_session_t *s,
                                const char *text, size_t len);
+
+#if ZVIBE_ENABLE_V4
+/**
+ * @brief Deliver one key to a game waiting in read_char (version 4 stories).
+ *
+ * The output frame that precedes the wait carries @c "key":true instead of
+ * @c "prompt":true; the client answers with @c {"type":"key","code":N}. @p zscii
+ * is a ZSCII code: 13 Return, 8 Delete, 27 Escape, 129-132 the cursor keys
+ * (up, down, left, right), or a printable character. Ignored unless the game is
+ * waiting for a key; webterm_session_on_input() is ignored while it is.
+ */
+void webterm_session_on_char(webterm_session_t *s, unsigned zscii);
+#endif
 
 /**
  * @brief Request a save operation.

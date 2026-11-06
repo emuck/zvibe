@@ -103,3 +103,15 @@ freely, subject to the following restrictions:
 2. Altered source versions must be plainly marked as such, and must not be
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
+
+-------------------------------------------------------------------------------
+Czech Z-machine test suite (games/catalog/czech.z3, games/catalog/czech.z4)
+Czech, v0.8
+Copyright (C) 2003, Amir Karger
+
+The copyright holder hereby grants the rights of usage, distribution
+and modification of this software to everyone and for any purpose, as
+long as this license and the copyright notice above are preserved and
+not modified.  There is no warranty for this software.
+
+(Czech is based on Evin Robertson's test script for nitfol.)

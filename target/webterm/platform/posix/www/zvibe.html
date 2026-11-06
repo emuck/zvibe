@@ -97,6 +97,19 @@ body.map-hidden #cart-stage, body.map-hidden #gutter { display: none; }
         height: var(--maph, 32vh); min-height: 130px;
     }
 }
+/* ── version 4 screen (zterm.js) ── */
+#screen {
+    flex: 1; overflow: auto; padding: 8px 14px;
+    font: 14px/1.3 'Courier New', Courier, monospace;
+}
+#screen[hidden], #output[hidden], #input-bar[hidden] { display: none; }
+.zrow { white-space: pre; height: 1.3em; }
+.zrev  { background: #c8c8c8; color: #0e0e0e; }
+.zbold { font-weight: bold; color: #fff; }
+.zrev.zbold { color: #000; }
+.zul   { text-decoration: underline; }
+.zcur  { background: #3a3; color: #000; animation: zblink 1.1s steps(1) infinite; }
+@keyframes zblink { 50% { background: transparent; color: inherit; } }
 #prompt-char { color: #3a3; user-select: none; }
 #input-field {
     flex: 1;
@@ -137,6 +150,7 @@ select:focus, button:hover { border-color: #666; outline: none; background: #2e2
 <div id="status-bar"></div>
 <div id="main">
     <div id="term">
+        <div id="screen" hidden></div>
         <div id="output"></div>
         <div id="input-bar">
             <span id="prompt-char">&gt;</span>
@@ -149,6 +163,7 @@ select:focus, button:hover { border-color: #666; outline: none; background: #2e2
 </div>
 
 <script src="cartographer.js"></script>
+<script src="zterm.js"></script>
 <script>
 (function () {
 'use strict';
@@ -162,6 +177,27 @@ const cartStage = document.getElementById('cart-stage');
 const mapToggle = document.getElementById('maptoggle');
 
 const cart = new Cartographer(cartStage);
+
+/* A version 4 story draws its own screen: the server sends terminal bytes in
+ * "screen" frames and zterm.js draws them (and takes the keys; see zterm.js). */
+const screenEl = document.getElementById('screen');
+const inputBar = document.getElementById('input-bar');
+let screenOn = false;
+const term = new ZTerm(screenEl, msg => send(msg));
+
+function showScreen(on) {
+    screenOn = on;
+    screenEl.hidden = !on;
+    output.hidden = on;
+    inputBar.hidden = on;
+    if (!on) term.setWait(null);
+}
+
+/* Messages go to the status bar while the screen is up (the log is hidden). */
+function notice(text, cls) {
+    if (screenOn) statusEl.textContent = text.trim();
+    else print(text, cls);
+}
 
 let ws = null;
 
@@ -246,6 +282,7 @@ function connect() {
 
     ws.addEventListener('close', () => {
         setInput(false);
+        term.setWait(null);
         print('\nDisconnected. Reconnecting...\n', 'msg-sys');
         ws = null;
         setTimeout(connect, 3000);
@@ -258,7 +295,15 @@ function connect() {
         try { msg = JSON.parse(data); } catch { print(data); return; }
 
         switch (msg.type) {
+            case 'screen':
+                if (msg.reset) { showScreen(true); statusEl.textContent = ''; term.reset(msg.rows, msg.cols); }
+                if (msg.data) term.write(msg.data);
+                if (msg.key) term.setWait('key');
+                else if (msg.prompt) term.setWait('line', msg.max);
+                break;
+
             case 'output':
+                showScreen(false);
                 print(msg.text);
                 setInput(!!msg.prompt);
                 break;
@@ -297,18 +342,19 @@ function connect() {
                 break;
 
             case 'resumed':
+                if (screenOn) break;                    // the replay redraws the screen
                 print('\n-- session resumed --\n', 'msg-sys');
                 setInput(!!msg.prompt);
                 break;
 
             case 'saved':
-                print('\n[Saved.]\n', 'msg-sys');
-                setInput(true);
+                notice('\n[Saved.]\n', 'msg-sys');
+                if (!screenOn) setInput(true);
                 break;
 
             case 'error':
-                print(`\n[${msg.message}]\n`, 'msg-err');
-                setInput(true);
+                notice(`\n[${msg.message}]\n`, 'msg-err');
+                if (!screenOn) setInput(true);
                 break;
         }
     });
@@ -328,6 +374,7 @@ document.getElementById('btn-load').addEventListener('click', () => {
     if (!g) return;
     output.textContent = '';
     statusEl.textContent = '';
+    showScreen(false);
     setInput(false);
     cart.reset();
     send({ type: 'load', game: g });
@@ -341,6 +388,7 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     if (!confirm('Reset session? Game progress will be lost.')) return;
     output.textContent = '';
     statusEl.textContent = '';
+    showScreen(false);
     setInput(false);
     cart.reset();
     send({ type: 'reset' });

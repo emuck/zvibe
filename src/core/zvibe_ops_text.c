@@ -40,7 +40,15 @@
 #define Z3_ZSCII_NEWLINE     13     /* Newline character in ZSCII */
 #define Z3_ZSCII_SPACE       32     /* Space character in ZSCII */
 #define Z3_TEXT_TERMINATOR   0x8000 /* Terminator bit for Z-strings */
-#define Z3_MAX_TOKEN_LENGTH  6      /* Maximum length of token (Z-chars per word) */
+/* A dictionary word is stored as 2 packed words (6 Z-chars) in V3 and 3 packed
+ * words (9 Z-chars) in V4. The maximum is a compile-time constant (array size);
+ * the count in use follows the story version. */
+#if ZVIBE_ENABLE_V4
+#define Z_MAX_DICT_WORDS     3
+#else
+#define Z_MAX_DICT_WORDS     2
+#endif
+#define Z_DICT_WORDS         Z_VSEL(2, 3)
 
 /* Forward declaration of helper functions */
 static char z_decode_zscii_char(zWord val);
@@ -83,9 +91,7 @@ static char z_alphabet_table[] =
  * Print a newline character (opcode: new_line)
  */
 void op_new_line(void) {
-    if (G->writestr) {
-        G->writestr("\n", 1);
-    }
+    Z_OUT("\n", 1);
 }
 
 /**
@@ -116,7 +122,7 @@ void op_print_num(void) {
         while (v) { buf[--n] = '0' + v % 10; v /= 10; }
         if (value < 0) buf[--n] = '-';
     }
-    if (G->writestr) G->writestr(buf + n, 6 - n);
+    Z_OUT(buf + n, 6 - n);
 }
 
 /**
@@ -125,6 +131,15 @@ void op_print_num(void) {
 void op_print_char(void) {
     char output_char = ' '; /* Default to space */
     const zWord zscii_value = G->operands[0];
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        if (zscii_value == 0) return;                      /* null prints nothing (3.8) */
+        if (G->stream3_depth && zscii_value >= 155 && zscii_value <= 251) {
+            z_stream3_zscii((zByte)zscii_value);           /* the table holds ZSCII, not display text */
+            return;
+        }
+    }
+#endif
     
     /* Handle ASCII printable range and newline */
     if ((zscii_value >= Z3_ZSCII_SPACE) && (zscii_value <= 126)) {
@@ -133,9 +148,7 @@ void op_print_char(void) {
         output_char = '\n';
     }
     
-    if (G->writestr) {
-        G->writestr(&output_char, 1);
-    }
+    Z_OUT(&output_char, 1);
 }
 
 /**
@@ -145,9 +158,7 @@ void op_print_ret(void) {
     const zByte *text_ptr = zmem_get_ptr(&G->memory_state, G->logical_pc, 0);
     zSize bytes_consumed = z_print_zscii(text_ptr, 0);
     G->logical_pc += bytes_consumed;
-    if (G->writestr) {
-        G->writestr("\n", 1);
-    }
+    Z_OUT("\n", 1);
     z_do_return(1);
 }
 
@@ -161,10 +172,10 @@ void op_print_addr(void) {
 /**
  * Print encoded text at a packed address (opcode: print_paddr)
  * 
- * In Version 3, packed addresses are multiplied by 2.
+ * Packed addresses are multiplied by 2 in V3 and by 4 in V4.
  */
 void op_print_paddr(void) {
-    z_print_zscii(zmem_get_ptr(&G->memory_state, G->operands[0] * 2, 0), 0);
+    z_print_zscii(zmem_get_ptr(&G->memory_state, z_packed_to_byte(G->operands[0]), 0), 0);
 }
 
 /**
@@ -193,9 +204,7 @@ static void z_zscii_emit_buffer(char ch, void *userdata) {
 
 static void z_zscii_emit_output(char ch, void *userdata) {
     (void)userdata;
-    if (G->writestr) {
-        G->writestr(&ch, 1);
-    }
+    Z_OUT(&ch, 1);
 }
 
 static zSize z_walk_zscii(const zByte *encoded_text, int is_abbreviation,
@@ -224,6 +233,10 @@ static zSize z_walk_zscii(const zByte *encoded_text, int is_abbreviation,
                 zscii_collector--;
                 if (!zscii_collector) {
                     decoded = z_decode_zscii_char(zscii_code);
+#if ZVIBE_ENABLE_V4
+                    if (Z_IS_V4() && G->stream3_depth && zscii_code >= 155 && zscii_code <= 251)
+                        decoded = (char)zscii_code;        /* memory tables keep extended ZSCII */
+#endif
                     if (decoded && sink) {
                         sink(decoded, sink_userdata);
                     }
@@ -320,40 +333,73 @@ zSize z_print_zscii(const zByte *encoded_text, int is_abbreviation) {
  * Z-char 6 in A2 is the ZSCII 10-bit escape — not in this table. */
 static const char Z3_A2_CHARS[] = "\n0123456789.,!?_#'\"/\\-:()";
 
-/* Encode up to Z3_MAX_TOKEN_LENGTH input chars into two packed Z-machine dictionary words. */
-static void z_encode_zchars(const zByte *chars, zByte length, zWord encoded[2]) {
-    zByte z[Z3_MAX_TOKEN_LENGTH] = {5, 5, 5, 5, 5, 5};
+/* Encode the leading input chars into Z_DICT_WORDS packed dictionary words
+ * (3 Z-characters each; the last word carries the end-of-text bit).
+ *
+ * Each input character becomes a short run of Z-characters: a letter is one;
+ * a character in alphabet 2 is a shift (5) plus one; any other character is the
+ * ZSCII escape: shift, 6, then the 10-bit code as two 5-bit halves. The run is
+ * appended up to the capacity (6 Z-characters in V3, 9 in V4) and the encoding
+ * STOPS there: the stream is truncated, so a shift that lands in the last slot
+ * stays there, and no later character may take its place (standard, section 3.7).
+ * Unused slots are padded with 5. */
+static void z_encode_zchars(const zByte *chars, zByte length, zWord encoded[Z_MAX_DICT_WORDS]) {
+    const int limit = Z_DICT_WORDS * 3;           /* Z-chars that fit: 6 in V3, 9 in V4 */
+    zByte z[Z_MAX_DICT_WORDS * 3];
     int n = 0;
-    for (zByte i = 0; i < length; i++) {
-        char c = (char)chars[i];
-        if (c >= 'A' && c <= 'Z') c |= 0x20;  /* fold to lowercase */
+    for (int k = 0; k < limit; k++) z[k] = 5;     /* pad */
+    for (zByte i = 0; i < length && n < limit; i++) {
+        zByte c = chars[i];
+        zByte run[4];
+        int run_len, j;
+        if (c >= 'A' && c <= 'Z') c |= 0x20;      /* fold to lowercase */
         if (c >= 'a' && c <= 'z') {
-            if (n >= Z3_MAX_TOKEN_LENGTH) break;
-            z[n++] = (zByte)(c - 'a' + 6);
+            run[0] = (zByte)(c - 'a' + 6);
+            run_len = 1;
         } else {
-            const char *p = strchr(Z3_A2_CHARS, c);
-            if (p && n + 1 < Z3_MAX_TOKEN_LENGTH) {
-                z[n++] = 5;  /* shift to A2 (v3 z-char 5) */
-                z[n++] = (zByte)((p - Z3_A2_CHARS) + 7);  /* z-char = index+7 */
+            const char *p = c ? strchr(Z3_A2_CHARS, c) : NULL;
+            run[0] = 5;                            /* shift to A2 (a single shift in V3 and later) */
+            if (p) {
+                run[1] = (zByte)((p - Z3_A2_CHARS) + 7);  /* z-char = index+7 */
+                run_len = 2;
+            } else {
+                run[1] = 6;                        /* ZSCII escape */
+                run[2] = (zByte)(c >> 5);
+                run[3] = (zByte)(c & 0x1F);
+                run_len = 4;
             }
         }
+        for (j = 0; j < run_len && n < limit; j++)
+            z[n++] = run[j];
     }
-    encoded[0] = (zWord)((z[0] << 10) | (z[1] << 5) | z[2]);
-    encoded[1] = (zWord)((z[3] << 10) | (z[4] << 5) | z[5]) | Z3_TEXT_TERMINATOR;
+    for (int w = 0; w < Z_DICT_WORDS; w++)
+        encoded[w] = (zWord)((z[3 * w] << 10) | (z[3 * w + 1] << 5) | z[3 * w + 2]);
+    encoded[Z_DICT_WORDS - 1] |= Z3_TEXT_TERMINATOR;
 }
 
-/* Binary search the sorted V3 dictionary; returns Z-machine byte address of entry or 0. */
+/* Compare dictionary entry e with the encoded word, a word at a time:
+ * <0 if the entry sorts first, 0 if equal, >0 if it sorts after. */
+Z_VERSION_HELPER int z_dict_compare(const zByte *e, const zWord encoded[Z_MAX_DICT_WORDS]) {
+    for (int w = 0; w < Z_DICT_WORDS; w++) {
+        const zWord ew = ((zWord)e[2 * w] << 8) | e[2 * w + 1];
+        if (ew != encoded[w])
+            return (ew < encoded[w]) ? -1 : 1;
+    }
+    return 0;
+}
+
+/* Binary search the sorted dictionary; returns Z-machine byte address of entry or 0. */
 static zWord z_dict_lookup(const zByte *dict, zWord entries, zByte entry_len,
-                            zWord base_addr, const zWord encoded[2]) {
+                            zWord base_addr, const zWord encoded[Z_MAX_DICT_WORDS]) {
+    if (entries == 0) return 0;                   /* empty dictionary: nothing to find (hi would underflow) */
     zWord lo = 0, hi = entries - 1;
     while (lo <= hi) {
         zWord mid = lo + (hi - lo) / 2;
         const zByte *e = dict + (zSize)mid * entry_len;
-        zWord e0 = ((zWord)e[0] << 8) | e[1];
-        zWord e1 = ((zWord)e[2] << 8) | e[3];
-        if (e0 == encoded[0] && e1 == encoded[1])
+        const int cmp = z_dict_compare(e, encoded);
+        if (cmp == 0)
             return base_addr + (zWord)((zSize)mid * entry_len);
-        if (e0 < encoded[0] || (e0 == encoded[0] && e1 < encoded[1]))
+        if (cmp < 0)
             lo = mid + 1;
         else {
             if (mid == 0) break;  /* prevent zWord underflow */
@@ -366,7 +412,7 @@ static zWord z_dict_lookup(const zByte *dict, zWord entries, zByte entry_len,
 /* Emit one token (word or separator) into the parse buffer. */
 static void z_emit_token(zByte **pb, const zByte *chars, zByte length, zByte position,
                           const zByte *dict, zWord entries, zByte entry_len, zWord base_addr) {
-    zWord enc[2];
+    zWord enc[Z_MAX_DICT_WORDS];
     z_encode_zchars(chars, length, enc);
     zWord addr = z_dict_lookup(dict, entries, entry_len, base_addr, enc);
     (*pb)[0] = (zByte)(addr >> 8);

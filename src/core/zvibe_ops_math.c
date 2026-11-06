@@ -217,7 +217,8 @@ void z_random_set_seed(zSDWord seed) {
  */
 static int z_generate_random(void) {
     /* Standard linear congruential generator parameters */
-    z_random_seed = z_random_seed * Z3_RANDOM_MULTIPLIER + Z3_RANDOM_INCREMENT;
+    /* unsigned arithmetic: the same wrap-around, without signed overflow */
+    z_random_seed = (zSDWord)((zDWord)z_random_seed * (zDWord)Z3_RANDOM_MULTIPLIER + (zDWord)Z3_RANDOM_INCREMENT);
     return (int)((unsigned int)(z_random_seed / Z3_RANDOM_DIVISOR) % Z3_RANDOM_MODULUS);
 }
 

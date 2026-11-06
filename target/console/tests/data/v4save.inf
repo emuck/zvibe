@@ -1,0 +1,31 @@
+! v4save.inf - a tiny version 4 story for testing save and restore on hardware
+!
+! Keys: i = add one to the counter, p = show it, s = save, r = restore, q = quit.
+! The counter lives in dynamic memory, so it is saved and restored with the game.
+!
+! Build:  inform -v4 v4save.inf v4save.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+Global counter = 0;
+
+[ Main c r;
+    print "v4save ready^";
+    for (::) {
+        print "key? ";
+        @read_char 1 -> c;
+        print (char) c, "^";
+        switch (c) {
+          'i': counter++;
+               print "counter=", counter, "^";
+          'p': print "counter=", counter, "^";
+          's': @save -> r;
+               print "save result ", r, "^";
+          'r': @restore -> r;
+               print "restore result ", r, " counter=", counter, "^";
+          'q': print "bye^";
+               quit;
+        }
+    }
+];

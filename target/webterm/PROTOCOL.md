@@ -20,6 +20,16 @@ Delivers one line of input to the Z-machine. Must only be sent when the
 session is waiting for input (i.e. after the `prompt` field appears in an
 `output` frame). Sending input when not prompted has no effect.
 
+### Send a key (version 4 stories)
+```json
+{"type": "key", "code": 13}
+```
+Delivers one key to a game waiting in `read_char`, as a ZSCII code: 13 Return,
+8 Delete, 27 Escape, 129-132 up/down/left/right, or the character's code. Only
+valid after a `screen` frame with `"key": true`; a `key` message at any other
+time, and an `input` message while a key is awaited, have no effect. The game
+prints whatever it wants to show for the key; nothing is echoed.
+
 ### Save game
 ```json
 {"type": "save"}
@@ -69,6 +79,40 @@ means one player input produces exactly one `output` frame in response.
 The `prompt` field is present and `true` on the output frame that immediately
 precedes the Z-machine blocking for input. The client uses this to show the
 input field and `>` cursor.
+
+### Screen frames (version 4 stories)
+```json
+{"type": "screen", "reset": true, "rows": 24, "cols": 80}
+{"type": "screen", "data": "\u001b[1;1H...", "prompt": true, "max": 39}
+{"type": "screen", "data": "...", "key": true}
+```
+A version 4 story draws its own screen (an upper window, cursor positioning,
+text styles), so it is not sent as `output` text. The server runs the ANSI
+screen layer (`src/screen/zvibe_screen.c`) on a `rows` x `cols` screen and sends
+its terminal bytes in `data`; the client draws them with a small VT100 emulator
+(`zterm.js`). The bytes use only cursor positioning (`CSI H`), erase (`CSI J`,
+`CSI K`), scroll regions (`CSI r`), SGR 0/1/4/7, auto-wrap switching (`CSI ?7h/l`),
+CR, LF and BS.
+
+- `reset` (no `data`) is sent when a story loads, and again on reconnect before
+  the replay: the client discards its screen, sizes a new one and draws what
+  follows. `story` and `resumed` frames work as for version 3.
+- A long run of output is split over several `screen` frames of at most 1024
+  bytes; an escape sequence may be split between frames.
+- `prompt` and `key` mark the last frame before the game waits for a line or for
+  one key, as for `output` frames. A `prompt` frame also carries `max`, the number of
+  characters the story's text buffer takes; the client stops the line there (and at the
+  end of the row), because the story would cut anything longer.
+- **Echo:** the client echoes the characters the player types into its own screen
+  (a Return sends `{"type":"input","text":...}`); the server does not echo them
+  back but moves to the next line itself, so the first bytes after an `input` are
+  the newline. The client limits a line to the columns left on the cursor's row.
+- A reconnecting client is sent `reset` and then the recorded bytes since the story last cleared
+  the whole screen, including the echo of commands the player typed. That history is a ring
+  (`WEBTERM_HISTORY_FRAMES` frames): if the game has produced more than fits since the last clear,
+  the oldest bytes are gone and the replay can start in the wrong place (cursor, scroll region,
+  attributes); a client that stayed on the page keeps its own screen and is not affected.
+- Version 3 stories still use `output` frames, `status` and `room`.
 
 ### Status line update
 ```json
@@ -123,18 +167,20 @@ Sent immediately after connection if another client is already active. The
 server closes the connection after sending this frame. The client should
 display a message like "A game is already in progress."
 
+The POSIX reference server handles one connection at a time (it is a development tool): a second
+client is not answered until the first disconnects, so it waits instead of receiving `busy`. A
+platform that serves several connections at once (a WiFi device with an HTTP server) sends `busy`
+as described.
+
 ### Session resumed
 ```json
-{"type": "resumed", "history": "...last N lines of output..."}
+{"type": "resumed"}
+{"type": "resumed", "prompt": true}
 ```
-Sent when a client connects and a paused session exists. The `history` field
-contains recent output so the player has context. The session resumes; the
-client should display the history and show the input field if `prompt` is
-also present.
-
-```json
-{"type": "resumed", "history": "...", "prompt": true}
-```
+Sent when a client connects and a paused session exists. The recent output follows as
+ordinary `output` (or, for a version 4 story, `reset` and `screen`) frames, oldest first, so the
+player has context. `prompt` (or `key`) is present when the session is waiting for a line (or a
+key) at the moment of reconnection; the last replayed frame carries it too.
 
 ### Save confirmed
 ```json

@@ -20,6 +20,7 @@
 #include <limits.h>
 #include <time.h>
 #include "zvibe_api.h"
+#include "zvibe_v4term.h"
 
 /* Platform-specific includes */
 #ifdef _WIN32
@@ -45,7 +46,7 @@
 /* ==================== GLOBAL STATE ==================== */
 
 /* Operating mode */
-static int script_mode = 0;  /* 1 if running in script mode (clean output) */
+static int script_mode = 0;  /* 1 if running in script mode (clean output); also used for a V4 story on the plain path, which has no status line */
 
 /* Terminal state (interactive mode only) */
 static int term_width = DEFAULT_TERM_WIDTH;
@@ -249,6 +250,36 @@ static size_t read_script_input(char *buffer, size_t max_length) {
     return len;
 }
 
+#if ZVIBE_ENABLE_V4
+/* One key for read_char. A script line is a run of keys (an empty line is
+ * Return); stdin gives its bytes one by one, with newline as Return. Returns -1
+ * at the end of input. */
+static int read_plain_key(void) {
+    static char pending[256];
+    static size_t pos, len;
+    int c;
+    while (script_file && pos >= len) {
+        if (!fgets(pending, sizeof pending, script_file)) {
+            fclose(script_file); script_file = NULL;
+            break;
+        }
+        len = strlen(pending);
+        pos = 0;
+        if (len && pending[len - 1] == '\n') pending[--len] = '\0';
+        if (len == 0) return 13;
+    }
+    if (script_file && pos < len) {
+        c = (unsigned char)pending[pos++];
+        log_command((char[]){(char)c, 0});
+        return c;
+    }
+    c = fgetc(stdin);
+    if (c == EOF) return -1;
+    if (c == '\n' || c == '\r') return 13;
+    return c & 0xFF;
+}
+#endif
+
 /* Simple line input for script mode or non-interactive terminals */
 static size_t read_simple_input(char *buffer, size_t max_length) {
     if (!buffer || max_length == 0) return 0;
@@ -404,6 +435,14 @@ static void print_usage(const char *program_name) {
 
 /* ==================== MAIN PROGRAM ==================== */
 
+/* Records the build configuration inside the binary, so tests can verify which
+ * configuration they are exercising (see `verify-console-config` in
+ * tests/Makefile). Host frontends only; costs nothing on embedded targets. */
+#define ZV_STR_(x) #x
+#define ZV_STR(x) ZV_STR_(x)
+__attribute__((used)) static const char zvibe_build_marker[] =
+    "zvibe-build:v4=" ZV_STR(ZVIBE_ENABLE_V4) ":stack=" ZV_STR(ZVIBE_STACK_WORDS);
+
 int main(int argc, char *argv[]) {
     char *story_file = NULL;
     char *script_filename = NULL;
@@ -495,6 +534,29 @@ int main(int argc, char *argv[]) {
         }
     }
     
+#if ZVIBE_ENABLE_V4 && !defined(_WIN32)
+    /* A version 4 story on a real terminal gets the full-screen player */
+    if (!script_mode && zvibe_v4term_wants(story_file)) {
+        int rc;
+        setup_save_filename(story_file);
+        rc = zvibe_v4term_play(story_file, rng_seed_set ? rng_seed : (int)time(NULL),
+                               save_filename, transcript_file, commands_file);
+        close_files();
+        return rc;
+    }
+#endif
+
+#if ZVIBE_ENABLE_V4
+    /* A V4 story has no status line to draw: on the plain path give it the same
+     * clean output as a script. (The terminal player above handles real ttys.) */
+    {
+        FILE *vf = fopen(story_file, "rb");
+        int version = vf ? fgetc(vf) : -1;
+        if (vf) fclose(vf);
+        if (version == 4) script_mode = 1;
+    }
+#endif
+
     /* Setup signal handling for clean exit */
 #ifdef _WIN32
     /* Windows uses SetConsoleCtrlHandler for Ctrl+C handling */
@@ -621,6 +683,17 @@ int main(int argc, char *argv[]) {
                 break;
 #endif
                 
+#if ZVIBE_ENABLE_V4
+            case ZVIBE_WAIT_FOR_CHAR: {
+                int key;
+                fflush(stdout);
+                key = read_plain_key();
+                if (key < 0) goto cleanup;
+                zvibe_input_char(ctx, (uint16_t)key);
+                break;
+            }
+#endif
+
             case ZVIBE_GAME_FINISHED:
                 printf("\n[Game finished]\n");
                 goto cleanup;

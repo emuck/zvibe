@@ -1,0 +1,40 @@
+! v4bigsave.inf - a version 4 story with ~20 KB of dynamic memory, for testing saves that
+! are larger than the SAM E51's 16 KB SmartEEPROM (as Bureaucracy's are)
+!
+! Keys: f = fill the next 1000 bytes of a big array with a pattern, c = checksum of the array,
+!       s = save, r = restore, q = quit.
+!
+! Build:  inform -v4 v4bigsave.inf v4bigsave.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+Array big -> 20000;
+Global filled = 0;
+
+[ Sum i s;
+    s = 0;
+    for (i = 0 : i < 20000 : i++) s = (s + big->i * (i % 7 + 1)) % 30011;
+    return s;
+];
+
+[ Main c r i;
+    print "v4bigsave ready^";
+    for (::) {
+        print "key? ";
+        @read_char 1 -> c;
+        print (char) c, "^";
+        switch (c) {
+          'f': filled++;
+               for (i = 0 : i < 1000 : i++) big->((filled - 1) * 1000 + i) = (i + filled * 13) % 251 + 1;
+               print "filled ", filled, "^";
+          'c': print "sum=", Sum(), " filled=", filled, "^";
+          's': @save -> r;
+               print "save result ", r, "^";
+          'r': @restore -> r;
+               print "restore result ", r, "^";
+          'q': print "bye^";
+               quit;
+        }
+    }
+];

@@ -21,8 +21,9 @@ import select
 
 TESTS_DIR    = os.path.dirname(os.path.abspath(__file__))
 CONSOLE_DIR  = os.path.dirname(TESTS_DIR)
-ZVIBE        = os.path.join(CONSOLE_DIR, "build", "bin", "zvibe_console")
-ZVIBE_MINIMAL = os.path.join(CONSOLE_DIR, "build", "bin", "zvibe_minimal")
+BUILD_NAME   = os.environ.get("ZVIBE_BUILD", "build")   # e.g. build_v4 for the V4-enabled build
+ZVIBE        = os.path.join(CONSOLE_DIR, BUILD_NAME, "bin", "zvibe_console")
+ZVIBE_MINIMAL = os.path.join(CONSOLE_DIR, BUILD_NAME, "bin", "zvibe_minimal")
 GAMES_DIR    = os.path.join(os.path.dirname(os.path.dirname(CONSOLE_DIR)), "games")
 CATALOG_DIR  = os.path.join(GAMES_DIR, "catalog")
 SCRIPTS_DIR  = os.path.join(GAMES_DIR, "scripts")
@@ -379,6 +380,10 @@ def main():
     cfg = OPTIONAL_GAMES[game_name]
     game_file   = os.path.join(CATALOG_DIR, cfg["file"])
     script_file = os.path.join(SCRIPTS_DIR, cfg["script"])
+
+    if not os.path.isfile(game_file) and "--skip-missing" in sys.argv[2:]:
+        print(f"SKIPPED {game_name}: {cfg['file']} is not in games/catalog (download it with games/get_games.py)")
+        sys.exit(0)
 
     if not os.path.isfile(game_file):
         die(f"Game file not found: {game_file}\n"

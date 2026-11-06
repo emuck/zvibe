@@ -1,0 +1,97 @@
+! v4screen.inf - a small version 4 story that exercises the screen model
+!
+! Used by test_screen_v4.c: the interpreter runs it with the real ANSI screen layer
+! feeding a VT100 emulator, and the test checks the resulting screen. Written
+! without the Inform library so it is a few hundred bytes of Z-code.
+!
+! Build:  inform -v4 v4screen.inf v4screen.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+Array capture --> 20;        ! memory table for output stream 3: word 0 = count, text from byte 2
+Array typed   -> 42;         ! line input buffer: byte 0 = maximum length, text from byte 1
+Array parsed  -> 40;         ! parse buffer: byte 0 = maximum tokens
+Array cursor  --> 2;         ! get_cursor result: row, column
+Array numbers --> 10 20 30;  ! scan_table subject: three words
+
+[ Spaces n i;
+    for (i = 0 : i < n : i++) print " ";
+];
+
+[ Main i c r;
+    @erase_window -1;
+    @split_window 3;
+    @set_window 1;
+
+    ! Row 1: a reverse-video status bar with text at both ends
+    @set_cursor 1 1;
+    @set_text_style 1;
+    Spaces(79);
+    @set_cursor 1 2;
+    print "ZVIBE V4";
+    @set_cursor 1 60;
+    print "Score: 7";
+    @set_text_style 0;
+
+    ! Rows 2 and 3: plain text and a bold word, written out of order
+    @set_cursor 3 5;
+    @set_text_style 2;
+    print "bold";
+    @set_text_style 0;
+    @set_cursor 2 1;
+    print "Row two";
+
+    ! The lower window scrolls under the status area
+    @set_window 0;
+    for (i = 1 : i <= 30 : i++) print "Lower line ", i, "^";
+    print "A longer paragraph of text that has to be wrapped at a word boundary by the interpreter because it is wider than the screen.^";
+
+    ! The header carries the screen size the interpreter was given
+    print "size ", 0->32, "x", 0->33, "^";
+
+    ! Output stream 3 captures text into a table instead of the screen
+    @output_stream 3 capture;
+    print "captured";
+    @output_stream -3;
+    print "len=", capture-->0, " [";
+    for (i = 0 : i < capture-->0 : i++) print (char) capture->(i + 2);
+    print "]^";
+
+    ! Single-key input
+    print "press a key: ";
+    @read_char 1 -> c;
+    print "key=", c, "^";
+
+    ! Line input
+    typed->0 = 40;
+    print "> ";
+    @sread typed parsed;
+    print "got: ";
+    for (i = 1 : typed->i ~= 0 : i++) print (char) typed->i;
+    print "^";
+
+    ! Cursor query and table scan
+    @get_cursor cursor;
+    print "cursor ", cursor-->0, ",", cursor-->1, "^";
+    @scan_table 20 numbers 3 -> r ?found;
+    print "scan: none^";
+    jump scanned;
+    .found;
+    print "scan: found^";
+    .scanned;
+
+    ! Update the score in the status bar, then finish in the lower window
+    @set_window 1;
+    @set_cursor 1 60;
+    @set_text_style 1;
+    print "Score: 8";
+    @set_text_style 0;
+    @set_cursor 3 12;
+    print "tail-to-erase";       ! columns 12-24
+    @set_cursor 3 20;
+    @erase_line 1;               ! keeps columns 12-19 ("tail-to-"), erases the rest
+    @set_window 0;
+    print "done^";
+    quit;
+];

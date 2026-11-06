@@ -12,6 +12,11 @@
 #include <string.h>
 #include "board_support.h"
 #include "../../../include/zvibe_api.h"
+#if ZVIBE_ENABLE_V4
+#include "../../../include/zvibe_screen.h"
+#include "terminal_io.h"
+#endif
+#include "save_delta.h"             /* save_crc32 (header only); the delta code itself is V4 only */
 
 /* External story data (generated at build time) */
 extern const uint8_t story_data[];
@@ -160,55 +165,51 @@ static bool smarteeprom_init(void) {
     return true;
 }
 
-/* Calculate checksum */
+/* A save's checksum is a CRC-32 (save_crc32). The earlier shift-and-xor sum kept only the
+ * last 32 bytes, so a change anywhere before them went unnoticed; a save written by an older
+ * firmware therefore fails this check and is ignored. */
 static uint32_t calculate_checksum(const void *data, size_t size) {
-    const uint8_t *bytes = (const uint8_t*)data;
-    uint32_t checksum = 0;
-    for (size_t i = 0; i < size; i++) {
-        checksum = (checksum << 1) ^ bytes[i];
-    }
-    return checksum;
+    return save_crc32(data, size);
 }
 
-/* Write data to SmartEEPROM using optimized 32-bit word writes */
-static bool smarteeprom_write_data(uint32_t offset, const void *data, size_t size) {
-    if (offset + size > SMARTEEPROM_SIZE) return false;
-    
+/* Write data into the SmartEEPROM page buffer with 32-bit word writes only. Nothing is stored for
+ * good until smarteeprom_flush() runs.
+ *
+ * Two things the SmartEEPROM does not do, found on the board: a single-byte store is not
+ * persisted, and zero words at the END of a write are not persisted over older non-zero data (the
+ * tail of a save came back as whatever an earlier, larger save had left there; the old checksum
+ * mostly hid it). So the last, partial word is padded with ones and written whole, and the caller
+ * ends every write with a non-zero word (smarteeprom_write_end_mark). The padding and the mark land
+ * after the data, in space the save does not use. */
+static bool smarteeprom_write_raw(uint32_t offset, const void *data, size_t size) {
     const uint8_t *src = (const uint8_t*)data;
+    size_t words = (size + 3) / 4;
     
-    // Handle word-aligned portion with 32-bit writes
-    if (size >= 4 && (offset & 3) == 0) {
-        volatile uint32_t *smarteeprom_words = (volatile uint32_t*)(SMARTEEPROM_BASE_ADDR + offset);
-        const uint32_t *src_words = (const uint32_t*)data;
-        size_t word_count = size / 4;
-        
-        for (size_t i = 0; i < word_count; i++) {
-            smarteeprom_words[i] = src_words[i];
-        }
-        
-        // Handle remaining bytes
-        size_t remaining = size % 4;
-        if (remaining > 0) {
-            volatile uint8_t *smarteeprom_bytes = (volatile uint8_t*)(SMARTEEPROM_BASE_ADDR + offset + (word_count * 4));
-            const uint8_t *src_bytes = src + (word_count * 4);
-            
-            for (size_t i = 0; i < remaining; i++) {
-                smarteeprom_bytes[i] = src_bytes[i];
-            }
-        }
-    } else {
-        // Fall back to byte writes for unaligned data
-        volatile uint8_t *smarteeprom = (volatile uint8_t*)(SMARTEEPROM_BASE_ADDR + offset);
-        
-        for (size_t i = 0; i < size; i++) {
-            smarteeprom[i] = src[i];
-        }
+    if ((offset & 3) != 0 || offset + words * 4 > SMARTEEPROM_SIZE) return false;
+    
+    volatile uint32_t *smarteeprom_words = (volatile uint32_t*)(SMARTEEPROM_BASE_ADDR + offset);
+    for (size_t i = 0; i < words; i++) {
+        uint32_t word = 0xFFFFFFFFUL;
+        size_t n = size - i * 4;
+        memcpy(&word, src + i * 4, n < 4 ? n : 4);
+        smarteeprom_words[i] = word;
     }
     
+    return true;
+}
+
+/* A non-zero word right after a save's data, so that the last words of the data (which may be zero)
+ * are not the tail of the write. Needs room for one word after the data's padded end. */
+#define SAVE_END_MARK_BYTES 4
+static bool smarteeprom_write_end_mark(uint32_t data_end_offset) {
+    static const uint32_t mark = 0xA55A5AA5UL;
+    return smarteeprom_write_raw((data_end_offset + 3) & ~3UL, &mark, sizeof mark);
+}
+
+/* Commit what was written (SEEFLUSH in BUFFERED mode) and wait until the SmartEEPROM is done. */
+static bool smarteeprom_flush(void) {
     __DSB();
     __ISB();
-    
-    // Use SEEFLUSH command for BUFFERED mode
     NVMCTRL_REGS->NVMCTRL_CTRLB = NVMCTRL_CTRLB_CMD_SEEFLUSH | NVMCTRL_CTRLB_CMDEX_KEY;
     
     volatile uint32_t timeout = 1000000;
@@ -217,6 +218,11 @@ static bool smarteeprom_write_data(uint32_t offset, const void *data, size_t siz
     }
     
     return timeout > 0;
+}
+
+/* Write and commit */
+static bool smarteeprom_write_data(uint32_t offset, const void *data, size_t size) {
+    return smarteeprom_write_raw(offset, data, size) && smarteeprom_flush();
 }
 
 /* Read data from SmartEEPROM using optimized 32-bit word reads */
@@ -265,7 +271,7 @@ static bool smarteeprom_read_data(uint32_t offset, void *buffer, size_t size) {
 
 /* Save callback - save to both RAM and SmartEEPROM */
 static int save_callback(const void *data, size_t size) {
-    size_t total_size = sizeof(save_header_t) + size;
+    size_t total_size = sizeof(save_header_t) + size + SAVE_END_MARK_BYTES + 3;
     
     if (total_size > SMARTEEPROM_SIZE) {
         printf("\n[ERROR: save data requires %zu bytes, SmartEEPROM size is %d]\n", total_size, SMARTEEPROM_SIZE);
@@ -279,13 +285,18 @@ static int save_callback(const void *data, size_t size) {
         .checksum = calculate_checksum(data, size)
     };
     
-    if (!smarteeprom_write_data(0, &header, sizeof(header))) {
-        printf("\n[ERROR: failed to write save header to flash]\n");
+    /* Header and data go into the page buffer together and are committed with one flush. Committing
+     * the header first and the data after it was not reliable once a larger save had been stored
+     * before: the data written after the first flush could be lost at the next reset, and the
+     * header was left describing data that was not there (the CRC now rejects such a save). */
+    if (!smarteeprom_write_raw(0, &header, sizeof(header)) ||
+        !smarteeprom_write_raw(sizeof(header), data, size) ||
+        !smarteeprom_write_end_mark((uint32_t)(sizeof(header) + size))) {
+        printf("\n[ERROR: failed to write the save to flash]\n");
         return 0;
     }
-    
-    if (!smarteeprom_write_data(sizeof(header), data, size)) {
-        printf("\n[ERROR: failed to write save data to flash]\n");
+    if (!smarteeprom_flush()) {
+        printf("\n[ERROR: the SmartEEPROM did not finish the save]\n");
         return 0;
     }
     
@@ -336,6 +347,15 @@ static void rtcEventHandler(RTC_TIMER32_INT_MASK intCause, uintptr_t context) {
     }
 }
 
+#if ZVIBE_ENABLE_V4
+/* V4: the story's text goes through the screen layer, which owns the terminal */
+static zscreen scr;
+
+static void zvibe_output_func(const char *text, size_t length) {
+    size_t i;
+    for (i = 0; i < length; i++) zscreen_putc(&scr, text[i]);
+}
+#else
 /* zvibe output function */
 static void zvibe_output_func(const char *text, size_t length) {
     if (length == 0) return;
@@ -352,6 +372,7 @@ static void zvibe_output_func(const char *text, size_t length) {
         SERCOM5_REGS->USART_INT.SERCOM_DATA = (uint16_t)c;
     }
 }
+#endif
 
 /* Wait for the user to press RETURN before starting the game.
  *
@@ -402,6 +423,10 @@ static bool init_zvibe() {
     if (!g_zvibe_ctx) {
         return false;
     }
+#if ZVIBE_ENABLE_V4
+    zscreen_init(&scr, term_put_byte, term_rows, term_cols);   /* clears the terminal: a restarted game starts clean */
+    zvibe_set_screen(g_zvibe_ctx, &zscreen_ops, &scr);
+#endif
 
     if (zvibe_load_story_from_memory(g_zvibe_ctx, story_data, story_data_size) != ZVIBE_OK) {
         zvibe_destroy(g_zvibe_ctx);
@@ -411,6 +436,145 @@ static bool init_zvibe() {
     
     return true;
 }
+
+#if ZVIBE_ENABLE_V4
+/* ---- V4: the story drives a full-screen terminal through the screen layer ---- */
+
+#define V4_LINE_SIZE 80
+
+static void v4_puts(const char *s) {
+    while (*s) zscreen_putc(&scr, *s++);
+}
+
+static void v4_press_return(void) {
+    v4_puts("\n[Press RETURN to start]\n");
+    zscreen_flush(&scr);
+    while (term_next_key() != '\r') {}
+}
+
+/* Start the game afresh; wait for RETURN first unless a test script asked for a quiet reset */
+static void v4_start(bool wait) {
+    if (wait) {
+        v4_press_return();                  /* before init_zvibe(), which clears the screen */
+        term_probe_size();                  /* ask again: the terminal may have been opened (or resized) since boot */
+    }
+    zvibe_initialized = init_zvibe();
+}
+
+/* A V4 story's full save (its dynamic memory plus the execution state) can be 20 KB or more,
+ * more than the SmartEEPROM holds. The save is packed against the story in flash, keeping
+ * only the bytes the game has changed (see save_delta.h): typically a few KB. */
+#define V4_BLOB_MAX    (ZVIBE_MEMORY_BUFFER_SIZE + 2 * ZVIBE_STACK_WORDS + 64)
+#define V4_PACKED_MAX  (SMARTEEPROM_SIZE - sizeof(save_header_t) - SAVE_END_MARK_BYTES - 3)
+
+static uint8_t v4_blob[V4_BLOB_MAX];        /* the core's save data, whole */
+static uint8_t v4_packed[V4_PACKED_MAX];    /* what goes to (or comes from) the SmartEEPROM */
+
+/* The story's dynamic memory size: the packing base is the first that many bytes of the story */
+static size_t v4_base_len(void) {
+    return ((size_t)story_data[14] << 8) | story_data[15];
+}
+
+/* A packed save leaves out every byte that equals the flashed story, including the story's own
+ * release, serial and checksum, and unpacking fills them in from whatever story is flashed
+ * now. So the save carries the identity of the story it was made for, and a restore compares it
+ * first (release 0x02, serial 0x12-0x17, checksum 0x1C). */
+#define V4_ID_LEN 10
+static void v4_story_id(uint8_t id[V4_ID_LEN]) {
+    id[0] = story_data[2];  id[1] = story_data[3];
+    memcpy(id + 2, story_data + 0x12, 6);
+    id[8] = story_data[0x1C];  id[9] = story_data[0x1D];
+}
+
+static void v4_save(void) {
+    size_t size = zvibe_get_save_size(g_zvibe_ctx);
+    int ok = 0;
+    if (size > 0 && size <= sizeof v4_blob && zvibe_get_save_data(g_zvibe_ctx, (char *)v4_blob, sizeof v4_blob) == size) {
+        size_t packed = delta_pack(v4_packed + V4_ID_LEN, sizeof v4_packed - V4_ID_LEN, v4_blob, size,
+                                   story_data, v4_base_len());
+        if (packed == 0) {
+            v4_puts("\n[Save failed: the changes do not fit the SmartEEPROM]\n");
+        } else {
+            v4_story_id(v4_packed);
+            ok = save_callback(v4_packed, packed + V4_ID_LEN);
+        }
+    }
+    zvibe_save_completed(g_zvibe_ctx, ok);
+}
+
+static void v4_restore(void) {
+    int ok = 0;
+    size_t packed = restore_callback(v4_packed, sizeof v4_packed);
+    uint8_t id[V4_ID_LEN];
+    v4_story_id(id);
+    if (packed > V4_ID_LEN && memcmp(v4_packed, id, V4_ID_LEN) == 0) {
+        size_t size = delta_unpack(v4_blob, sizeof v4_blob, v4_packed + V4_ID_LEN, packed - V4_ID_LEN,
+                                   story_data, v4_base_len());
+        ok = size > 0 && zvibe_restore_data(g_zvibe_ctx, (const char *)v4_blob, size) == ZVIBE_OK;
+    } else if (packed > 0) {
+        v4_puts("\n[That save is from a different story or release]\n");
+    }
+    zvibe_restore_completed(g_zvibe_ctx, ok);
+}
+
+/* Read a command line with echo and backspace; the screen layer says what fits on the line. */
+static void v4_read_line(char *buf, size_t size) {
+    size_t len = 0;
+    zscreen_flush(&scr);
+    for (;;) {
+        int k = term_next_key();
+        if (k == '\r') { zscreen_echo(&scr, '\n'); break; }
+        if (k == 8 || k == 127) {
+            if (len && zscreen_echo(&scr, 8)) len--;
+        } else if (k >= 32 && k < 127 && len + 1 < size) {
+            if (zscreen_echo(&scr, (char)k)) buf[len++] = (char)k;
+        }
+    }
+    buf[len] = '\0';
+}
+
+static void v4_loop(void) __attribute__((noreturn));
+static void v4_loop(void) {
+    char line[V4_LINE_SIZE];
+    zscreen_init(&scr, term_put_byte, term_rows, term_cols);
+    v4_start(true);
+    for (;;) {
+        zvibeResult result;
+        if (zvibeReset) {
+            zvibeReset = false;
+            v4_start(true);
+        }
+        if (!zvibe_initialized) {                       /* the game could not start: any key tries again */
+            (void)term_next_key();
+            v4_start(false);
+            continue;
+        }
+        result = zvibe_run(g_zvibe_ctx);
+        zscreen_flush(&scr);
+        switch (result) {
+        case ZVIBE_WAIT_FOR_INPUT:
+            v4_read_line(line, sizeof line);
+            if (strcmp(line, "~reset~") == 0) v4_start(false);     /* test scripts: restart with no prompt */
+            else zvibe_input(g_zvibe_ctx, line);
+            break;
+        case ZVIBE_WAIT_FOR_CHAR:
+            zvibe_input_char(g_zvibe_ctx, (uint16_t)term_next_zscii());
+            break;
+        case ZVIBE_SAVE_REQUESTED:    v4_save(); break;
+        case ZVIBE_RESTORE_REQUESTED: v4_restore(); break;
+        case ZVIBE_RESTART_REQUESTED: zvibe_restart_completed(g_zvibe_ctx); break;
+        case ZVIBE_GAME_FINISHED:
+            v4_puts("\n[Game finished]\n");
+            v4_start(true);
+            break;
+        default:
+            v4_puts("\n[Game error - restarting]\n");
+            v4_start(true);
+            break;
+        }
+    }
+}
+#endif /* ZVIBE_ENABLE_V4 */
 
 int main(void) {
     /* Initialize all modules */
@@ -422,9 +586,19 @@ int main(void) {
     RTC_Timer32Compare0Set(PERIOD_50MS);
     RTC_Timer32Start();
     
+#if ZVIBE_ENABLE_V4
+    term_start();
+    term_probe_size();
+#endif
+
     /* Initialize SmartEEPROM first */
     bool smarteeprom_available = smarteeprom_init();
     
+#if ZVIBE_ENABLE_V4
+    (void)smarteeprom_available;
+    v4_loop();
+#endif
+
     /* Initialize zvibe Z-machine */
     zvibe_initialized = init_zvibe();
 

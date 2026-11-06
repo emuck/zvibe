@@ -68,5 +68,7 @@ void SERCOM5_USART_WriteByte(int data);
 bool SERCOM5_USART_ReceiverIsReady(void);
 int SERCOM5_USART_ReadByte(void);
 void SERCOM5_USART_ReadCallbackRegister(SERCOM5_USART_RING_BUFFER_CALLBACK callback, uintptr_t context);
+void SERCOM5_USART_EnableRxInterrupt(void);
+extern volatile uint32_t SERCOM5_USART_ErrorCount;
 
 #endif /* UART_H */

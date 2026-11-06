@@ -35,7 +35,10 @@ source venv/bin/activate    # run once per terminal session
 ```
 games/
 ├── catalog/          # Bundled test assets plus downloaded .z3 files
-│   ├── czech.z3      # Public domain conformance test suite
+│   ├── czech.z3      # Czech conformance test suite, V3 (Karger, see THIRD_PARTY_NOTICES)
+│   ├── czech.z4      # Czech conformance test suite, V4
+│   ├── CZECH-NOTICE.txt  # Czech's license notice: ship it with any distribution containing Czech
+│   ├── CZECH-README.txt  # upstream Czech README, unchanged
 │   └── restaurant.z3 # Original work, ships with the repo
 ├── scripts/          # Recorded command scripts for automated testing
 ├── game_builder/     # Cross-target build library (Python)

@@ -15,8 +15,14 @@ Expect an acknowledgment within 48 hours and an initial assessment within
 
 zVibe is a Z-machine interpreter with no network access and no privilege
 elevation. The primary attack surface is **story file parsing** — malformed
-`.z3` files supplied as input. All memory accesses are bounds-checked against
-the story file size; invalid opcodes are detected and abort execution.
+`.z3`/`.z4` files supplied as input. Story files are treated as trusted: the
+interpreter checks the header, the stack and most addresses and aborts on invalid
+opcodes, but a deliberately corrupted story can still make it read outside its
+buffers (the dictionary and object-table lookups are not range-checked) or follow a
+null pointer. `scripts/fuzz_story.c` finds these; see "Corrupt stories" in
+[docs/V4_DESIGN.md](docs/V4_DESIGN.md) for what is fixed and what remains. Do not
+run story files from untrusted sources on a device that holds secrets. Range-checking
+those lookups is a possible future hardening step.
 
 Save file restoration validates a CRC32 before applying any delta. Corrupted
 saves are rejected.

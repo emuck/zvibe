@@ -36,7 +36,9 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "zvibe_config.h"
 #include "zvibe_memory.h"
+#include "zvibe_screen_ops.h"
 
 /* -------------------- BASIC TYPE DEFINITIONS -------------------- */
 
@@ -63,42 +65,23 @@ typedef size_t zSize;
 
 /* -------------------- MEMORY CONFIGURATION -------------------- */
 
-/**
- * @def Z3_STORY_MEM_SIZE
- * @brief Maximum story file size for bounds checking
- *
- * Z-machine V3 maximum: 128KB (per spec)
- */
-#define Z3_STORY_MEM_SIZE   (128*1024)
-
-/**
- * @def Z3_STACK_SIZE
- * @brief Minimum stack size in 16-bit words
- *
- * Stack size: 512 words = 1KB
- * Sufficient for typical V3 games (max call depth ~10-20)
- */
-#define Z3_STACK_SIZE       512
+/* Story size limit, stack size and operand count depend on the enabled
+ * versions; see zvibe_config.h (Z_STORY_MEM_SIZE, ZVIBE_STACK_WORDS,
+ * Z_MAX_OPERANDS). */
 
 /*
- * ZVIBE_MEMORY_BUFFER_SIZE - Shared buffer size for dynamic memory + stack
+ * ZVIBE_MEMORY_BUFFER_SIZE - RAM buffer for the story's dynamic memory
  *
  * Default: 16KB
- * Layout: [dynamic memory (0..staticmem_addr)][stack (grows upward)]
- * Stack space = buffer_size - staticmem_addr (typically 2-4KB for V3 games)
+ * Holds only dynamic memory (0..staticmem_addr). The Z-machine stack is
+ * separate: zState::stack_mem, ZVIBE_STACK_WORDS words.
  *
  * Override at compile time: -DZVIBE_MEMORY_BUFFER_SIZE=...
  */
 #ifndef ZVIBE_MEMORY_BUFFER_SIZE
-/** @brief Shared buffer size for dynamic memory and stack (default: 16KB) */
+/** @brief RAM buffer size for dynamic memory (default: 16KB) */
 #define ZVIBE_MEMORY_BUFFER_SIZE  (16*1024)
 #endif
-
-/**
- * @def Z3_MAX_OPERANDS
- * @brief Maximum operands per instruction (Z-machine V3 spec)
- */
-#define Z3_MAX_OPERANDS     4
 
 /**
  * @def Z3_ALPHABET_SIZE
@@ -220,7 +203,7 @@ typedef struct {
 typedef struct {
     /* Memory management */
     zmem_state_t memory_state;           /**< Split memory manager (RAM/flash) */
-    zWord stack_mem[Z3_STACK_SIZE];      /**< Stack memory (512 words = 1KB) */
+    zWord stack_mem[ZVIBE_STACK_WORDS];  /**< Stack memory (default 512 words = 1KB) */
 
     /* Core execution state */
     zWord *stack_ptr;             /**< Current stack pointer */
@@ -233,7 +216,7 @@ typedef struct {
     zHeader header;               /**< Parsed story file header (V3 format) */
 
     /* Instruction decoding */
-    zWord operands[Z3_MAX_OPERANDS];  /**< Current instruction operands */
+    zWord operands[Z_MAX_OPERANDS];   /**< Current instruction operands */
     zByte operand_count;          /**< Number of operands for current instruction */
     int quit_flag;                /**< Set by QUIT opcode */
 
@@ -251,6 +234,16 @@ typedef struct {
     /* UI state */
     zWord current_window;         /**< Current output window (0=lower, 1=upper) */
     zWord upper_window_lines;     /**< Upper window height in lines */
+
+#if ZVIBE_ENABLE_V4
+    /* V4 screen and output streams */
+    const zvibeScreenOps *screen; /**< Platform screen operations (may be NULL) */
+    void *screen_user;            /**< Passed back to every screen operation */
+    int char_requested;           /**< 1 if waiting for a single character (read_char) */
+    zByte output_screen_off;      /**< 1 while output stream 1 (the screen) is deselected */
+    zByte stream3_depth;          /**< Output stream 3 (memory table) nesting depth; 0 = not selected */
+    zWord stream3_table[ZVIBE_STREAM3_DEPTH];   /**< Table address of each selected level */
+#endif
 
     /* Platform callbacks */
     void (*split_window)(zWord oldval, zWord newval);  /**< Split window callback */
@@ -282,8 +275,43 @@ int z_load_story_data(const void *data, size_t size);
 /** @brief Execute one Z-machine instruction */
 void z_run_instruction(void);
 
-/** @brief Initialize opcode dispatch tables */
-void init_opcodes(void);
+#if ZVIBE_ENABLE_V4
+/** @brief Call an optional screen operation, passing the platform's context pointer */
+#define Z_SCREEN(fn, ...) \
+    do { if (G->screen && G->screen->fn) G->screen->fn(G->screen_user, __VA_ARGS__); } while (0)
+#endif
+
+/**
+ * @def Z_OUT
+ * @brief Send game text to the current output stream(s)
+ *
+ * In a V3-only build this is exactly the original "if (G->writestr) G->writestr()".
+ * With V4 enabled it goes through z_out(), which honours the output-stream
+ * opcodes (screen on/off, the memory table).
+ */
+#if ZVIBE_ENABLE_V4
+void z_out(const char *text, zSize length);
+/** @brief Reset the output streams: screen on, no memory table selected */
+void z_reset_output_state(void);
+/** @brief Complete a pending read_char with the ZSCII character c */
+void z_process_char(zWord zscii);
+/** @brief Restart: output streams reset, windows unsplit, screen cleared */
+void z_reset_ui_state(void);
+void z_stream3_zscii(zByte code);
+#define Z_OUT(text, length) z_out((text), (length))
+/** Flags 2 bits 0-1 (transcripting, fixed-pitch) belong to the running interpreter (6.1.2):
+ *  carry them across a memory replacement (restart, restore). V3 stories keep the old behaviour. */
+#define Z_FLAGS2_KEEP()    const zByte keep_flags2_ = Z_IS_V4() ? (zByte)(G->memory_state.ram_buffer[0x11] & 3) : 0
+#define Z_FLAGS2_RETURN()  do { if (Z_IS_V4()) G->memory_state.ram_buffer[0x11] = (zByte)((G->memory_state.ram_buffer[0x11] & ~3) | keep_flags2_); } while (0)
+#else
+#define Z_FLAGS2_KEEP()    ((void)0)
+#define Z_FLAGS2_RETURN()  ((void)0)
+#define Z_OUT(text, length) do { if (G->writestr) G->writestr((text), (length)); } while (0)
+#define z_reset_ui_state() ((void)0)
+#endif
+
+/** @brief Write the interpreter's capabilities into the story header (load and restart) */
+void z_init_interpreter_header(void);
 
 /** @brief Get handler for a decoded opcode */
 zOpcodeFn z_get_opcode_handler(zByte opcode);
@@ -303,12 +331,22 @@ zByte *z_get_mem_ptr(zWord offset);
 /**
  * @brief Unpack packed address to byte address
  *
- * V3: Packed address × 2 = byte address
+ * Packed address × 2 (V3) or × 4 (V4) = byte address. See z_packed_to_byte().
  *
  * @param[in] addr Packed address
  * @return Pointer to memory at unpacked address
  */
 zByte *z_unpack_addr(zDWord addr);
+
+/**
+ * @brief Convert a packed address (a routine or a string) to a byte address
+ *
+ * × 2 in V3, × 4 in V4. Abbreviation table entries are word addresses and are
+ * always × 2 in every version; do not use this for them.
+ */
+Z_VERSION_HELPER zDWord z_packed_to_byte(zDWord packed) {
+    return packed << Z_VSEL(1, 2);
+}
 
 /**
  * @brief Get address of variable (stack/local/global)
@@ -324,6 +362,23 @@ void z_do_return(zWord val);
 
 /** @brief Execute conditional branch */
 void z_do_branch(int truth);
+
+/**
+ * @brief Finish a save/restore: V3 branches on success; V4 stores 0 (failed),
+ *        1 (saved) or 2 (restored)
+ *
+ * In a V3-only build this is exactly the original z_do_branch() call.
+ */
+Z_VERSION_HELPER void z_do_save_result(int result) {
+#if ZVIBE_ENABLE_V4
+    if (Z_IS_V4()) {
+        zByte *store = z_var_addr(z_read_pc_byte(), 1);
+        Z_WRITE16(store, result);
+        return;
+    }
+#endif
+    z_do_branch(result ? 1 : 0);
+}
 
 /** @brief Print ZSCII-encoded string to output */
 zSize z_print_zscii(const zByte *str, int abbr);
@@ -498,6 +553,20 @@ void op_pull(void);
 void op_split_window(void);
 /** @brief Set current output window @ingroup OpcodesText */
 void op_set_window(void);
+#if ZVIBE_ENABLE_V4
+/* Opcodes that exist only from version 4 (src/core/zvibe_ops_v4.c) */
+void op_erase_window(void);
+void op_erase_line(void);
+void op_set_cursor(void);
+void op_get_cursor(void);
+void op_set_text_style(void);
+void op_buffer_mode(void);
+void op_output_stream(void);
+void op_input_stream(void);
+void op_sound_effect(void);
+void op_read_char(void);
+void op_scan_table(void);
+#endif
 
 
 #endif /* ZVIBE_H */

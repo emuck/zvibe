@@ -75,11 +75,14 @@ size_t delta_encode(
  *   original     - Original game data (from flash)
  *   dynamic_size - Size of dynamic memory
  *   pc           - Output: program counter
- *   stack        - Output: stack buffer (must be large enough)
+ *   stack        - Output: stack buffer
+ *   stack_capacity - Size of the stack buffer in 16-bit words (ZVIBE_STACK_WORDS);
+ *                  a save whose stack is larger is rejected (-7)
  *   stack_words  - Output: number of stack words restored
  *   base_ptr     - Output: base pointer
  *
- * Returns: 0 on success, negative on error
+ * Returns: 0 on success, negative on error. On any error no output (RAM, stack,
+ * pc, base_ptr) has been modified.
  */
 int delta_decode(
     const uint8_t *input,
@@ -89,8 +92,54 @@ int delta_decode(
     size_t dynamic_size,
     uint32_t *pc,
     uint16_t *stack,
+    size_t stack_capacity,
     size_t *stack_words,
     uint32_t *base_ptr
 );
+
+/*
+ * Pack and unpack a save blob against a base image.
+ *
+ * A blob from zvibe_get_save_data() starts with the story's dynamic memory, which
+ * differs from the story file in a few places, followed by the execution state.
+ * delta_pack() stores only the runs of bytes that differ from `base` (bytes past
+ * base_len always count as different), so a V4 save of 20 KB typically packs to a
+ * few KB. It needs nothing from the core, only the bytes of the blob.
+ *
+ * Format: 'DPK1', total length (u32), packed length (u32), then runs of offset (u32),
+ * count (u16), data. Little-endian, like the blob it describes: same device only.
+ */
+#define DELTA_PACK_MAGIC 0x314B5044  /* 'DPK1' */
+
+/** Returns the packed size, or 0 if it does not fit in `capacity`. */
+size_t delta_pack(uint8_t *out, size_t capacity,
+                  const uint8_t *data, size_t len,
+                  const uint8_t *base, size_t base_len);
+
+/**
+ * Rebuild the blob into `out` (capacity bytes). Returns its length, or 0 if the packed
+ * data is malformed or the blob does not fit; `out` is untouched on failure.
+ */
+size_t delta_unpack(uint8_t *out, size_t capacity,
+                    const uint8_t *packed, size_t packed_len,
+                    const uint8_t *base, size_t base_len);
+
+/*
+ * CRC-32 (IEEE 802.3, the zlib one: "123456789" gives 0xCBF43926). Every byte of the
+ * data counts, whatever its position. Defined here, not in save_delta.c, so a V3-only
+ * firmware that does not link the delta code can use it.
+ */
+static inline uint32_t save_crc32(const void *data, size_t len) {
+    const uint8_t *p = (const uint8_t *)data;
+    uint32_t crc = 0xFFFFFFFFUL;
+    size_t i;
+    for (i = 0; i < len; i++) {
+        int bit;
+        crc ^= p[i];
+        for (bit = 0; bit < 8; bit++)
+            crc = (crc >> 1) ^ (0xEDB88320UL & (0UL - (crc & 1UL)));
+    }
+    return ~crc;
+}
 
 #endif /* SAVE_DELTA_H */

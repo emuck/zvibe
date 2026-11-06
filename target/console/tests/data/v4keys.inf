@@ -1,0 +1,28 @@
+! v4keys.inf - a tiny version 4 story that reports the keys it is given
+!
+! Reads keys until q, printing the ZSCII code of each ("key=13"), then reads a line
+! and prints it back ("line=[...]"). For testing a terminal player's key handling.
+!
+! Build:  inform -v4 v4keys.inf v4keys.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+Array buf -> 82;
+Array parse -> 20;
+
+[ Main c i;
+    print "keys ready^";
+    for (::) {
+        @read_char 1 -> c;
+        print "key=", c, "^";
+        if (c == 'q') break;
+    }
+    print "line? ";
+    buf->0 = 79;
+    read buf parse;
+    print "line=[";
+    for (i = 1 : buf->i ~= 0 : i++) print (char) buf->i;
+    print "]^";
+    quit;
+];

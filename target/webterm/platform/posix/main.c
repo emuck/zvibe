@@ -371,9 +371,14 @@ static posix_platform_t g_platform = {
  * Game file management
  * ========================================================================= */
 
-/* Max Z-machine v3 story size (128 KB).  Game data must outlive the session,
- * so we keep a single static buffer for the currently loaded game. */
+/* Max story size: 128 KB for version 3, 256 KB when version 4 is built in.
+ * Game data must outlive the session, so we keep a single static buffer for the
+ * currently loaded game. */
+#if ZVIBE_ENABLE_V4
+#define MAX_Z3_SIZE (256 * 1024)
+#else
 #define MAX_Z3_SIZE (128 * 1024)
+#endif
 static uint8_t g_game_buf[MAX_Z3_SIZE];
 static size_t  g_game_size;
 
@@ -388,15 +393,34 @@ static int build_games_json(const char *dir, char *out, size_t max) {
         struct dirent *e;
         while ((e = readdir(d)) != NULL) {
             size_t nlen = strlen(e->d_name);
-            if (nlen > 3 && strcmp(e->d_name + nlen - 3, ".z3") == 0) {
-                pos += (size_t)snprintf(out + pos, max - pos,
-                    "%s\"%s\"", count ? "," : "", e->d_name);
+            if (nlen > 3 && (strcmp(e->d_name + nlen - 3, ".z3") == 0
+#if ZVIBE_ENABLE_V4
+                             || strcmp(e->d_name + nlen - 3, ".z4") == 0
+#endif
+                             )) {
+                /* "name" with JSON escapes, never past the buffer (leave room for the closing "]}") */
+                char item[2 * 256 + 8];
+                size_t n = 0;
+                const char *c;
+                if (count) item[n++] = ',';
+                item[n++] = '"';
+                for (c = e->d_name; *c && n + 8 < sizeof item; c++) {
+                    unsigned char ch = (unsigned char)*c;
+                    if (ch == '"' || ch == '\\') { item[n++] = '\\'; item[n++] = (char)ch; }
+                    else if (ch < 0x20) n += (size_t)snprintf(item + n, 7, "\\u%04x", ch);
+                    else item[n++] = (char)ch;
+                }
+                if (*c) continue;                         /* the escaped name does not fit: leave it out, never cut it */
+                item[n++] = '"';
+                if (pos + n + 3 > max) continue;          /* the list is full: leave this one out */
+                memcpy(out + pos, item, n);
+                pos += n;
                 count++;
             }
         }
         closedir(d);
     }
-    snprintf(out + pos, max - pos, "]}");
+    if (pos + 3 <= max) memcpy(out + pos, "]}", 3);
     return count;
 }
 
@@ -477,6 +501,12 @@ static void dispatch_frame(webterm_session_t *s, const char *game_dir,
         char text[WEBTERM_INPUT_MAX + 1];
         if (json_str(json, "text", text, sizeof(text)))
             webterm_session_on_input(s, text, strlen(text));
+
+#if ZVIBE_ENABLE_V4
+    } else if (strcmp(type, "key") == 0) {
+        const char *p = strstr(json, "\"code\":");
+        if (p) webterm_session_on_char(s, (unsigned)atoi(p + 7));
+#endif
 
     } else if (strcmp(type, "load") == 0) {
         char game[256];
@@ -566,6 +596,9 @@ static size_t g_html_len;
 static char *g_cart_js;
 static size_t g_cart_js_len;
 
+static char *g_zterm_js;
+static size_t g_zterm_js_len;
+
 /* Read an entire file into a malloc'd, null-terminated buffer.
  * Exits the process on failure — both assets are required to serve. */
 static void load_file(const char *path, const char *what,
@@ -638,6 +671,7 @@ static void usage(const char *prog) {
         "  -p PORT     port (default 8080)\n"
         "  -w HTML     path to zvibe.html (default www/zvibe.html)\n"
         "  -c CARTJS   path to cartographer.js (default ../../cartographer.js)\n"
+        "  -z ZTERMJS  path to zterm.js, the V4 screen (default ../../zterm.js)\n"
         "  -s SAVE     save file path (default /tmp/zvibe.sav)\n"
         "  GAME_DIR    .z3 game files (default ../../../../games/catalog)\n",
         prog);
@@ -647,6 +681,7 @@ int main(int argc, char *argv[]) {
     int         port      = 8080;
     const char *html_path = "www/zvibe.html";
     const char *cart_path = "../../cartographer.js";
+    const char *zterm_path = "../../zterm.js";
     const char *game_dir  = "../../../../games/catalog";
 
     signal(SIGPIPE, SIG_IGN);   /* ignore broken pipe on ws_send */
@@ -659,6 +694,8 @@ int main(int argc, char *argv[]) {
             html_path = argv[++i];
         } else if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             cart_path = argv[++i];
+        } else if (strcmp(argv[i], "-z") == 0 && i + 1 < argc) {
+            zterm_path = argv[++i];
         } else if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) {
             snprintf(g_platform.save_path, sizeof(g_platform.save_path),
                      "%s", argv[++i]);
@@ -673,6 +710,7 @@ int main(int argc, char *argv[]) {
     sha1_selftest();
     load_file(html_path, "HTML file", &g_html, &g_html_len);
     load_file(cart_path, "cartographer.js", &g_cart_js, &g_cart_js_len);
+    load_file(zterm_path, "zterm.js", &g_zterm_js, &g_zterm_js_len);
 
     webterm_session_t *session = webterm_session_create(&g_platform.base);
     if (!session) { fprintf(stderr, "Failed to create session\n"); return 1; }
@@ -714,6 +752,10 @@ int main(int argc, char *argv[]) {
                 strcmp(path, "/cartographer.js") == 0) {
                 http_serve(client, "text/javascript; charset=utf-8",
                            g_cart_js, g_cart_js_len);
+            } else if (http_request_path(req, path, sizeof(path)) &&
+                       strcmp(path, "/zterm.js") == 0) {
+                http_serve(client, "text/javascript; charset=utf-8",
+                           g_zterm_js, g_zterm_js_len);
             } else {
                 /* Serve HTML for any other non-WS GET */
                 http_serve(client, "text/html; charset=utf-8",
@@ -727,6 +769,7 @@ int main(int argc, char *argv[]) {
     webterm_session_destroy(session);
     free(g_html);
     free(g_cart_js);
+    free(g_zterm_js);
     close(server_fd);
     return 0;
 }

@@ -15,6 +15,7 @@ live here are the parts that work identically on any platform:
 - **`webterm_platform.h`** — the interface a hardware target must implement:
   send a JSON frame, optionally persist save data.
 - **`PROTOCOL.md`** — the WebSocket message specification.
+- **`zterm.js`** — the browser's screen for version 4 stories (see below).
 - **`platform/posix/`** — a POSIX reference server: development tool and
   second reference implementation alongside the tests.
 - **`tests/`** — host-runnable test suite using a mock platform.
@@ -85,7 +86,7 @@ This target is designed for embedded devices where one interactive session
 at a time is the natural model (a clock, a handheld, a kiosk). The policy is:
 
 - **One active client.** A second client that connects while a session is in
-  use receives `{"type":"busy"}` and the connection is immediately closed.
+  use receives `{"type":"busy"}` and the connection is immediately closed. (The POSIX reference server handles one connection at a time, so there a second client waits until the first leaves; see `PROTOCOL.md`.)
 - **Sessions survive disconnects.** If the client drops, the session pauses —
   the zvibe context and all game state remain in RAM. The next client to
   connect resumes the session from where it was.
@@ -177,6 +178,31 @@ The Czech conformance suite is the primary correctness gate: if all 368
 Czech tests pass through the webterm session layer, the I/O wiring is correct.
 
 See `tests/README.md` for full details.
+
+## Version 4 stories
+
+Build with `-DZVIBE_ENABLE_V4=1` (the POSIX server: `make V4=1`; it adds
+`zvibe_ops_v4.c`, `src/screen/zvibe_screen.c` and a 72 KB `ZVIBE_MEMORY_BUFFER_SIZE`).
+The server then lists `.z4` files and accepts stories up to 256 KB; a V4 save can
+be over 24 KB, so the session's save buffer grows to 64 KB.
+
+A V4 story draws its own screen, so the session runs the ANSI screen layer on a
+fixed 24x80 screen (`WEBTERM_SCREEN_ROWS`, `WEBTERM_SCREEN_COLS`) and sends its
+terminal bytes in `screen` frames. `zterm.js` (next to `cartographer.js`; the
+POSIX server serves it at `/zterm.js`, `-z` sets the path) is the browser's VT100
+screen: it draws the bytes, echoes typed characters, and sends lines and
+`read_char` keys. The upper window, cursor addressing and styles all work, so
+Bureaucracy's form plays. A platform's page needs `<script src="zterm.js">`, a
+host element for `new ZTerm(el, send)`, and handling of `screen` frames as in
+`platform/posix/www/zvibe.html`. `zvibe-duo.html` is version 3 only. On a phone the
+keyboard does not appear yet: keys come from the document's `keydown`, and nothing is
+focused. Planned upgrade: a hidden input that takes focus on a tap and is read through
+`input` events, plus on-screen arrow and Escape keys. The cartographer follows version 3 stories only.
+
+`make test` also runs the session tests in a V4 build (`make test-v4`) and the
+screen tests (`make test-screen`: the screen frames drawn by the console tests'
+VT100 emulator, and `zterm.js` checked against that emulator on a story and 200
+random screens; the JS part needs `node`).
 
 ## Protocol
 

@@ -134,7 +134,7 @@ void zvibe_destroy(zvibeContext *ctx) {
 zvibeResult zvibe_load_story_from_memory(zvibeContext *ctx, const uint8_t *data, size_t size) {
     if (!ctx || !data || size == 0) return ZVIBE_ERROR;
     
-    if (size > Z3_STORY_MEM_SIZE) {
+    if (size > Z_STORY_MEM_SIZE) {
         return ZVIBE_ERROR;
     }
     
@@ -149,10 +149,16 @@ zvibeResult zvibe_run(zvibeContext *ctx) {
     zState *G = &ctx->z_state;
     
     while (1) {
+#if ZVIBE_ENABLE_V4
+        if (G->char_requested)
+            return ZVIBE_WAIT_FOR_CHAR;
+#endif
+
         if (G->input_requested) {
 #if ZVIBE_ENABLE_STATUS_LINE
-            /* Update status line once per command cycle, right before waiting for input */
-            if (ctx->status_func) {
+            /* Update status line once per command cycle, right before waiting for input.
+             * A V4 story draws its own status line, so there is nothing to extract. */
+            if (ctx->status_func && !Z_IS_V4()) {
                 zvibeStatus new_status;
                 zvibe_get_status(ctx, &new_status);
 
@@ -188,21 +194,23 @@ zvibeResult zvibe_run(zvibeContext *ctx) {
         /* Minimal version - skip save/restore silently */
         if (G->save_requested) {
             G->save_requested = 0;
-            z_do_branch(0); /* Fail save */
+            z_do_save_result(0); /* Fail save */
             continue;
         }
         
         if (G->restore_requested) {
             G->restore_requested = 0;
-            z_do_branch(0); /* Fail restore */
+            z_do_save_result(0); /* Fail restore */
             continue;
         }
         
         if (G->restart_requested) {
             G->restart_requested = 0;
             if (G->memory_state.flash_data && G->memory_state.ram_buffer && G->memory_state.ram_size > 0) {
+                Z_FLAGS2_KEEP();
                 memcpy(G->memory_state.ram_buffer, G->memory_state.flash_data, G->memory_state.ram_size);
-                zmem_write_byte(&G->memory_state, 1, (zmem_byte_t)(G->header.flags1 | (1U << 4)));
+                Z_FLAGS2_RETURN();
+                z_init_interpreter_header();
             }
             G->logical_pc = G->header.pc_start;
             G->quit_flag = 0;
@@ -211,6 +219,7 @@ zvibeResult zvibe_run(zvibeContext *ctx) {
             memset(G->stack_mem, 0, sizeof(G->stack_mem));
             G->stack_ptr = G->stack_mem;
             G->base_ptr = 0;
+            z_reset_ui_state();
             continue;
         }
 #endif
@@ -229,6 +238,37 @@ zvibeResult zvibe_input(zvibeContext *ctx, const char *input) {
     
     return ZVIBE_OK;
 }
+
+#if ZVIBE_ENABLE_V4
+zvibeResult zvibe_input_char(zvibeContext *ctx, uint16_t zscii) {
+    if (!ctx) return ZVIBE_ERROR;
+
+    zState *G = &ctx->z_state;
+    if (!G->char_requested) return ZVIBE_ERROR;
+
+    z_process_char(zscii);
+    return ZVIBE_OK;
+}
+
+zvibeResult zvibe_set_screen(zvibeContext *ctx, const zvibeScreenOps *ops, void *user) {
+    if (!ctx) return ZVIBE_ERROR;
+
+    zState *G = &ctx->z_state;
+    G->screen = ops;
+    G->screen_user = user;
+    /* A V4 story already loaded: its header must describe this screen */
+    if (G->memory_state.flash_data && G->memory_state.ram_buffer && Z_IS_V4())
+        z_init_interpreter_header();
+    return ZVIBE_OK;
+}
+
+size_t zvibe_get_input_limit(zvibeContext *ctx) {
+    zmem_byte_t max;
+    if (!ctx || !ctx->z_state.input_requested) return 0;
+    if (zmem_read_byte(&ctx->z_state.memory_state, ctx->z_state.input_buffer_addr, &max) != 0 || max < 2) return 0;
+    return (size_t)max - 1;               /* the first byte is the buffer size, one of it is the terminator */
+}
+#endif
 
 zvibeResult zvibe_get_room(zvibeContext *ctx, uint16_t *room_id,
                            char *name_buf, size_t name_buf_size) {
@@ -361,7 +401,7 @@ zvibeResult zvibe_save_completed(zvibeContext *ctx, int success) {
     if (!G->save_requested) return ZVIBE_ERROR;
     
     G->save_requested = 0;
-    z_do_branch(success ? 1 : 0);
+    z_do_save_result(success ? 1 : 0);
     return ZVIBE_OK;
 }
 
@@ -372,7 +412,7 @@ zvibeResult zvibe_restore_completed(zvibeContext *ctx, int success) {
     if (!G->restore_requested) return ZVIBE_ERROR;
     
     G->restore_requested = 0;
-    z_do_branch(success ? 1 : 0);
+    z_do_save_result(success ? 2 : 0);          /* V4: 2 = the game was restored */
     return ZVIBE_OK;
 }
 
@@ -396,8 +436,10 @@ zvibeResult zvibe_restart_completed(zvibeContext *ctx) {
     /* Restore dynamic memory from original story data */
     zmem_state_t *mem = &G->memory_state;
     if (mem->flash_data && mem->ram_buffer && mem->ram_size > 0) {
+        Z_FLAGS2_KEEP();
         memcpy(mem->ram_buffer, mem->flash_data, mem->ram_size);
-        zmem_write_byte(mem, 1, (zmem_byte_t)(G->header.flags1 | (1U << 4)));
+        Z_FLAGS2_RETURN();
+        z_init_interpreter_header();
     }
 
     /* Reset interpreter state */
@@ -410,6 +452,7 @@ zvibeResult zvibe_restart_completed(zvibeContext *ctx) {
     memset(G->stack_mem, 0, sizeof(G->stack_mem));
     G->stack_ptr = G->stack_mem;
     G->base_ptr = 0;
+    z_reset_ui_state();
 
     return ZVIBE_OK;
 }

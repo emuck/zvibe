@@ -228,6 +228,36 @@ Enter your choice (1-9): _
 - **Delta compressed**: Only changed bytes stored (typically 500-2000 bytes per save)
 - **Smart fusing**: Automatic 16KB SmartEEPROM configuration
 
+## Version 4 firmware
+
+`make v4` builds the single-game firmware with Z-machine V4 support: the story
+drives a full-screen terminal (split windows, cursor addressing, styles,
+single-key input) through the screen layer in `src/screen`. The default build
+stays V3-only and unchanged.
+
+```
+make v4-program                                   # Czech (V4) by default
+make v4-program STORY_FILE=../console/tests/data/v4screen.z4
+python3 tests/test_v4_game.py                     # needs pyserial and pyte
+make v4-program STORY_FILE=../console/tests/data/v4save.z4
+python3 tests/test_v4_save.py                     # save/restore, also across a reset
+make v4-program STORY_FILE=../console/tests/data/v4bigsave.z4
+python3 tests/test_v4_bigsave.py                  # a 21 KB save, packed into the SmartEEPROM
+```
+
+Connect at 115200 8N1 with an xterm-compatible terminal of at least 56 columns
+(the firmware asks the terminal for its size at boot and again each time you press
+RETURN to start, so a terminal opened after boot is measured too; if it never
+answers, 24x80 is assumed, and a taller window will show stale text below row 24). `V4_RAM` (default 32768)
+is the RAM given to the story's dynamic memory; a story needs its dynamic
+memory plus about 5 KB. A V4 story's full save can be over 20 KB (Bureaucracy), more
+than the 16 KB SmartEEPROM, so the firmware stores it packed against the story in
+flash: only the bytes the game has changed (`delta_pack` in `save_delta.c`). If the
+changes still do not fit, the save fails cleanly and the previous save is kept.
+Save and restore of Bureaucracy has been verified on the board.
+`terminal_io.c` holds the interrupt-driven receive ring and key decoding that
+the screen demo shares.
+
 ## Hardware Requirements
 
 ### SAM E51 Curiosity Nano
@@ -404,3 +434,7 @@ Automated testing requires only device connection.
 ## License
 
 BSD-3-Clause. See [../../LICENSE](../../LICENSE).
+
+Bundled Czech story data retains its own license; see the root `NOTICE` and
+`games/catalog/CZECH-NOTICE.txt`. Include that notice with any distribution
+(firmware, flash image or generated array) that contains Czech.

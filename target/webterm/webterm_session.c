@@ -15,6 +15,10 @@
 #include <string.h>
 #include <stdio.h>
 
+#if ZVIBE_ENABLE_V4
+#include "zvibe_screen.h"
+#endif
+
 /* -------------------------------------------------------------------------
  * Compile-time constants (override before including this file if needed)
  * ---------------------------------------------------------------------- */
@@ -34,7 +38,25 @@
 /** Scratch buffer for save data extraction.
  *  Z-machine v3 saves are 2-14KB for known games; 24KB gives comfortable headroom. */
 #ifndef WEBTERM_SAVE_BUF_MAX
+#if ZVIBE_ENABLE_V4
+#define WEBTERM_SAVE_BUF_MAX 65536   /* a V4 story's save can be over 20 KB */
+#else
 #define WEBTERM_SAVE_BUF_MAX 24576
+#endif
+#endif
+
+#if ZVIBE_ENABLE_V4
+/** Size of the screen a version 4 story draws on (the browser matches it). */
+#ifndef WEBTERM_SCREEN_ROWS
+#define WEBTERM_SCREEN_ROWS 24
+#endif
+#ifndef WEBTERM_SCREEN_COLS
+#define WEBTERM_SCREEN_COLS 80
+#endif
+
+/** Terminal bytes are sent in frames of at most this many bytes, so a frame of
+ *  escape-heavy output (6 bytes each once JSON-escaped) still fits json_buf. */
+#define WEBTERM_SCREEN_CHUNK 1024
 #endif
 
 /* -------------------------------------------------------------------------
@@ -47,6 +69,15 @@ struct webterm_session_t {
     webterm_state_t     state;
     int                 client_connected;
     int                 input_pending;   /* zvibe_input() was called, ready to run */
+    int                 key_wait;        /* waiting for one key (V4 read_char), not a line */
+    int                 has_rooms;       /* the cartographer can follow this story (V3) */
+#if ZVIBE_ENABLE_V4
+    int                 screen_mode;     /* a V4 story: output is terminal bytes from the screen layer */
+    int                 muted;           /* collect screen-layer output into echo_buf, not out_buf (input echo the browser already drew) */
+    char                echo_buf[256];
+    size_t              echo_len;
+    zscreen             scr;
+#endif
 
     /* Raw output accumulation — flushed as one JSON frame on each WAIT */
     char   out_buf[WEBTERM_OUT_BUF_SIZE];
@@ -116,6 +147,35 @@ static size_t json_escape(const char *in, size_t in_len,
  * Frame emission
  * ---------------------------------------------------------------------- */
 
+/** What the game waits for after an output frame (stored in history too). */
+enum { WAIT_NONE = 0, WAIT_LINE = 1, WAIT_KEY = 2 };
+
+/** Text frames carry story text; in screen mode they carry terminal bytes. */
+static const char *frame_prefix(const webterm_session_t *s) {
+#if ZVIBE_ENABLE_V4
+    if (s->screen_mode) return "{\"type\":\"screen\",\"data\":\"";
+#else
+    (void)s;
+#endif
+    return "{\"type\":\"output\",\"text\":\"";
+}
+
+/** The end of a text frame. `wait` is a WAIT_* kind; a line wait may carry the story's input limit
+ *  in the bits above the kind, sent as "max" so the browser stops typing where the story stops reading. */
+static size_t write_suffix(char *dst, int wait) {
+    const int kind = wait & 0xFF;
+    const unsigned max = (unsigned)wait >> 8;
+    const char *fixed = "\"}";
+    if (kind == WAIT_LINE) {
+        if (max) return (size_t)sprintf(dst, "\",\"prompt\":true,\"max\":%u}", max);
+        fixed = "\",\"prompt\":true}";
+    } else if (kind == WAIT_KEY) {
+        fixed = "\",\"key\":true}";
+    }
+    memcpy(dst, fixed, strlen(fixed));
+    return strlen(fixed);
+}
+
 /**
  * Push raw output text into the history ring buffer.
  * Stores unencoded text so entries are compact and the prompt flag is
@@ -147,7 +207,7 @@ static void send_history_entry(webterm_session_t *s, int idx) {
     size_t max = WEBTERM_JSON_BUF_SIZE;
     size_t pos = 0;
 
-    const char *prefix = "{\"type\":\"output\",\"text\":\"";
+    const char *prefix = frame_prefix(s);
     size_t plen = strlen(prefix);
     memcpy(buf + pos, prefix, plen);
     pos += plen;
@@ -155,15 +215,7 @@ static void send_history_entry(webterm_session_t *s, int idx) {
     pos += json_escape(s->history_text[idx], s->history_text_lens[idx],
                        buf + pos, max - pos - 32);
 
-    if (s->history_prompt[idx]) {
-        const char *suffix = "\",\"prompt\":true}";
-        size_t slen = strlen(suffix);
-        memcpy(buf + pos, suffix, slen);
-        pos += slen;
-    } else {
-        buf[pos++] = '"';
-        buf[pos++] = '}';
-    }
+    pos += write_suffix(buf + pos, s->history_prompt[idx]);
 
     s->platform->send(s->platform, buf, pos);
 }
@@ -201,7 +253,7 @@ static void flush_output(webterm_session_t *s, int prompt) {
     size_t pos = 0;
 
     /* Frame prefix */
-    const char *prefix = "{\"type\":\"output\",\"text\":\"";
+    const char *prefix = frame_prefix(s);
     size_t plen = strlen(prefix);
     memcpy(buf + pos, prefix, plen);
     pos += plen;
@@ -210,15 +262,7 @@ static void flush_output(webterm_session_t *s, int prompt) {
     pos += json_escape(s->out_buf, s->out_len, buf + pos, max - pos - 32);
 
     /* Frame suffix */
-    if (prompt) {
-        const char *suffix = "\",\"prompt\":true}";
-        size_t slen = strlen(suffix);
-        memcpy(buf + pos, suffix, slen);
-        pos += slen;
-    } else {
-        buf[pos++] = '"';
-        buf[pos++] = '}';
-    }
+    pos += write_suffix(buf + pos, prompt);
 
     send_output_frame(s, buf, pos, s->out_buf, s->out_len, prompt);
     s->out_len = 0;
@@ -228,9 +272,57 @@ static void flush_output(webterm_session_t *s, int prompt) {
  * zvibe callbacks
  * ---------------------------------------------------------------------- */
 
+#if ZVIBE_ENABLE_V4
+/* ---- screen mode: the ANSI screen layer drives the browser's terminal ---- */
+
+/** The screen layer's byte sink: collect terminal bytes, sending full chunks. */
+static void screen_put(uint8_t b) {
+    webterm_session_t *s = g_session;
+    if (!s) return;
+    if (s->muted) {                          /* the browser drew this already: keep it for the history only */
+        if (s->echo_len < sizeof s->echo_buf) s->echo_buf[s->echo_len++] = (char)b;
+        return;
+    }
+    s->out_buf[s->out_len++] = (char)b;
+    if (s->out_len >= WEBTERM_SCREEN_CHUNK) flush_output(s, WAIT_NONE);
+}
+
+/* An unsplit full clear starts the screen over, so what a reconnecting client
+ * needs to replay starts there too. */
+static void screen_erase_window(void *user, int16_t window) {
+    webterm_session_t *s = g_session;
+    if (window == -1 && s) {
+        zscreen_flush(&s->scr);
+        flush_output(s, WAIT_NONE);
+        s->history_head = 0;
+        s->history_count = 0;
+    }
+    zscreen_erase_window((zscreen *)user, window);
+}
+
+static zvibeScreenOps g_screen_ops;
+
+/** Tell the client the screen's size and to start from a blank one. */
+static void send_screen_reset(webterm_session_t *s) {
+    char buf[96];
+    snprintf(buf, sizeof buf,
+        "{\"type\":\"screen\",\"reset\":true,\"rows\":%d,\"cols\":%d}",
+        WEBTERM_SCREEN_ROWS, WEBTERM_SCREEN_COLS);
+    send_ephemeral(s, buf);
+}
+#endif
+
 static void output_cb(const char *text, size_t len) {
     webterm_session_t *s = g_session;
     if (!s) return;
+
+#if ZVIBE_ENABLE_V4
+    if (s->screen_mode) {
+        size_t i;
+        for (i = 0; i < len; i++) zscreen_putc(&s->scr, text[i]);
+        return;
+    }
+#endif
 
     size_t space = WEBTERM_OUT_BUF_SIZE - s->out_len;
     size_t copy  = len < space ? len : space;
@@ -294,6 +386,7 @@ static zvibeContext *create_zvibe(void) {
  * here, rather than the shared interpreter core, is sufficient.
  */
 static void cart_check_room_change(webterm_session_t *s) {
+    if (!s->has_rooms) return;
     uint16_t room_id = 0;
     char name[80];
 
@@ -335,6 +428,7 @@ static void send_story_id(webterm_session_t *s) {
  * move. No-op before the first room has ever been reported.
  */
 static void cart_resume_announce(webterm_session_t *s) {
+    if (!s->has_rooms) return;
     if (s->cart_room == 0) return;
 
     uint16_t room_id = 0;
@@ -399,15 +493,19 @@ int webterm_session_accept(webterm_session_t *s) {
 
         /* Signal reconnection */
         int prompt = (s->state == WEBTERM_STATE_WAITING);
-        const char *hdr = prompt
-            ? "{\"type\":\"resumed\",\"prompt\":true}"
-            : "{\"type\":\"resumed\"}";
+        const char *hdr = !prompt
+            ? "{\"type\":\"resumed\"}"
+            : s->key_wait ? "{\"type\":\"resumed\",\"key\":true}"
+                          : "{\"type\":\"resumed\",\"prompt\":true}";
         s->platform->send(s->platform, hdr, strlen(hdr));
 
         /* Let the client key/restore its persisted Cartographer map and
          * highlight the current room before the transcript replay lands. */
         send_story_id(s);
         cart_resume_announce(s);
+#if ZVIBE_ENABLE_V4
+        if (s->screen_mode) send_screen_reset(s);   /* replay starts from a blank screen */
+#endif
 
         /* Replay output history oldest-first, re-encoding each entry as JSON */
         for (int i = 0; i < s->history_count; i++) {
@@ -451,16 +549,35 @@ webterm_result_t webterm_session_load(webterm_session_t *s,
     s->history_head  = 0;
     s->history_count = 0;
     s->input_pending = 0;
+    s->key_wait      = 0;
+    s->has_rooms     = 0;
     s->cart_room     = 0;
     s->cart_cmd_valid = 0;
     memset(s->history_prompt, 0, sizeof(s->history_prompt));
 
     g_session = s;
 
+#if ZVIBE_ENABLE_V4
+    /* A version 4 story draws its own screen: give it one before it loads (the
+     * header's screen size is set from it). */
+    s->screen_mode = data[0] >= 4;
+    s->muted = 0;
+    if (s->screen_mode) {
+        zscreen_init(&s->scr, screen_put, WEBTERM_SCREEN_ROWS, WEBTERM_SCREEN_COLS);
+        g_screen_ops = zscreen_ops;
+        g_screen_ops.erase_window = screen_erase_window;
+        zvibe_set_screen(s->zvibe, &g_screen_ops, &s->scr);
+        send_screen_reset(s);
+    }
+#endif
+
     if (zvibe_load_story_from_memory(s->zvibe, data, len) != ZVIBE_OK) {
         return WEBTERM_ERROR;
     }
 
+    /* The cartographer reads the player's room from global 0 and its object's
+     * name, which is the version 3 convention only. */
+    s->has_rooms = data[0] <= 3;
     s->state = WEBTERM_STATE_RUNNING;
     send_story_id(s);
     return WEBTERM_OK;
@@ -496,15 +613,39 @@ webterm_result_t webterm_session_run(webterm_session_t *s) {
 
     switch (r) {
         case ZVIBE_WAIT_FOR_INPUT:
+#if ZVIBE_ENABLE_V4
+            if (s->screen_mode) zscreen_flush(&s->scr);
+#endif
             /* Cartographer's "room" event is ephemeral, like "status" — sent
              * before the output frame so output remains the last (and
              * prompt-bearing) frame of the turn. */
             cart_check_room_change(s);
-            flush_output(s, 1 /* prompt */);
+#if ZVIBE_ENABLE_V4
+            if (s->screen_mode) {
+                size_t limit = zvibe_get_input_limit(s->zvibe);
+                flush_output(s, WAIT_LINE | (int)((limit < 0xFFFF ? limit : 0xFFFF) << 8));
+            } else
+#endif
+            flush_output(s, WAIT_LINE);
+            s->key_wait = 0;
             s->state = WEBTERM_STATE_WAITING;
             return WEBTERM_WAIT;
 
+#if ZVIBE_ENABLE_V4
+        case ZVIBE_WAIT_FOR_CHAR:
+            /* read_char: the client answers with one key, not a line. */
+            if (s->screen_mode) zscreen_flush(&s->scr);
+            cart_check_room_change(s);
+            flush_output(s, WAIT_KEY);
+            s->key_wait = 1;
+            s->state = WEBTERM_STATE_WAITING;
+            return WEBTERM_WAIT;
+#endif
+
         case ZVIBE_GAME_FINISHED:
+#if ZVIBE_ENABLE_V4
+            if (s->screen_mode) zscreen_flush(&s->scr);
+#endif
             cart_check_room_change(s);
             flush_output(s, 0);
             s->state = WEBTERM_STATE_DONE;
@@ -570,7 +711,7 @@ webterm_result_t webterm_session_run(webterm_session_t *s) {
 void webterm_session_on_input(webterm_session_t *s,
                                const char *text, size_t len) {
     if (!s || !text) return;
-    if (s->state != WEBTERM_STATE_WAITING) return;
+    if (s->state != WEBTERM_STATE_WAITING || s->key_wait) return;
 
     if (len > WEBTERM_INPUT_MAX) len = WEBTERM_INPUT_MAX;
 
@@ -581,10 +722,43 @@ void webterm_session_on_input(webterm_session_t *s,
     memcpy(s->cart_cmd, buf, len + 1);
     s->cart_cmd_valid = 1;
 
+#if ZVIBE_ENABLE_V4
+    if (s->screen_mode) {
+        /* The browser has echoed the typed characters. Walk the screen layer over
+         * them without output so it knows where the cursor is, then let it move to
+         * the next line for real. Characters it would not have echoed are dropped. */
+        size_t i, kept = 0;
+        s->muted = 1;
+        s->echo_len = 0;
+        for (i = 0; i < len; i++) {
+            if (zscreen_echo(&s->scr, buf[i]) && buf[i] >= 32) buf[kept++] = buf[i];
+        }
+        s->muted = 0;
+        /* A client that reconnects must see the command on its row: record the echo in the history
+         * (it is not sent, the browser already shows it). */
+        if (s->echo_len) history_push(s, s->echo_buf, s->echo_len, WAIT_NONE);
+        buf[kept] = '\0';
+        zscreen_echo(&s->scr, '\n');
+    }
+#endif
+
     zvibe_input(s->zvibe, buf);
     s->input_pending = 1;
     s->state = WEBTERM_STATE_RUNNING;
 }
+
+#if ZVIBE_ENABLE_V4
+void webterm_session_on_char(webterm_session_t *s, unsigned zscii) {
+    if (!s) return;
+    if (s->state != WEBTERM_STATE_WAITING || !s->key_wait) return;
+
+    s->cart_cmd_valid = 0;
+    s->key_wait = 0;
+    zvibe_input_char(s->zvibe, (uint16_t)zscii);
+    s->input_pending = 1;
+    s->state = WEBTERM_STATE_RUNNING;
+}
+#endif
 
 void webterm_session_on_save(webterm_session_t *s) {
     /* Inject "save" as player input — the game triggers ZVIBE_SAVE_REQUESTED */
@@ -602,8 +776,13 @@ void webterm_session_on_reset(webterm_session_t *s) {
     s->history_head  = 0;
     s->history_count = 0;
     s->input_pending = 0;
+    s->key_wait      = 0;
+    s->has_rooms     = 0;
     s->cart_room     = 0;
     s->cart_cmd_valid = 0;
+#if ZVIBE_ENABLE_V4
+    s->screen_mode   = 0;
+#endif
     s->state         = WEBTERM_STATE_IDLE;
 
     zvibe_destroy(s->zvibe);
