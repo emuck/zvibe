@@ -14,3 +14,6 @@ arty_layout.json
 
 # Generated simulation files
 *.dat
+
+# Build mode stamp (V3/V4, story size, RAM size)
+.build_mode

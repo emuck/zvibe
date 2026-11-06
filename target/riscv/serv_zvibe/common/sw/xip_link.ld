@@ -9,11 +9,20 @@
  *
  * Memory Map:
  *   FLASH: Variable origin - Code (.text, .rodata)
- *   RAM:   0x00000200 - 0x00007FFF - Data (.data, .bss, .stack)
+ *   RAM:   0x00000200 - end of RAM - Data (.data, .bss, .stack)
+ *          32 KB by default (0x00007FFF). A board built with more RAM (the Arty's
+ *          memsize parameter, needed by large version 4 stories) passes its size on
+ *          the linker command line: --defsym=__ram_size=0x10000
  */
 
 OUTPUT_ARCH( "riscv" )
 ENTRY(_start)
+
+/* Total RAM in bytes, from the board's memsize parameter; override with --defsym=__ram_size=... */
+__ram_size = DEFINED(__ram_size) ? __ram_size : 32K;
+
+/* Least stack the firmware may be left with after .data and .bss; the link fails below it */
+__stack_min = DEFINED(__stack_min) ? __stack_min : 2K;
 
 /* Flash origin can be overridden via linker command line */
 /* Default: Arty S7-50 @ 1MB offset */
@@ -22,7 +31,7 @@ __flash_origin = DEFINED(__flash_origin) ? __flash_origin : 0x80100000;
 MEMORY
 {
   FLASH (rx)  : ORIGIN = __flash_origin, LENGTH = 15M
-  RAM   (rwx) : ORIGIN = 0x00000200, LENGTH = 32K - 512
+  RAM   (rwx) : ORIGIN = 0x00000200, LENGTH = __ram_size - 512
 }
 
 PHDRS
@@ -73,6 +82,8 @@ SECTIONS
 
   /* Stack at top of RAM (grows downward) - NOT a section, just symbols */
   __stack_end = ORIGIN(RAM) + LENGTH(RAM);  /* 0x8000 for 32KB RAM */
+  ASSERT(__bss_end + __stack_min <= __stack_end,
+         "RAM: .data and .bss leave less than __stack_min for the stack (raise the board's RAM size)")
 
   /* Symbols for initialization */
   __ramfunc_source_start = LOADADDR(.ramfunc);

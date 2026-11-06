@@ -83,17 +83,34 @@ configs and the measured firmware sizes in `CODE_SIZE_ANALYSIS.md`.
 
 ### Arty S7-50 (RISC-V)
 
-- **Flash:** no concern.
-- **RAM:** usable RAM is 32,256 B (`xip_link.ld`: 32 KB minus 512). Today
-  `.bss` is 20,100 B and `.data` 16 B, leaving 12.1 KB for the C stack and any
-  growth. The C stack depth has not been measured. If 4 KB is reserved for it,
-  the budget for dynamic memory plus interpreter state is 28,144 B, which is
-  about 23 KB of dynamic memory for V4 (state grows by about 1.3 KB with the
-  doubled stack and screen state).
-- **The fix if a story needs more:** enlarge the BRAM in the SoC. The S7-50 has
-  about 337 KB of block RAM and the SoC uses 8.5 tiles, so this is a bitstream
-  parameter change and rebuild, not a redesign. Not checked in this analysis.
-- **Saves:** 64 KB slots, no concern.
+- **Flash:** no concern. The V4 firmware is 41 KB of code against 28.7 KB for V3 (it runs in
+  place from QSPI; the flash layout adapts to the firmware size).
+- **RAM is a bitstream parameter.** The SoC's RAM is `servant_zvibe_arty_s7_50 #(RAM_KB)`
+  (32 by default, a power of two); the S7-50 has about 337 KB of block RAM and the SoC uses
+  8.5 tiles. A V4 build that needs more than 32 KB needs a bitstream built with more
+  (`ARTY_RAM_KB`, see [the build guide](../target/riscv/serv_zvibe/docs/build.md#version-4-stories)).
+  The firmware is linked for the same size (`--defsym=__ram_size`), and the link fails if
+  `.data` and `.bss` leave less than 2 KB for the stack.
+- **What the V4 player needs** (`common/sw/ram_budget.py`): the story's dynamic memory plus the
+  core's 1 KB reserve as the story buffer; a second buffer of the same size for the core's save
+  data (dynamic memory and stack, packed against the story afterwards); the packed save (16 KB,
+  or the story buffer if smaller); about 4 KB of interpreter, menu and flash state; the screen
+  layer; and 4 KB for the stack (the linker insists on 2 KB; stack depth is not measured).
+
+  | Story | Dynamic memory | Needs | `.bss` (measured) |
+  |---|---|---|---|
+  | Czech V4 gate (`czech.z4`) | 2.3 KB | **32 KB** (today's bitstream) | 15.4 KB |
+  | `generic` r6 | 3.6 KB | **32 KB** (today's bitstream) | 18.5 KB |
+  | *Nord and Bert* | 14.9 KB | 64 KB | 53.1 KB |
+  | *Bureaucracy* | 18.2 KB | 64 KB | 60.0 KB |
+  | *A Mind Forever Voyaging* | 31.7 KB | 128 KB | 86.6 KB |
+  | *Trinity* | 37.7 KB | 128 KB | 98.9 KB |
+
+  So the small V4 stories run on the bitstream that is on the board today; the large ones need
+  a rebuild with `ARTY_RAM_KB=64` or `128`. Not yet run on the board: see
+  [V4_DESIGN.md](V4_DESIGN.md) (RISC-V slice).
+- **Saves:** 64 KB flash slots. The save is `[story identity][packed save][CRC-32]`; the flash
+  save layer does not check its own CRC on read, so the V4 save carries one.
 
 ### MAX10 08 Eval (RISC-V)
 

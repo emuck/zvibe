@@ -12,3 +12,6 @@ build/
 
 # Boot stub hex (copied from ../sw/ by build.tcl at build time)
 flash_boot_banner.hex
+
+# RAM size stamp (sw/Makefile ram-kb)
+.ram_kb.stamp

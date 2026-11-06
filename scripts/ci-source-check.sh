@@ -33,9 +33,19 @@ run_step "Host validation (V4 enabled)" make validate-v4
 run_step "Webterm tests" make -C target/webterm/tests clean
 run_step "Webterm tests" make -C target/webterm/tests test
 
+# The RISC-V firmware's V4 player on the host: the real interpreter, screen layer and flash save
+# layer against a mock flash and a VT100 emulator (needs only the host C compiler).
+run_step "RISC-V V4 player (host)" make -C target/riscv/serv_zvibe/common/sw/tests clean
+run_step "RISC-V V4 player (host)" make -C target/riscv/serv_zvibe/common/sw/tests test
+
 if have_cmd riscv64-unknown-elf-gcc; then
     run_step "RISC-V build" make -C target/riscv/serv_zvibe/common/sw clean
     run_step "RISC-V build" make -C target/riscv/serv_zvibe/common/sw zvibe_riscv_multi.elf
+    run_step "Arty V3 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw clean
+    run_step "Arty V3 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw firmware
+    run_step "Arty V4 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw clean
+    run_step "Arty V4 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw firmware V4=1 GAME=czech
+    run_step "Arty V4 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw clean
 else
     echo
     echo "==> Skipping RISC-V build (riscv64-unknown-elf-gcc not found)"

@@ -12,6 +12,10 @@
 #   make flash-test      — Build arty_flash_test.bin (default: restaurant)
 #   make flash-test GAME=hitchhiker
 #   make check-layout    — Preview flash layout without building
+#   make flash-test V4=1 STORY=/path/story.z4
+#                        — Version 4 story: builds the V4 firmware, sized for the story
+#   make ram-kb V4=1 STORY=...  — SoC RAM (KB) the bitstream must be built with for it
+#   make ram-budget V4=1 STORY=... — The RAM budget behind that number
 #   make clean           — Remove all build artifacts
 #   make help            — Show this help
 
@@ -55,8 +59,71 @@ ZVIBE_XIP_FLAGS = -DZVIBE_MINIMAL_FEATURES -DZVIBE_FREESTANDING=1 -DZVIBE_ENABLE
                   -DZVIBE_ENABLE_STATUS_LINE=0 -DZVIBE_ENABLE_SAVE_RESTORE=1 \
                   -DMAX_GAMES=32
 
+# ---------------------------------------------------------------------------
+# Game selection (flash-test GAME=... or STORY=<file>)
+# ---------------------------------------------------------------------------
+V4 ?= 0
+GAME ?= restaurant
+GAME_FILE_plunderedhearts = plunderedhearts
+GAME_FILE_hitchhiker      = hitchhiker-r60-s861002
+GAME_FILE_zork1           = zork1
+
+GAME_BASE = $(or $(GAME_FILE_$(GAME)),$(GAME))
+# V4=1 prefers a version 4 story of that name (czech.z4 over czech.z3); V3 builds look for .z3 only
+GAME_EXTS = $(if $(filter 1,$(V4)),z4 z3,z3)
+GAME_TESTS   = ../../../../../../tests/games
+GAME_CATALOG = ../../../../../../games/catalog
+GAME_PATH = $(or $(STORY),$(firstword \
+	$(foreach e,$(GAME_EXTS),$(wildcard $(GAME_TESTS)/$(GAME_BASE).$(e))) \
+	$(foreach e,$(GAME_EXTS),$(wildcard $(GAME_TESTS)/$(GAME)*.$(e))) \
+	$(foreach e,$(GAME_EXTS),$(wildcard $(GAME_CATALOG)/$(GAME_BASE)*.$(e))) \
+	$(foreach e,$(GAME_EXTS),$(wildcard $(GAME_CATALOG)/$(GAME)*.$(e)))))
+
+# ---------------------------------------------------------------------------
+# Version 4 stories (V4=1)
+#
+# V4=1 compiles the interpreter with ZVIBE_ENABLE_V4, adds the ANSI screen layer and the
+# V4 player, and sizes the firmware for the story: the story's dynamic memory lives in
+# RAM, with two save buffers, so a large story needs more than the 32 KB SoC RAM. The SoC
+# RAM is a bitstream parameter (ARTY_RAM_KB, see fpga/Makefile): this Makefile works out
+# the size, links for it, and the FPGA build uses the same number.
+#   STORY=<file.z4>   the story (default: the GAME lookup above, which prefers .z4 when V4=1)
+#   ARTY_RAM_KB=<n>   override the computed RAM size (a power of two)
+# V4=0 (default) is the unchanged V3 firmware: 32 KB RAM.
+# ---------------------------------------------------------------------------
+ARTY_RAM_KB_V3 = 32
+RAM_BUDGET = python3 $(COMMON_SW)/ram_budget.py
+
+# The story the V4 build is sized for
+V4_STORY := $(GAME_PATH)
+
+ifeq ($(V4),1)
+  ifndef ARTY_RAM_KB
+    ARTY_RAM_KB := $(shell $(RAM_BUDGET) kb $(V4_STORY) 2>/dev/null)
+  endif
+  V4_DYN      := $(shell $(RAM_BUDGET) dyn $(V4_STORY) 2>/dev/null)
+  ifeq ($(or $(ARTY_RAM_KB),$(V4_DYN)),)
+    $(error Cannot size the V4 build for "$(V4_STORY)": it must be a version 4 story file, and not too large (see common/sw/ram_budget.py))
+  endif
+  ZVIBE_V4_FLAGS = -DZVIBE_ENABLE_V4=1 -DZVIBE_MEMORY_BUFFER_SIZE=$(V4_DYN)
+  V4_OBJS     = src/screen/zvibe_screen_xip.o src/core/zvibe_ops_v4_xip.o zvibe_riscv_v4.o
+else
+  ARTY_RAM_KB = $(ARTY_RAM_KB_V3)
+  V4_DYN      =
+  ZVIBE_V4_FLAGS =
+  V4_OBJS     =
+endif
+RAM_BYTES := $(shell echo $$(( $(ARTY_RAM_KB) * 1024 )))
+
+# Objects are not interchangeable between modes: switching V4, the story's size or the RAM
+# size starts from a clean tree.
+BUILD_MODE := v4=$(V4) dyn=$(V4_DYN) ram=$(ARTY_RAM_KB)
+ifneq ($(shell cat .build_mode 2>/dev/null),$(BUILD_MODE))
+  $(shell rm -rf *.o src *.elf *.bin *.dis *.map; echo '$(BUILD_MODE)' > .build_mode)
+endif
+
 # Combined flags for all Arty compilation units
-ARTY_CFLAGS = $(CFLAGS) $(INCLUDES) $(ZVIBE_XIP_FLAGS)
+ARTY_CFLAGS = $(CFLAGS) $(INCLUDES) $(ZVIBE_XIP_FLAGS) $(ZVIBE_V4_FLAGS)
 
 # ---------------------------------------------------------------------------
 # ZVibe interpreter objects (XIP variants)
@@ -77,6 +144,13 @@ src/api/%_xip.o: $(ZVIBE_ROOT)/src/api/%.c
 
 src/core/%_xip.o: $(ZVIBE_ROOT)/src/core/%.c
 	@mkdir -p src/core
+	$(CC) $(ARTY_CFLAGS) -c $< -o $@
+
+src/screen/%_xip.o: $(ZVIBE_ROOT)/src/screen/%.c
+	@mkdir -p src/screen
+	$(CC) $(ARTY_CFLAGS) -c $< -o $@
+
+zvibe_riscv_v4.o: $(COMMON_SW)/zvibe_riscv_v4.c $(COMMON_SW)/zvibe_riscv_v4.h flash_save_config.h
 	$(CC) $(ARTY_CFLAGS) -c $< -o $@
 
 # ---------------------------------------------------------------------------
@@ -111,13 +185,15 @@ zvibe_riscv_multi_arty.elf: $(COMMON_SW)/zvibe_riscv_multi.c \
                               $(COMMON_SW)/zvibe_stubs.c \
                               $(COMMON_SW)/xip_start.S \
                               $(COMMON_SW)/xip_link.ld \
-                              $(ARTY_OBJS) $(ZVIBE_OBJ_XIP)
+                              $(ARTY_OBJS) $(V4_OBJS) $(ZVIBE_OBJ_XIP)
 	$(CC) $(ARTY_CFLAGS) \
 		-nostdlib -nostartfiles -T$(COMMON_SW)/xip_link.ld \
-		-Wl,--defsym=__flash_origin=0x80100100 -Wl,--gc-sections \
+		-Wl,--defsym=__flash_origin=0x80100100 -Wl,--defsym=__ram_size=$(RAM_BYTES) \
+		-Wl,--gc-sections \
 		-o $@ $(COMMON_SW)/xip_start.S $(COMMON_SW)/zvibe_riscv_multi.c \
-		$(ARTY_OBJS) $(COMMON_SW)/zvibe_stubs.c $(ZVIBE_OBJ_XIP) -lgcc
+		$(ARTY_OBJS) $(V4_OBJS) $(COMMON_SW)/zvibe_stubs.c $(ZVIBE_OBJ_XIP) -lgcc
 	$(SIZE) $@
+	@echo "SoC RAM this firmware is linked for: $(ARTY_RAM_KB) KB (the bitstream must be built with ARTY_RAM_KB=$(ARTY_RAM_KB))"
 
 zvibe_riscv_multi_arty.bin: zvibe_riscv_multi_arty.elf
 	$(OBJCOPY) -O binary $< $@
@@ -129,18 +205,6 @@ zvibe_riscv_multi_arty.dis: zvibe_riscv_multi_arty.elf
 # Flash image (invokes build_flash.py)
 # ---------------------------------------------------------------------------
 BUILD_FLASH = python3 ../build_flash.py
-
-GAME ?= restaurant
-GAME_FILE_plunderedhearts = plunderedhearts
-GAME_FILE_hitchhiker      = hitchhiker-r60-s861002
-GAME_FILE_zork1           = zork1
-
-GAME_BASE = $(or $(GAME_FILE_$(GAME)),$(GAME))
-GAME_PATH = $(firstword \
-	$(wildcard ../../../../../../tests/games/$(GAME_BASE).z3) \
-	$(wildcard ../../../../../../tests/games/$(GAME)*.z3) \
-	$(wildcard ../../../../../../games/catalog/$(GAME_BASE)*.z3) \
-	$(wildcard ../../../../../../games/catalog/$(GAME)*.z3))
 
 arty_flash_test.bin: zvibe_riscv_multi_arty.bin
 	@if [ -z "$(GAME_PATH)" ]; then \
@@ -170,7 +234,7 @@ arty_flash_all.bin: zvibe_riscv_multi_arty.bin
 # ---------------------------------------------------------------------------
 # Top-level phony targets
 # ---------------------------------------------------------------------------
-.PHONY: all firmware flash-test all-games check-layout clean help
+.PHONY: all firmware flash-test all-games check-layout clean help ram-kb ram-budget
 
 all: firmware
 
@@ -206,7 +270,19 @@ check-layout: zvibe_riscv_multi_arty.bin
 		--game-name "$(GAME)" \
 		--layout-only
 
+# SoC RAM (KB) the bitstream must be built with for this firmware: 32 for V3
+ram-kb:
+	@echo $(ARTY_RAM_KB)
+
+ram-budget:
+ifeq ($(V4),1)
+	@$(RAM_BUDGET) show $(V4_STORY)
+else
+	@echo "V3 firmware: $(ARTY_RAM_KB) KB SoC RAM"
+endif
+
 clean:
+	rm -f .build_mode
 	rm -f *.o *.elf *.bin *.dis *.hex *.map
 	rm -f flash_layout.h arty_layout.json arty_flash_test.bin
 	rm -rf src/

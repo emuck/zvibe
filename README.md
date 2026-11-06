@@ -163,13 +163,15 @@ make sim-tier1    # Unit + SoC tests (~30 s)
 
 The interpreter is stable and handles the full Z-machine v3 opcode set, and
 version 4 when built with it. All targets build and run end-to-end. The RISC-V
-targets have been validated on physical hardware, and the SAM E51 V4 firmware on
+targets have been validated on physical hardware (version 3), and the SAM E51 V4 firmware on
 a Curiosity Nano (the Czech V4 gate, and *Bureaucracy* played through with save and
-restore). Known limits are listed in [docs/V4_DESIGN.md](docs/V4_DESIGN.md).
+restore). The Arty S7-50 has a V4 firmware build (`make flash-test V4=1`) that is tested on
+the host but has not yet run on the board. Known limits are listed in
+[docs/V4_DESIGN.md](docs/V4_DESIGN.md).
 
 **Active work:**
 - Regression suite expansion
-- Version 4 on the RISC-V targets, and a multi-game SAM E51 V4 firmware
+- Version 4 on the RISC-V targets (Arty built and host-tested, not yet on the board; MAX10 not started), and a multi-game SAM E51 V4 firmware
 
 **Out of scope:**
 - Z-machine v5 and later
@@ -192,7 +194,7 @@ Good starting points — no embedded hardware required for most:
 - **Unit test coverage** — `test_split_memory.c` covers the memory abstraction layer; opcode dispatch, save format, and text decode have no unit tests yet
 - **Console target improvements** — status line rendering, save file compatibility, platform edge cases
 - **New board port** — `docs/TARGETS.md` has a porting checklist; any target with 32 KB RAM and XIP-accessible flash is a candidate
-- **v4 on more targets** — the plan, the slices already done and the deferred items are in [docs/V4_DESIGN.md](docs/V4_DESIGN.md); the RISC-V firmware and a phone keyboard for the web terminal are open
+- **v4 on more targets** — the plan, the slices already done and the deferred items are in [docs/V4_DESIGN.md](docs/V4_DESIGN.md); the first run of the Arty V4 firmware on the board, the MAX10, and a phone keyboard for the web terminal are open
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, code style, and PR checklist.
 Bugs and feature requests: [GitHub Issues](https://github.com/emuck/zvibe/issues).

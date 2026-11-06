@@ -18,6 +18,12 @@
 #include <stdint.h>
 #include <stddef.h>
 
+/* Code that runs while the flash is being erased or programmed must live in RAM (XIP fetch is
+ * unavailable then). The host test builds define ZV_RAMFUNC to nothing. */
+#ifndef ZV_RAMFUNC
+#define ZV_RAMFUNC __attribute__((section(".ramfunc")))
+#endif
+
 void flash_read_bytes(uint32_t byte_addr, void *buf, size_t len);
 int  flash_erase_sector(uint32_t byte_addr);
 int  flash_program_bytes(uint32_t byte_addr, const void *data, size_t len);

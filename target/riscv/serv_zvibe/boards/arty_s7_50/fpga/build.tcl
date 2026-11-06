@@ -17,6 +17,12 @@ set_property target_language Verilog [current_project]
 set_property default_lib work [current_project]
 set_property top servant_zvibe_arty_s7_50 [current_fileset]
 
+## SoC RAM size in KB (default 32; larger for version 4 stories, see sw/Makefile `ram-kb`)
+set ram_kb 32
+if {[info exists ::env(ARTY_RAM_KB)]} { set ram_kb $::env(ARTY_RAM_KB) }
+puts "SoC RAM: ${ram_kb} KB"
+set_property generic "RAM_KB=${ram_kb}" [current_fileset]
+
 ## Path configuration
 # Common RTL (shared across boards)
 set common_rtl "../../../common/rtl"

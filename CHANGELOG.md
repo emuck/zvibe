@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Arty S7-50 (RISC-V) version 4 firmware: `make flash-test V4=1 STORY=<file.z4>` in
+  `target/riscv/serv_zvibe/boards/arty_s7_50/sw`. A V4 player on the screen layer with saves packed against
+  the story (story identity and CRC-32), sized for the story: `make ram-kb` / `make ram-budget` say how much
+  SoC RAM it needs, and the SoC's RAM is now a bitstream parameter (`ARTY_RAM_KB`, default 32, unchanged).
+  Host-tested; **not yet run on the board.** V3 firmware is byte-identical to before.
+- The RISC-V link fails if `.data` and `.bss` leave less than 2 KB for the stack.
+
 ## [2.1.0] - 2026-11-05
 
 ### Added

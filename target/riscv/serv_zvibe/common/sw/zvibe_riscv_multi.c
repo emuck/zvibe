@@ -39,6 +39,9 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "flash_save.h"
 #include "save_delta.h"
 
+// Version 4 stories (built with ZVIBE_ENABLE_V4=1) are played by their own module
+#include "zvibe_riscv_v4.h"
+
 //=============================================================================
 // Hardware Definitions
 //=============================================================================
@@ -256,6 +259,56 @@ static int do_delta_restore(void) {
     return 1;
 }
 
+#if ZVIBE_ENABLE_V4
+//=============================================================================
+// Version 4 stories (see zvibe_riscv_v4.c)
+//=============================================================================
+
+// Terminal port for the V4 player: the UART, polled
+void rv_put_byte(uint8_t b) { uart_putc((char)b); }
+
+int rv_rx_get(void) {
+    if (UART_STATUS & RX_AVAILABLE) return (int)(UART_RX_DATA & 0xFF);
+    return -1;
+}
+
+void rv_idle(void) {}
+
+static bool game_is_v4(int game_index) {
+    const game_entry_t *game = get_game(game_index);
+    return game && rv_v4_is_v4_story(game->data, game->size);
+}
+
+// Play a V4 game until it ends. The V3 path keeps its context in main(); a V4 story needs
+// only the player's own state, so this runs the whole session.
+static void run_v4_session(int game_index) {
+    const game_entry_t *game = get_game(game_index);
+    if (!game) return;
+
+    // This game's save slots, as for a V3 game
+    {
+        const flash_toc_t *toc = (const flash_toc_t *)
+            (FLASH_XIP_BASE + g_flash_metadata->games_toc_offset);
+        const flash_toc_entry_t *entry = &toc->entries[game_index];
+        if (entry->saves_offset != 0 && entry->save_slot_count > 0) {
+            flash_save_init(entry->saves_offset, (int)entry->save_slot_count);
+        }
+    }
+
+    GPIO_LEDS = 0x2;
+    for (;;) {
+        rv_v4_result r = rv_v4_play(game->data, game->size);
+        if (r == RV_V4_RESET) continue;                 // ~reset~ from a test script: start afresh
+        if (r == RV_V4_ERROR) {
+            uart_puts("\r\nERROR: the version 4 game stopped\r\n");
+        }
+        break;
+    }
+    GPIO_LEDS = 0x0;
+    uart_puts("\r\n");
+}
+#endif /* ZVIBE_ENABLE_V4 */
+
 //=============================================================================
 // Game Initialization
 //=============================================================================
@@ -351,6 +404,14 @@ int main(void) {
     if (num_games == 1) {
         single_game_wait_for_return();
 
+#if ZVIBE_ENABLE_V4
+        if (game_is_v4(0)) {
+            for (;;) {                      // a V4 game restarts after RETURN when it ends
+                run_v4_session(0);
+                single_game_wait_for_return();
+            }
+        }
+#endif
         if (init_zvibe_game(&ctx, 0)) {
             in_menu_mode = false;
             GPIO_LEDS = 0x1;  // LED 0 on = game mode
@@ -372,6 +433,13 @@ int main(void) {
 
             int selected_index;
             if (menu_parse_input(input_buffer, num_games, &selected_index)) {
+#if ZVIBE_ENABLE_V4
+                if (game_is_v4(selected_index)) {
+                    run_v4_session(selected_index);
+                    print_menu();
+                    continue;
+                }
+#endif
                 // Valid selection - initialize game
                 if (init_zvibe_game(&ctx, selected_index)) {
                     in_menu_mode = false;

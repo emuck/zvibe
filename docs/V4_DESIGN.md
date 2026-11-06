@@ -354,8 +354,8 @@ each is a separate commit.
      covers the opcodes and streams directly; `test_screen.c` the layer alone.
 
    **Deferred from this slice:**
-   - Frontend migrations are separate work: RISC-V firmware. The console and the SAME51 single-game firmware are
-     done, see below.
+   - Frontend migrations are separate work: the console, the SAME51 single-game firmware and the
+     Arty S7-50 firmware (built and host-tested, not yet run on the board) are done, see below.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
    - Timed input.
@@ -419,7 +419,8 @@ each is a separate commit.
      `v4bigsave.z4` (21 KB save) pass their scripts; a save from another release
      of a story is refused.
    - Bureaucracy (r116) played on the board with a real save and restore: verified.
-   - Not yet done: the multi-game SAME51 firmware and RISC-V firmware.
+   - Not yet done: the multi-game SAME51 firmware, the MAX10 firmware, and the first run of the
+     Arty firmware on the board (see item 9).
 8. **Webterm.** In a `ZVIBE_ENABLE_V4` build a V4 story gets a 24x80 ANSI screen
    layer in the session; its terminal bytes go to the browser in `screen` frames
    and `zterm.js` (a small VT100 emulator, checked against the console tests' C
@@ -430,6 +431,30 @@ each is a separate commit.
    cartographer follows V3 stories only. Future upgrade: phone keyboard (a hidden focused input and on-screen arrow/Escape keys; the page takes keys from `keydown`, so no keyboard appears on a phone). Not done: window
    resizing (the size is fixed by the server), scrollback of the lower window, and
    `zvibe-duo.html`. `make -C target/webterm/tests test` runs everything.
+
+9. **RISC-V (Arty S7-50).** `make flash-test V4=1 STORY=<file.z4>` in
+   `target/riscv/serv_zvibe/boards/arty_s7_50/sw` builds the V4 firmware: the interpreter with
+   `ZVIBE_ENABLE_V4`, the screen layer, and a V4 player (`common/sw/zvibe_riscv_v4.c`) that
+   follows the SAME51 one: size probe, line and key input, saves packed against the story with
+   a story identity and a CRC-32 into the flash save slots. A story that is not V4 takes the
+   unchanged V3 path, so one flash image can mix both. The firmware is sized for the story: the
+   Makefile works out the RAM it needs (`ram_budget.py`), links for it, and `fpga/Makefile`
+   builds the bitstream with the same `RAM_KB` (the SoC's RAM was a hard-wired 32 KB; the
+   default is unchanged). Small V4 stories (Czech, `generic`) fit the 32 KB bitstream already
+   on the board; *Bureaucracy* and *Nord and Bert* need 64 KB, *AMFV* and *Trinity* 128 KB
+   (table in [V4_MEMORY.md](V4_MEMORY.md)). **V3 firmware is byte-identical** to the build
+   before this slice (`cmp` of the `.bin`). The player is tested on the host
+   (`common/sw/tests`, 191 checks): the real interpreter, screen layer and flash save layer
+   on a mock NOR flash that enforces erase-before-program, with a VT100 emulator as the
+   terminal; mutation-checked (CRC, each identity field, input limit, key decoding, flash
+   errors, size probe).
+   **Not verified:** anything on the board. The busy-wait loops that wait for an escape
+   sequence's tail and for the terminal's size reply count loop iterations
+   (`RV_SPIN_PER_MS`, a guess for the bit-serial SERV core); the UART, QSPI saves, the bitstream
+   with a larger `RAM_KB` (the RTL and `build.tcl` changes were not run: no Vivado here), and
+   stack depth are untested. `flash_save.c` does not check the CRC-16 it stores when reading
+   (found while writing this; V3 saves are unaffected by this slice, V4 saves carry their
+   own CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
 
 ### Proving "zero cost"
 

@@ -119,6 +119,48 @@ make program-flash ARTY_FLASH=../sw/arty_flash_all.bin
 make program-flash
 ```
 
+### Version 4 stories
+
+*Status: builds and passes the host tests (`common/sw/tests`); not yet run on the board.*
+
+A version 4 story draws its own screen, so the V4 firmware plays it through the ANSI screen
+layer on the serial terminal (use a terminal of at least 56 columns and 10 rows; the player
+asks it for its size). Build a V4 image with `V4=1` and the story:
+
+```bash
+cd boards/arty_s7_50/sw
+make ram-budget V4=1 STORY=/path/story.z4          # what it needs, line by line
+make ram-kb     V4=1 STORY=/path/story.z4          # the SoC RAM it needs: 32, 64 or 128 KB
+make flash-test V4=1 STORY=/path/story.z4          # firmware + flash image (V4=1 GAME=czech finds czech.z4)
+```
+
+The story's dynamic memory lives in RAM, with a second buffer for saves, so a big story needs
+more RAM than the 32 KB the SoC has had so far. The SoC's RAM is a bitstream parameter, and
+the firmware is linked for the size that was computed; **the two must agree.** From `fpga/`
+the same arguments do both (the Makefile asks `sw/Makefile` for the size and builds the bitstream
+with it):
+
+```bash
+cd ../fpga
+make program-complete V4=1 STORY=/path/story.z4     # bitstream (RAM_KB from the story) + flash image
+
+# or, when the bitstream on the board already has enough RAM, only the flash image
+# built above (sw/arty_flash_test.bin):
+make program-flash
+```
+
+| Story | SoC RAM |
+|---|---|
+| `czech.z4`, `generic` | 32 KB: the bitstream already on the board works, `program-flash` is enough |
+| *Nord and Bert*, *Bureaucracy* | 64 KB: rebuild the bitstream |
+| *A Mind Forever Voyaging*, *Trinity* | 128 KB: rebuild the bitstream |
+
+Switching V4, the story or the RAM size cleans the build (`sw/.build_mode`). A V3 build is
+unchanged (byte-identical firmware). A flash image holds one V4 story for now (the firmware
+buffers are sized for it); a V3 game in the same image still takes the V3 path.
+Saves are one slot ring of 64 KB flash sectors, as for V3; a save from another release of the
+story is refused.
+
 ### UART Connection
 
 ```bash

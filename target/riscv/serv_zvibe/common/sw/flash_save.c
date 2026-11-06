@@ -88,7 +88,7 @@ int flash_save_init(uint32_t base, int num_slots) {
     return SAVE_OK;
 }
 
-__attribute__((section(".ramfunc")))
+ZV_RAMFUNC
 int flash_save_write(const void *data, size_t data_len) {
     if (g_num_slots <= 0)
         return SAVE_ERR_NO_SPACE;
