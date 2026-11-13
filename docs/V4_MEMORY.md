@@ -107,8 +107,10 @@ configs and the measured firmware sizes in `CODE_SIZE_ANALYSIS.md`.
   | *Trinity* | 37.7 KB | 128 KB | 98.9 KB |
 
   So the small V4 stories run on the bitstream that is on the board today; the large ones need
-  a rebuild with `ARTY_RAM_KB=64` or `128`. Not yet run on the board: see
-  [V4_DESIGN.md](V4_DESIGN.md) (RISC-V slice).
+  a rebuild with `ARTY_RAM_KB=64` or `128`. **Checked on the board:** Czech and the small test
+  stories on the 32 KB design, and *Bureaucracy* r160 on a 64 KB design (timing met, +0.043 ns;
+  17.5 of 75 block RAM tiles). 128 KB (*Trinity*, *AMFV*) and the stack depth are not measured
+  yet: see [V4_DESIGN.md](V4_DESIGN.md) (RISC-V slice).
 - **Saves:** 64 KB flash slots. The save is `[story identity][packed save][CRC-32]`; the flash
   save layer does not check its own CRC on read, so the V4 save carries one.
 

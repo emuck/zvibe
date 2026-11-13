@@ -12,7 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `target/riscv/serv_zvibe/boards/arty_s7_50/sw`. A V4 player on the screen layer with saves packed against
   the story (story identity and CRC-32), sized for the story: `make ram-kb` / `make ram-budget` say how much
   SoC RAM it needs, and the SoC's RAM is now a bitstream parameter (`ARTY_RAM_KB`, default 32, unchanged).
-  Host-tested; **not yet run on the board.** V3 firmware is byte-identical to before.
+  Host-tested, and run on the board: Czech V4 gate, the small V4 test stories (keys, lines, split screen,
+  save and restore across a power cycle, story identity) on the 32 KB design, and *Bureaucracy* r160 on a
+  64 KB design. V3 firmware is byte-identical to before.
+- `make build-nonproject` in the Arty `fpga/` directory: the same bitstream by Vivado's non-project flow,
+  for hosts where the project flow crashes after synthesis (Vivado 2025.1, kernel 7.0).
+- Board tests `test_v4_czech.py` and `test_v4_stories.py` (`boards/arty_s7_50/tests`).
 - The RISC-V link fails if `.data` and `.bss` leave less than 2 KB for the stack.
 
 ## [2.1.0] - 2026-11-05

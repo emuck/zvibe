@@ -355,7 +355,7 @@ each is a separate commit.
 
    **Deferred from this slice:**
    - Frontend migrations are separate work: the console, the SAME51 single-game firmware and the
-     Arty S7-50 firmware (built and host-tested, not yet run on the board) are done, see below.
+     Arty S7-50 firmware (host-tested and run on the board) are done, see below.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
    - Timed input.
@@ -419,7 +419,7 @@ each is a separate commit.
      `v4bigsave.z4` (21 KB save) pass their scripts; a save from another release
      of a story is refused.
    - Bureaucracy (r116) played on the board with a real save and restore: verified.
-   - Not yet done: the multi-game SAME51 firmware, the MAX10 firmware, and the first run of the
+   - Not yet done: the multi-game SAME51 firmware, the MAX10 firmware, and the open Arty items in
      Arty firmware on the board (see item 9).
 8. **Webterm.** In a `ZVIBE_ENABLE_V4` build a V4 story gets a 24x80 ANSI screen
    layer in the session; its terminal bytes go to the browser in `screen` frames
@@ -448,13 +448,26 @@ each is a separate commit.
    on a mock NOR flash that enforces erase-before-program, with a VT100 emulator as the
    terminal; mutation-checked (CRC, each identity field, input limit, key decoding, flash
    errors, size probe).
-   **Not verified:** anything on the board. The busy-wait loops that wait for an escape
-   sequence's tail and for the terminal's size reply count loop iterations
-   (`RV_SPIN_PER_MS`, a guess for the bit-serial SERV core); the UART, QSPI saves, the bitstream
-   with a larger `RAM_KB` (the RTL and `build.tcl` changes were not run: no Vivado here), and
-   stack depth are untested. `flash_save.c` does not check the CRC-16 it stores when reading
-   (found while writing this; V3 saves are unaffected by this slice, V4 saves carry their
-   own CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
+   **Board results (Arty S7-50, 13 November 2026):** on the 32 KB bitstream already on the board
+   (user flash region written only): Czech V4 gate, 386 performed, 367 passed, 0 failed, 19 print
+   tests, the same as frotz and the console (`tests/test_v4_czech.py`); `v4keys` (Return, the four
+   arrows, Delete, a lone Escape and the key after it, CR LF as one key), `v4lines` (editing, the
+   39-character limit), `v4screen` (reverse-video bar, bold, positioned text, 80 x 24 reported to
+   the story), `v4save` (save, power cycle, restore with result 2, the newer of two saves), and
+   story identity (a changed release, serial number or checksum refused) all pass
+   (`tests/test_v4_stories.py`, 61 checks). On a 64 KB bitstream (`ARTY_RAM_KB=64`): *Bureaucracy*
+   r160 plays, with the licence form, the status line, a save, a restart of the SoC and a restore
+   back to the saved room. That bitstream meets timing (worst setup slack +0.043 ns against +0.288 ns
+   for the 32 KB design) and uses 17.5 of 75 block RAM tiles.
+   **Still not verified:** `RV_SPIN_PER_MS` is still the guess (the key and size-probe waits work
+   with it, since the bytes arrive together; no calibration was done); stack depth (the 4 KB
+   budget was not measured); a bitstream with 128 KB; *Trinity* and *A Mind Forever Voyaging*;
+   a long play session of Bureaucracy; power-cycling with the 64 KB bitstream written to flash (it
+   was loaded into SRAM). Vivado's project flow (`make build`) crashes on the test machine after
+   a successful synthesis, with `main` as well, so the 64 KB bitstream was built with the new
+   non-project flow (`make build-nonproject`, same sources and part). `flash_save.c` still does
+   not check the CRC-16 it stores when reading (V3 saves are unaffected by this slice; V4 saves
+   carry their own CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
 
 ### Proving "zero cost"
 

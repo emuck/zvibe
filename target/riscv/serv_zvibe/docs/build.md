@@ -22,7 +22,7 @@ Complete build and programming reference for both supported boards.
 ### Arty S7-50
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Xilinx Vivado 2024.x or 2025.1 | FPGA synthesis | `vivado` must be in PATH |
+| Xilinx Vivado 2024.x or 2025.1 | FPGA synthesis | `vivado` must be in PATH (a non-interactive `ssh` does not read `.bashrc`: export it in the command, e.g. `PATH=$PATH:<install>/2025.1/Vivado/bin`) |
 | openFPGALoader | Flash programming | `sudo apt install openfpgaloader` or build from source |
 
 ### Simulation Only
@@ -94,6 +94,14 @@ make build
 # Output: build/servant_zvibe_arty_s7_50.bit
 ```
 
+If `make build` stops after synthesis with `Abnormal program termination (7)` (Vivado 2025.1 on a
+new kernel crashed writing its hardware-definition file; seen with Ubuntu 24.04, kernel 7.0), use
+the non-project flow, which builds the same design without that step:
+
+```bash
+make build-nonproject               # same output: build/servant_zvibe_arty_s7_50.bit
+```
+
 ### 2. Build Firmware + Flash Image
 
 ```bash
@@ -121,7 +129,9 @@ make program-flash
 
 ### Version 4 stories
 
-*Status: builds and passes the host tests (`common/sw/tests`); not yet run on the board.*
+*Status: verified on the board with Czech, the console's small test stories and Bureaucracy r160
+(see "Board results" in [V4_DESIGN.md](../../../../docs/V4_DESIGN.md)). Board tests:
+`boards/arty_s7_50/tests/test_v4_czech.py` and `test_v4_stories.py`.*
 
 A version 4 story draws its own screen, so the V4 firmware plays it through the ANSI screen
 layer on the serial terminal (use a terminal of at least 56 columns and 10 rows; the player

@@ -51,7 +51,7 @@ $(RAM_STAMP): FORCE
 
 FORCE:
 
-.PHONY: all build clean program program-complete program-flash program-sram \
+.PHONY: all build build-nonproject clean program program-complete program-flash program-sram \
         reports show-deps help
 
 all: build
@@ -73,6 +73,14 @@ $(BUILD_DIR)/$(DESIGN).bit: $(BITSTREAM_DEPS)
 	@echo "Build Complete!"
 	@echo "Bitstream: $(BUILD_DIR)/$(DESIGN).bit"
 	@echo "=========================================="
+
+# Same bitstream by the plain (non-project) Vivado flow: use this if `make build` ends in
+# "Abnormal program termination (7)" after synthesis (see build_nonproject.tcl).
+# Leaves build/$(DESIGN).bit, so the program-* targets work unchanged.
+build-nonproject: $(BITSTREAM_DEPS) build_nonproject.tcl
+	@mkdir -p $(BUILD_DIR)
+	$(VIVADO) -mode batch -source build_nonproject.tcl -notrace
+	@echo "Bitstream: $(BUILD_DIR)/$(DESIGN).bit"
 
 # One-command full programming: bitstream + user flash region
 program-complete: $(BUILD_DIR)/$(DESIGN).bit

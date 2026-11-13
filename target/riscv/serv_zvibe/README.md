@@ -10,7 +10,7 @@ moved inside this directory.
 ## Overview
 
 - **CPU**: SERV (bit-serial RV32I, ~200 LUTs)
-- **RAM**: 32KB BRAM for data/stack
+- **RAM**: 32KB BRAM for data/stack (Arty: a bitstream parameter, 64 or 128 KB for large version 4 stories)
 - **Flash**: On-chip UFM (MAX10) or external QSPI (Arty) for XIP execution and saves
 - **Peripherals**: UART (115200 baud), Timer, GPIO
 - **Application**: ZVibe Z-machine interpreter with SAVE/RESTORE support
