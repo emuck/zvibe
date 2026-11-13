@@ -442,8 +442,8 @@ each is a separate commit.
    builds the bitstream with the same `RAM_KB` (the SoC's RAM was a hard-wired 32 KB; the
    default is unchanged). Small V4 stories (Czech, `generic`) fit the 32 KB bitstream already
    on the board; *Bureaucracy* and *Nord and Bert* need 64 KB, *AMFV* and *Trinity* 128 KB
-   (table in [V4_MEMORY.md](V4_MEMORY.md)). **V3 firmware is byte-identical** to the build
-   before this slice (`cmp` of the `.bin`). The player is tested on the host
+   (table in [V4_MEMORY.md](V4_MEMORY.md)). **V3 firmware was byte-identical** to the build
+   before this slice (`cmp` of the `.bin`; the later object-0 fix added 44 bytes). The player is tested on the host
    (`common/sw/tests`, 191 checks): the real interpreter, screen layer and flash save layer
    on a mock NOR flash that enforces erase-before-program, with a VT100 emulator as the
    terminal; mutation-checked (CRC, each identity field, input limit, key decoding, flash
@@ -459,6 +459,17 @@ each is a separate commit.
    r160 plays, with the licence form, the status line, a save, a restart of the SoC and a restore
    back to the saved room. That bitstream meets timing (worst setup slack +0.043 ns against +0.288 ns
    for the 32 KB design) and uses 17.5 of 75 block RAM tiles.
+   **A hang found by playing *Bureaucracy* (r160) on the board:** after the stamp, `take mail` stopped the game
+   dead. Replayed on the host from the published walkthrough, it ended in the interpreter's fatal-error handler,
+   which spins forever on an embedded target: "Missing property obj=0, prop=1F", a `put_prop` on object 0. Fixing
+   that exposed `insert_obj` on object 0 (a null-pointer write). Every object opcode now takes object 0 as "no
+   object" (`test_objects.c`, V3 and V4), and the handler prints a message before it stops. **Open:** the same turn
+   prints "You do find a , though." with the object's name missing, because the helper that rotates through the
+   mail list returns 0 on its first call (the list's words are read one byte earlier than the data is laid out).
+   `dfrotz` returns the same 0, 0xCF00, 0xF700 from the same routine and table, so this is not a difference between
+   frotz and zvibe; whether the original game printed that blank is not known. Reading the table one byte later
+   makes the sentence "You do find a Popular Paranoia magazine, though.", which suggests the original data was
+   meant to be read that way, but no interpreter does.
    **Terminal size:** the player measures it at the start of a game and at a restart (a restart
    found stale text when the game believed the terminal was smaller than it was: a script had
    answered the size question at game start, and a bigger terminal connected later; the layer

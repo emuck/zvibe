@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Object 0 ("no object") is now accepted by every object opcode, in V3 and V4: `put_prop` on object 0 or on a
+  property the object lacks is ignored (it halted), `insert_obj` and `remove_obj` with object 0 are ignored (they
+  read and wrote through a null pointer: a segmentation fault on a host, silent corruption of RAM address 0 on
+  the RISC-V), `get_parent`, `get_sibling` and `get_child` return 0, and `jin` reads its branch for object 0
+  (it did not, so the branch bytes ran as code). Found when *Bureaucracy* hung on the Arty at `take mail`, after
+  giving a stamp away: the game sets property 31 of object 0. Frotz ignores these the same way. Costs 44 bytes
+  of flash on the RISC-V V3 firmware.
+- A fatal interpreter error on an embedded target (`ZVIBE_FREESTANDING`) used to spin silently, which looks like a
+  hung board; it now prints "The interpreter stopped on a fatal error. Reset the board." first.
+
 ### Added
 - Arty S7-50 (RISC-V) version 4 firmware: `make flash-test V4=1 STORY=<file.z4>` in
   `target/riscv/serv_zvibe/boards/arty_s7_50/sw`. A V4 player on the screen layer with saves packed against
@@ -14,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   SoC RAM it needs, and the SoC's RAM is now a bitstream parameter (`ARTY_RAM_KB`, default 32, unchanged).
   Host-tested, and run on the board: Czech V4 gate, the small V4 test stories (keys, lines, split screen,
   save and restore across a power cycle, story identity) on the 32 KB design, and *Bureaucracy* r160 on a
-  64 KB design. V3 firmware is byte-identical to before.
+  64 KB design. V3 firmware was byte-identical to before this slice (the object-0 fix above then added 44 bytes).
 - `make build-nonproject` in the Arty `fpga/` directory: the same bitstream by Vivado's non-project flow,
   for hosts where the project flow crashes after synthesis (Vivado 2025.1, kernel 7.0).
 - Board tests `test_v4_czech.py` and `test_v4_stories.py` (`boards/arty_s7_50/tests`).

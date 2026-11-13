@@ -321,6 +321,8 @@ void op_insert_obj(void) {
     zByte *objptr = z_get_obj_ptr(objid);
     zByte *dstptr = z_get_obj_ptr(dstid);
     
+    if (!objptr || !dstptr) return;  /* Object 0 is no object: ignore the move (as frotz does) */
+    
     z_unparent_obj(objid);  /* Take object out of tree first */
     
     /* Now reinsert in the right place */
@@ -336,6 +338,8 @@ void op_insert_obj(void) {
 void op_remove_obj(void) {
     const zWord objid = G->operands[0];
     zByte *objptr = z_get_obj_ptr(objid);
+    
+    if (!objptr) return;  /* Object 0 is no object: nothing to remove */
     
     z_unparent_obj(objid);  /* Take object out of tree */
     
@@ -354,8 +358,12 @@ void op_put_prop(void) {
     zByte size = 0;
     zByte *ptr = z_get_obj_property(objid, propid, &size);
     
+    /* The standard calls a put_prop on a property the object lacks illegal, and object 0 is no
+     * object. Interpreters that run the Infocom games ignore the write, and some games make it:
+     * Bureaucracy (r160) sets property 31 of object 0 on "take mail" after giving away a stamp.
+     * Halting here would stop the game (on an embedded target, hang it). */
     if (!ptr)
-        G->die("Missing property obj=%X, prop=%X", (unsigned int)objid, (unsigned int)propid);
+        return;
     else if (size == 1)
         *ptr = (value & 0xFF);
     else {
@@ -483,7 +491,8 @@ void op_jin(void) {
     const zWord parentid = G->operands[1];
     
     if (objid == 0) {
-        return;  /* Handle Zork 1 edge case */
+        z_do_branch((parentid == 0) ? 1 : 0);  /* Object 0 has parent 0; the branch must still be read */
+        return;
     }
     
     zByte *objptr = z_get_obj_ptr(objid);
@@ -499,6 +508,7 @@ void op_jin(void) {
  */
 static zWord z_get_obj_relation(zWord objid, int which) {
     zByte *objptr = z_get_obj_ptr(objid);
+    if (!objptr) return 0;  /* Object 0 has no relations */
     return z_field_get(z_obj_field(objptr, which));
 }
 

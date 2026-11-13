@@ -192,6 +192,22 @@ static void test_tree(const layout_t *l, unsigned a, unsigned b, unsigned c, uns
     CHECK(run_branch(op_jin, 2, a, p) == 1);
     CHECK(run_branch(op_jin, 2, a, b) == 0);
 
+    /* Object 0 is "no object" (games pass it: Bureaucracy moves and removes object 0). Every object opcode
+     * must take it without a halt or a stray read or write, and leave the tree as it was. */
+    {
+        unsigned st0 = 0xFFFF;
+        CHECK(run_store(op_get_parent, 1, 0, 0, 0) == 0);
+        CHECK(run_store_branch(op_get_child, 0, &st0) == 0 && st0 == 0);
+        st0 = 0xFFFF;
+        CHECK(run_store_branch(op_get_sibling, 0, &st0) == 0 && st0 == 0);
+        CHECK(run_branch(op_jin, 2, 0, 0) == 1);                   /* object 0's parent is 0 */
+        CHECK(run_branch(op_jin, 2, 0, p) == 0);
+        CHECK(!dies(op_remove_obj, 1, 0, 0));
+        CHECK(!dies(op_insert_obj, 2, 0, p));                      /* move nothing */
+        CHECK(!dies(op_insert_obj, 2, a, 0));                      /* into nothing */
+        CHECK(get_rel(a, 0) == p && get_rel(p, 2) == c && get_rel(c, 1) == b && get_rel(b, 1) == a);   /* tree unchanged */
+    }
+
     /* remove the middle sibling: the chain must close up (walks wide sibling values) */
     G->operands[0] = b; op_remove_obj();
     CHECK(get_rel(b, 0) == 0 && get_rel(b, 1) == 0);
@@ -293,6 +309,18 @@ static void test_properties(const layout_t *l, const char *name) {
     G->operands[0] = id; G->operands[1] = props[0].num; G->operands[2] = 0x1234; G->operand_count = 3; op_put_prop();
     CHECK(run_store(op_get_prop, 2, id, props[0].num, 0) == 0x34);                              /* size 1 keeps the low byte */
     G->operands[1] = props[1].num; G->operands[2] = 0xBEEF; op_put_prop();
+    CHECK(run_store(op_get_prop, 2, id, props[1].num, 0) == 0xBEEF);
+
+    /* put_prop on object 0, or on a property the object lacks, is ignored, as in frotz and the Infocom
+     * interpreters (Bureaucracy writes property 31 of object 0): no halt, nothing else changes */
+    G->operands[0] = 0; G->operands[1] = 31; G->operands[2] = 0x5555; G->operand_count = 3;
+    die_called = 0;
+    if (setjmp(die_jmp) == 0) op_put_prop();
+    CHECK(!die_called);
+    G->operands[0] = id; G->operands[1] = 2; G->operands[2] = 0x5555; G->operand_count = 3;   /* property 2 is absent */
+    if (setjmp(die_jmp) == 0) op_put_prop();
+    CHECK(!die_called);
+    CHECK(run_store(op_get_prop, 2, id, props[0].num, 0) == 0x34);
     CHECK(run_store(op_get_prop, 2, id, props[1].num, 0) == 0xBEEF);
 
     /* absent property: the default table, including entries beyond number 31 in V4 */
