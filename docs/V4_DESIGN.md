@@ -420,7 +420,7 @@ each is a separate commit.
      of a story is refused.
    - Bureaucracy (r116) played on the board with a real save and restore: verified.
    - Not yet done: the multi-game SAME51 firmware, the MAX10 firmware, and the open Arty items in
-     Arty firmware on the board (see item 9).
+     item 9 (see there).
 8. **Webterm.** In a `ZVIBE_ENABLE_V4` build a V4 story gets a 24x80 ANSI screen
    layer in the session; its terminal bytes go to the browser in `screen` frames
    and `zterm.js` (a small VT100 emulator, checked against the console tests' C
