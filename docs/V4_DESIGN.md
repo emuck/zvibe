@@ -463,13 +463,15 @@ each is a separate commit.
    dead. Replayed on the host from the published walkthrough, it ended in the interpreter's fatal-error handler,
    which spins forever on an embedded target: "Missing property obj=0, prop=1F", a `put_prop` on object 0. Fixing
    that exposed `insert_obj` on object 0 (a null-pointer write). Every object opcode now takes object 0 as "no
-   object" (`test_objects.c`, V3 and V4), and the handler prints a message before it stops. **Open:** the same turn
-   prints "You do find a , though." with the object's name missing, because the helper that rotates through the
-   mail list returns 0 on its first call (the list's words are read one byte earlier than the data is laid out).
-   `dfrotz` returns the same 0, 0xCF00, 0xF700 from the same routine and table, so this is not a difference between
-   frotz and zvibe; whether the original game printed that blank is not known. Reading the table one byte later
-   makes the sentence "You do find a Popular Paranoia magazine, though.", which suggests the original data was
-   meant to be read that way, but no interpreter does.
+   object" (`test_objects.c`, V3 and V4), and the handler prints a message before it stops.
+   **The blank object name is not an interpreter bug:** in release 160 (serial 880521) the same turn prints
+   "You do find a , though." and a room text prints "lies at your feet  .". Release 116 (serial 870602, the
+   "Masterpieces" file) prints "You do find a Popular Paranoia magazine, though." through the same interpreter.
+   The cause is release 160's data: the routine that rotates through the mail list reads the list's words from
+   offset 3 of the table, and the table's words start at offset 4 (one header byte too many; release 116's routine
+   and table agree). `dfrotz`, run on a patched copy of the story that calls the routine directly, returns the same
+   values as zvibe (0, 0xCF00, 0xF700), so frotz shows the blank too. Nothing in zvibe is changed for it; play
+   release 116 if the blank matters.
    **Terminal size:** the player measures it at the start of a game and at a restart (a restart
    found stale text when the game believed the terminal was smaller than it was: a script had
    answered the size question at game start, and a bigger terminal connected later; the layer
