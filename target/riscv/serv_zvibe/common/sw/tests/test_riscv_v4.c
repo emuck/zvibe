@@ -138,8 +138,8 @@ static uint8_t *load_story(const char *name, size_t *size) {
     return buf;
 }
 
-static uint8_t *story_save, *story_big, *story_keys, *story_lines, *story_screen;
-static size_t   size_save, size_big, size_keys, size_lines, size_screen;
+static uint8_t *story_save, *story_big, *story_keys, *story_lines, *story_screen, *story_restart;
+static size_t   size_save, size_big, size_keys, size_lines, size_screen, size_restart;
 
 /* One boot of the firmware: reset the terminal, mount the save slots, play `story` with
  * `script` as the terminal's input. Returns how the player ended, or -1 if the script ran out. */
@@ -426,6 +426,27 @@ static void test_size_probe_answers(void) {
     CHECK(screen_has("size 24x80"));
 }
 
+static void test_restart_measures_the_terminal_again(void) {
+    /* v4restart shows the screen size it was given, then restarts on 'r'. The terminal is resized
+     * between the start and the restart (a terminal of another size connected, say): the restarted
+     * game must see the new size, and the terminal must be cleared for it. */
+    int r = boot(story_restart, size_restart, SIZE_REPLY "r" "\033[24;60R", sizeof(SIZE_REPLY "r" "\033[24;60R") - 1);
+    int shown = 0, i;
+    CHECK(r == -1);
+    CHECK(screen_has("size 24x60"));
+    for (i = 0; i < ROWS; i++) if (row_has(i, "size 24x80")) shown++;
+    CHECK(shown == 0);                                         /* the old screen is gone */
+    CHECK(screen_has("key?"));
+    /* a restart on a terminal that does not answer keeps the size it had */
+    r = boot(story_restart, size_restart, SIZE_REPLY "r", sizeof(SIZE_REPLY "r") - 1);
+    CHECK(r == -1);
+    CHECK(screen_has("size 24x60") || screen_has("size 24x80"));
+    /* leave the size as the other tests expect it */
+    r = boot(story_restart, size_restart, SIZE_REPLY, sizeof(SIZE_REPLY) - 1);
+    CHECK(r == -1);
+    CHECK(screen_has("size 24x80"));
+}
+
 static void test_screen_story_draws_a_split_screen(void) {
     /* v4screen splits the window, draws a reverse-video status bar, writes positioned and bold
      * text in the upper window, scrolls the lower window and reads a key and a line. The player
@@ -469,6 +490,7 @@ int main(void) {
     story_keys   = load_story("v4keys.z4", &size_keys);
     story_lines  = load_story("v4lines.z4", &size_lines);
     story_screen = load_story("v4screen.z4", &size_screen);
+    story_restart = load_story("v4restart.z4", &size_restart);
 
     printf("RISC-V V4 player, host build (packed save max %d B, buffers %zu B)\n",
            RV_V4_PACKED_MAX, rv_v4_save_buffers_bytes());
@@ -491,6 +513,7 @@ int main(void) {
     test_no_answer_to_the_size_probe();
     test_probe_ignores_noise_before_the_answer();
     test_size_probe_answers();
+    test_restart_measures_the_terminal_again();
     test_screen_story_draws_a_split_screen();
     test_a_v3_story_is_not_a_v4_story();
 

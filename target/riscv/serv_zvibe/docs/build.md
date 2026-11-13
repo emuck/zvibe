@@ -165,6 +165,12 @@ make program-flash
 | *Nord and Bert*, *Bureaucracy* | 64 KB: rebuild the bitstream |
 | *A Mind Forever Voyaging*, *Trinity* | 128 KB: rebuild the bitstream |
 
+The player measures the terminal's size when the game starts and again at a restart, never in
+between. If you connect (or resize the window) after the game has started, the screen layout will
+not match: restart the game (a game's own RESTART, or type `~reset~` at a command prompt) and it
+measures your terminal. Connect a terminal before starting the game; a test script that answers the
+size question for you (the board tests answer 80 x 24) leaves the game with that size.
+
 Switching V4, the story or the RAM size cleans the build (`sw/.build_mode`). A V3 build is
 unchanged (byte-identical firmware). A flash image holds one V4 story for now (the firmware
 buffers are sized for it); a V3 game in the same image still takes the V3 path.

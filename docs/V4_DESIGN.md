@@ -459,6 +459,12 @@ each is a separate commit.
    r160 plays, with the licence form, the status line, a save, a restart of the SoC and a restore
    back to the saved room. That bitstream meets timing (worst setup slack +0.043 ns against +0.288 ns
    for the 32 KB design) and uses 17.5 of 75 block RAM tiles.
+   **Terminal size:** the player measures it at the start of a game and at a restart (a restart
+   found stale text when the game believed the terminal was smaller than it was: a script had
+   answered the size question at game start, and a bigger terminal connected later; the layer
+   clears only the rows it believes exist). It does not follow a resize in between, which a serial
+   line cannot report: restart the game after resizing. `test_restart_measures_the_terminal_again`
+   covers the restart.
    **Still not verified:** `RV_SPIN_PER_MS` is still the guess (the key and size-probe waits work
    with it, since the bytes arrive together; no calibration was done); stack depth (the 4 KB
    budget was not measured); a bitstream with 128 KB; *Trinity* and *A Mind Forever Voyaging*;

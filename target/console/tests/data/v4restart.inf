@@ -1,0 +1,24 @@
+! v4restart.inf - a tiny version 4 story that shows the screen size it was given and restarts
+!
+! It prints the screen size from the header (rows 0x20, columns 0x21), then waits for a key:
+! r restarts the game (the size is shown again, after the interpreter has set the header again),
+! q quits.
+!
+! Build:  inform -v4 v4restart.inf v4restart.z4        (Inform 6.44)
+!
+! Copyright (c) 2025 Martin R. Raumann
+! SPDX-License-Identifier: BSD-3-Clause
+
+[ Main c;
+    print "size ", 0->32, "x", 0->33, "^";
+    for (::) {
+        print "key? ";
+        @read_char 1 -> c;
+        print (char) c, "^";
+        switch (c) {
+          'r': @restart;
+          'q': print "bye^";
+               quit;
+        }
+    }
+];

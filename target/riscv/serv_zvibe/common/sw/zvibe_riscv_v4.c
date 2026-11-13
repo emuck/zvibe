@@ -275,6 +275,11 @@ rv_v4_result rv_v4_play(const uint8_t *story, size_t size) {
         } else if (result == ZVIBE_RESTORE_REQUESTED) {
             zvibe_restore_completed(ctx, v4_restore(ctx));
         } else if (result == ZVIBE_RESTART_REQUESTED) {
+            /* Measure the terminal again: the game learns the screen size from the header, which
+             * a restart sets afresh, and the terminal may have been resized, or another one
+             * connected, since the game started. The restart clears the screen anyway. */
+            probe_size();
+            zscreen_init(&scr, rv_put_byte, term_rows, term_cols);
             zvibe_restart_completed(ctx);
         } else if (result == ZVIBE_GAME_FINISHED) {
             v4_puts("\n[Game finished]\n");
