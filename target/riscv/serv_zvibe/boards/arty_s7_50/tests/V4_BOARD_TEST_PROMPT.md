@@ -10,7 +10,7 @@ You are on an Ubuntu 24.04 machine with an Arty S7-50 board attached over USB (J
 
 ## Repo
 - git@github.com:emuck/zvibe.git, branch `dev/riscv-v4` (`git fetch && git checkout dev/riscv-v4 && git pull`). Do NOT open a PR; do not push to main.
-- Commits: plain messages, no attribution lines, and never the word "claude" in commits, notes or docs.
+- Commits: plain messages, no attribution lines or mention of the assistant in commits, notes or docs.
 - Read first: target/riscv/serv_zvibe/docs/build.md ("Version 4 stories"), docs/V4_DESIGN.md item 9, docs/V4_MEMORY.md (Arty section), target/riscv/serv_zvibe/common/sw/zvibe_riscv_v4.{h,c}, boards/arty_s7_50/sw/Makefile, boards/arty_s7_50/fpga/Makefile.
 
 ## What was built (all unverified on hardware)
