@@ -478,10 +478,13 @@ each is a separate commit.
    clears only the rows it believes exist). It does not follow a resize in between, which a serial
    line cannot report: restart the game after resizing. `test_restart_measures_the_terminal_again`
    covers the restart.
+   **Played through:** *Bureaucracy* r116 (serial 870602, "Masterpieces" file) was played by hand from start to
+   finish on the 64 KB design, with save and restore, after the fixes below (13 November 2026). Release 160 hung
+   at `take mail` and prints a blank object name (see below), which is why r116 is the release to use.
    **Still not verified:** `RV_SPIN_PER_MS` is still the guess (the key and size-probe waits work
    with it, since the bytes arrive together; no calibration was done); stack depth (the 4 KB
    budget was not measured); a bitstream with 128 KB; *Trinity* and *A Mind Forever Voyaging*;
-   a long play session of Bureaucracy; power-cycling with the 64 KB bitstream written to flash (it
+   power-cycling with the 64 KB bitstream written to flash (it
    was loaded into SRAM). Vivado's project flow (`make build`) crashes on the test machine after
    a successful synthesis, with `main` as well, so the 64 KB bitstream was built with the new
    non-project flow (`make build-nonproject`, same sources and part). `flash_save.c` still does
