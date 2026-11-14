@@ -88,10 +88,10 @@ int rv_rx_get(void) {
     return -1;
 }
 
-/* The player is waiting and the script is used up. The size probe waits about 20000 idle
- * calls for an answer before it gives up; stop only after that. */
+/* The player is waiting and the script is used up. The size probe waits 500 ms worth of idle
+ * calls (500 * RV_SPIN_PER_MS) for an answer before it gives up; stop only after that. */
 void rv_idle(void) {
-    if (in_pos >= in_len && ++idle_calls > 40000) longjmp(stop, 1);
+    if (in_pos >= in_len && ++idle_calls > 600UL * RV_SPIN_PER_MS) longjmp(stop, 1);
 }
 
 #define SIZE_REPLY "\033[24;80R"           /* what a terminal answers to the probe */

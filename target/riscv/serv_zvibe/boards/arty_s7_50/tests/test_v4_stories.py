@@ -56,6 +56,8 @@ class Board:
     def __init__(self, port, rows=24, cols=80):
         self.port, self.rows, self.cols = port, rows, cols
         self.ser = None
+        self.reply_delay = 0.0      # seconds before the terminal answers the size question
+        self.reply_size = (rows, cols)
         self.reset_terminal()
 
     def reset_terminal(self):
@@ -119,7 +121,9 @@ class Board:
                                self.raw.decode("latin1"))
             self.probes = self.raw.count(b"\x1b[6n")
             while self.answered < self.probes:
-                self.ser.write(f"\x1b[{self.rows};{self.cols}R".encode())
+                if self.reply_delay:
+                    time.sleep(self.reply_delay)
+                self.ser.write(f"\x1b[{self.reply_size[0]};{self.reply_size[1]}R".encode())
                 self.answered += 1
 
     def wait_for(self, s, timeout=10):
@@ -308,8 +312,33 @@ def scenario_identity(b):
     check("with its counter", b.wait_for("counter=2", 5))
 
 
+def scenario_timing(b):
+    print("== timing: escape sequences spread out, and a slow answer to the size question")
+    b.flash(story("v4keys.z4"))
+    check("starts", b.start_game() and b.wait_for("keys ready", 8))
+    # an arrow key whose three bytes arrive 5 ms apart (a slow link or terminal program)
+    n = b.text.count("key=129")
+    b.send("\x1b[A", gap=0.005)
+    check("an arrow key spread over 10 ms is still one key (129)", b.wait_for("key=129", 4) and b.text.count("key=129") == n + 1 and "key=27" not in b.text, b.text[-80:])
+    n = b.text.count("key=131")
+    b.send("\x1b[D", gap=0.008)
+    check("an arrow key with 8 ms between bytes is key 131", b.wait_for("key=131", 4) and b.text.count("key=131") == n + 1 and "key=27" not in b.text, b.text[-80:])
+    # a lone Escape still comes out as Escape (the wait for a tail ends)
+    b.send("\x1b"); b.pump(0.3)
+    check("a lone Escape is delivered as 27 within the wait", "key=27" in b.text, b.text[-60:])
+    b.send("q")
+    # the terminal answers the size question 300 ms late, with a width that is not the default
+    b.flash(story("v4screen.z4"))
+    b.reply_delay = 0.3
+    b.reply_size = (24, 60)
+    check("v4screen starts", b.start_game() and b.wait_for("press a key", 10), b.text[-100:])
+    check("a size answer 300 ms late is still used (24 x 60)", "size 24x60" in b.text, b.text[-200:])
+    b.reply_delay = 0.0
+    b.reply_size = (24, 80)
+
+
 SCENARIOS = {"keys": scenario_keys, "lines": scenario_lines, "screen": scenario_screen,
-             "save": scenario_save, "identity": scenario_identity}
+             "save": scenario_save, "identity": scenario_identity, "timing": scenario_timing}
 
 
 def main():

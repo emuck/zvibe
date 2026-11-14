@@ -26,6 +26,12 @@ static int rx_wait(void) {
     return c;
 }
 
+/* How long to wait for the rest of an escape sequence (an arrow key is three bytes 87 microseconds
+ * apart on the wire, but a network or a terminal program can space them out by several milliseconds) */
+#ifndef RV_ESC_WAIT_MS
+#define RV_ESC_WAIT_MS 10
+#endif
+
 /* A byte that arrives within `ms` milliseconds (the tail of an escape sequence), or -1 */
 static int rx_within(unsigned long ms) {
     unsigned long spin, n = ms * RV_SPIN_PER_MS;
@@ -92,17 +98,17 @@ static int next_zscii(void) {
         if (c == '\r' || c == '\n') return 13;
         if (c == 8 || c == 127) return 8;
         if (c == 27) {
-            c = rx_within(4);
+            c = rx_within(RV_ESC_WAIT_MS);
             if (c != '[' && c != 'O') {                           /* a lone Escape; the next key is its own */
                 pending = c;
                 return 27;
             }
-            c = rx_within(4);
+            c = rx_within(RV_ESC_WAIT_MS);
             if (c == 'A') return 129;
             if (c == 'B') return 130;
             if (c == 'D') return 131;
             if (c == 'C') return 132;
-            while (c >= 0 && !(c >= 0x40 && c <= 0x7E)) c = rx_within(4);
+            while (c >= 0 && !(c >= 0x40 && c <= 0x7E)) c = rx_within(RV_ESC_WAIT_MS);
             continue;
         }
         if (c >= 32 && c < 127) return c;
@@ -266,6 +272,9 @@ rv_v4_result rv_v4_play(const uint8_t *story, size_t size) {
         zscreen_flush(&scr);
         if (result == ZVIBE_WAIT_FOR_INPUT) {
             v4_read_line(ctx, line, sizeof line);
+#ifdef RV_PROBE
+            { extern int rv_probe(const char *); while (rv_probe(line)) v4_read_line(ctx, line, sizeof line); }
+#endif
             if (strcmp(line, "~reset~") == 0) { out = RV_V4_RESET; break; }   /* test scripts */
             if (zvibe_input(ctx, line) != ZVIBE_OK) { out = RV_V4_ERROR; break; }
         } else if (result == ZVIBE_WAIT_FOR_CHAR) {

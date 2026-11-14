@@ -115,9 +115,15 @@ else
 endif
 RAM_BYTES := $(shell echo $$(( $(ARTY_RAM_KB) * 1024 )))
 
+# PROBE=1: a measurement build (stack high-water mark, wait-loop speed); see zvibe_riscv_multi.c
+PROBE ?= 0
+ifeq ($(PROBE),1)
+  ZVIBE_V4_FLAGS += -DRV_PROBE
+endif
+
 # Objects are not interchangeable between modes: switching V4, the story's size or the RAM
 # size starts from a clean tree.
-BUILD_MODE := v4=$(V4) dyn=$(V4_DYN) ram=$(ARTY_RAM_KB)
+BUILD_MODE := v4=$(V4) dyn=$(V4_DYN) ram=$(ARTY_RAM_KB) probe=$(PROBE)
 ifneq ($(shell cat .build_mode 2>/dev/null),$(BUILD_MODE))
   $(shell rm -rf *.o src *.elf *.bin *.dis *.map; echo '$(BUILD_MODE)' > .build_mode)
 endif

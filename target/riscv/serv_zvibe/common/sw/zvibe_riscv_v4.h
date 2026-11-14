@@ -36,15 +36,16 @@ int rv_rx_get(void);
 void rv_idle(void);
 
 /**
- * Busy-wait iterations that last about one millisecond. The wait for an escape
- * sequence's tail and for the terminal-size reply count loop iterations, so this
- * needs calibrating on the real core (SERV is bit-serial and slow). A value that
- * is too small cuts those waits short (arrow keys may arrive as an Escape plus
- * letters, the size probe falls back to 24 x 80); one that is too large only makes
- * them slower. Override with -DRV_SPIN_PER_MS=...
+ * Busy-wait iterations that last about one millisecond. The wait for an escape sequence's tail
+ * and for the terminal-size reply count iterations of rv_rx_get(). Measured on the Arty S7-50
+ * (SERV at 166.67 MHz, firmware in XIP QSPI flash behind the 4 KB cache): about 247 iterations
+ * per millisecond (`make PROBE=1`, `~spin~ N` at a command prompt, 200,000 iterations in 0.81 s).
+ * Another core, clock or cache setup needs its own measurement. Too small a value cuts the waits
+ * short (arrow keys can arrive as an Escape plus letters, the size probe falls back to 24 x 80);
+ * too large only makes them slower. Override with -DRV_SPIN_PER_MS=...
  */
 #ifndef RV_SPIN_PER_MS
-#define RV_SPIN_PER_MS 40UL
+#define RV_SPIN_PER_MS 250UL
 #endif
 
 /* ---- player ----------------------------------------------------------------- */
