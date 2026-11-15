@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- SAM E51: `make v4-multi`, one firmware with several version 4 stories and a menu (`V4_STORIES` picks the
+  games; the default is the five Infocom V4 stories, 993,612 bytes of the flash), a SmartEEPROM save slot
+  for each story, `tools/v4_games_to_c.py`, and `tests/test_v4_multi.py` (verified on the board). A
+  restart in the V4 firmware now measures the terminal again (as the Arty player does).
+
 ### Fixed
 - Object 0 ("no object") is now accepted by every object opcode, in V3 and V4: `put_prop` on object 0 or on a
   property the object lacks is ignored (it halted), `insert_obj` and `remove_obj` with object 0 are ignored (they

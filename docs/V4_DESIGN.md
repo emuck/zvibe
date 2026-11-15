@@ -491,6 +491,22 @@ each is a separate commit.
    not check the CRC-16 it stores when reading (V3 saves are unaffected by this slice; V4 saves
    carry their own CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
 
+10. **SAM E51 multi-game V4 firmware.** `make v4-multi` (`target/same51`) builds the single-game V4 player
+   with a menu over several stories (the `V4_STORIES` list, up to nine), so every fix of the single-game
+   player (SmartEEPROM whole-word writes with an end mark, CRC-32, story identity) applies; the older V3
+   multi-game firmware was not extended. Each story gets its own SmartEEPROM slot (whole 512-byte pages);
+   the save format is the same as the single-game firmware's. The five Infocom V4 stories (969 KB) plus the
+   24 KB firmware are 993,612 bytes and fit under the 999,424-byte limit that the SmartEEPROM reserve leaves
+   (measured on the board: a padded image of 998,983 bytes runs, 1,013,983 does not program). Verified on
+   the board (`tests/test_v4_multi.py`, 24 checks): the menu; each story starts from its number; quitting
+   returns to the menu (Bureaucracy after its licence form, Trinity, A Mind Forever Voyaging, Nord and
+   Bert); a save in each of three stories survives a reset and each restores its own. Generic has no
+   `quit` command, so only `~reset~` and the board's button leave it. The single-game V4 hardware tests
+   (`v4screen`, `v4save`, `v4bigsave`, identity, save over a large save) still pass, and the V3 firmware
+   is byte-identical. The restart re-measures the terminal (as on the Arty, item 9) in both V4 builds.
+   Not tried: saves from deep in Trinity or A Mind Forever Voyaging (the slot is 3 KB and the early-game saves
+   were 0.4 to 0.6 KB); the Curiosity Nano's button was not pressed.
+
 ### Proving "zero cost"
 
 Equal totals alone are not enough. For SAME51 and SERV, with identical

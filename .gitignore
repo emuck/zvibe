@@ -210,3 +210,7 @@ save.dat
 # Log files
 *.logtarget/webterm/platform/posix/zvibe_webterm
 target/same51/src/.story_data.stamp
+
+# Multi-game V4 firmware: generated story table and its stamp
+target/same51/src/v4_games.c
+target/same51/src/.v4_games.stamp

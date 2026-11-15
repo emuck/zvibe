@@ -258,6 +258,43 @@ Save and restore of Bureaucracy has been verified on the board.
 `terminal_io.c` holds the interrupt-driven receive ring and key decoding that
 the screen demo shares.
 
+### Several version 4 games with a menu
+
+`make v4-multi` builds one firmware with several V4 stories and a menu; `make v4-multi-program`
+builds and programs it. **The games are the `V4_STORIES` variable**: a list of story files,
+each optionally `"Menu name=file.z4"`. The default list is the five Infocom V4 stories of
+`$(V4_LIB)` (default `~/infocom/library/z4`): Bureaucracy, Trinity, A Mind Forever Voyaging,
+Nord and Bert, Generic.
+
+```
+make v4-multi-program                                       # the five stories above
+make v4-multi-program V4_STORIES="$HOME/infocom/library/z4/bureaucracy/bureaucracy-r116-s870602.z4 \
+                                  Restaurant=$HOME/infocom/restaurant/build/restaurant.z4"
+make v4-multi-program V4_LIB=/path/to/library               # the default five, from another folder
+python3 tests/test_v4_multi.py                              # the hardware test
+```
+
+`tools/v4_games_to_c.py` (run by the Makefile) checks that each file is a version 4 story, writes
+them into `src/v4_games.c`, and sizes the firmware's story buffer for the largest (the dynamic memory
+plus the core's 1 KB). Up to nine stories (the menu takes one digit); `python3 tools/v4_games_to_c.py --list
+files...` shows what a list would cost.
+
+- **Menu:** the firmware draws it at start and when you press RETURN (which also measures the terminal).
+  A digit starts that story. When a story ends (`quit`), RETURN brings the menu back; the Curiosity Nano's
+  user button (SW0) returns to the menu from any story, and `~reset~` restarts the current one.
+- **Saves:** the 16 KB SmartEEPROM is divided into one slot per story (whole 512-byte pages: 3,072 bytes
+  each for five stories). A save is the packed save used by the single-game firmware, with its story
+  identity and CRC-32, so one story never sees another's save, and a save that does not fit its slot
+  fails cleanly with a message. Typical packed saves are 0.4 to 2 KB (measured: 1.7 KB for Bureaucracy
+  after a long session; 0.4 to 0.6 KB for the others near their start).
+- **Flash:** the five Infocom stories are 969 KB; with the 24 KB firmware the image is 993,612 bytes. The
+  SmartEEPROM takes the top of the flash, so the image must stay under 999,424 bytes (measured on the board:
+  a padded image of 998,983 bytes runs and one of 1,013,983 bytes does not program). `make v4-multi` fails
+  when the image is over that; `V4_FLASH_LIMIT` changes the number. Five stories leave 5.8 KB: another story
+  needs one of them out.
+- **Not for V3:** the older V3 multi-game firmware (`zvibe_same51_multi.c`, built from `game_registry.c`) is
+  unchanged.
+
 ## Hardware Requirements
 
 ### SAM E51 Curiosity Nano
