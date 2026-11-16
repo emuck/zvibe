@@ -280,6 +280,15 @@ make multi-program MULTI_ARGS="--story Restaurant=../../games/catalog/restaurant
   (story buffer, game count), both carrying one generation id that the Makefile checks. Nothing is rewritten when nothing changed.
 - Up to nine games (the menu takes one digit). The story buffer is sized for the largest.
 
+**The TUI.** `games/game_manager.py` is an interactive way to choose the games (`pip install -r ../../games/requirements.txt`
+gives the nicer menu; a plain text one is the fallback). It lists every registry game, version 3 and 4, with its size and whether
+the story file is present. Type a number to tick or untick a game, `d` downloads missing ones, `b` writes the generated files for
+a target, `q` quits. Notes:
+- Your choices are saved into `games/registry.json` (the `exclude` flags), so they also set what a plain `make multi` builds.
+- The budget line adds up everything ticked, V3 and V4 together, against the story budget (973,824 bytes, about 951 KB). If it is
+  over, SAM E51 is not offered as a target: untick games first (the default V3 games are ticked until you change them).
+- `b` only writes `src/game_registry.c` and `.mk`. Then run `make multi-program` to compile and program.
+
 **The menu.** Type a number to start a game. RETURN draws the menu again and measures the terminal (do that after
 connecting). When a story ends, RETURN brings the menu back. **The board's button** (SW0) returns to the menu from any story,
 including one waiting for a key or a line; `~reset~` restarts the story that is running. Games are played at the terminal's
