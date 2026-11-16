@@ -491,21 +491,41 @@ each is a separate commit.
    not check the CRC-16 it stores when reading (V3 saves are unaffected by this slice; V4 saves
    carry their own CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
 
-10. **SAM E51 multi-game V4 firmware.** `make v4-multi` (`target/same51`) builds the single-game V4 player
-   with a menu over several stories (the `V4_STORIES` list, up to nine), so every fix of the single-game
-   player (SmartEEPROM whole-word writes with an end mark, CRC-32, story identity) applies; the older V3
-   multi-game firmware was not extended. Each story gets its own SmartEEPROM slot (whole 512-byte pages);
-   the save format is the same as the single-game firmware's. The five Infocom V4 stories (969 KB) plus the
-   24 KB firmware are 993,612 bytes and fit under the 999,424-byte limit that the SmartEEPROM reserve leaves
-   (measured on the board: a padded image of 998,983 bytes runs, 1,013,983 does not program). Verified on
-   the board (`tests/test_v4_multi.py`, 24 checks): the menu; each story starts from its number; quitting
-   returns to the menu (Bureaucracy after its licence form, Trinity, A Mind Forever Voyaging, Nord and
-   Bert); a save in each of three stories survives a reset and each restores its own. Generic has no
-   `quit` command, so only `~reset~` and the board's button leave it. The single-game V4 hardware tests
-   (`v4screen`, `v4save`, `v4bigsave`, identity, save over a large save) still pass, and the V3 firmware
-   is byte-identical. The restart re-measures the terminal (as on the Arty, item 9) in both V4 builds.
-   Not tried: saves from deep in Trinity or A Mind Forever Voyaging (the slot is 3 KB and the early-game saves
-   were 0.4 to 0.6 KB); the Curiosity Nano's button was not pressed.
+10. **SAM E51 multi-game menu, versions 3 and 4.** `make multi` (`target/same51`) builds one firmware with a menu over up to
+   nine stories of either version: the single-game V4 player (so every fix of it applies) with the menu on top; the core plays
+   V3 and V4 alike. One generator (`games/build_games.py same51`) reads `games/registry.json` (the V4 entries point at files
+   outside the catalog) or a list of files, checks every story as the loader does, and writes the story table and the story
+   buffer size with one generation id. The older V3-only multi firmware and the V4-only generator were removed; a plain `make`
+   is always the single-game firmware (the mode used to be guessed from the generated file's presence).
+   **Saves** are a separate module, `save_store.c`, on a SmartEEPROM module of its own (`smarteeprom.c`): the 16 KB is *n* + 1
+   equal areas, one per game and a write-ahead scratch. A save goes to the scratch and is read back, then to the game's area and is
+   read back; at every start an interrupted copy is finished. Records carry a sequence number, CRCs of header and data, and a tag
+   of the story (a CRC of the packing base, the story's dynamic memory). Why the scratch: a save that overwrites the old one in
+   place can lose both to a reset (found by an adversarial review; two records per game would have halved every area, which does not
+   leave a 7-game V3 menu room for the Restaurant's first save). A single-game firmware has a 8 KB area and an 8 KB scratch (it
+   had 16 KB); a V3-only firmware is unchanged, byte for byte, and keeps its single record.
+   **Verified.** On the host (`tests/host/test_save_store.c`, 187 checks, ASan and UBSan clean): a model of the SmartEEPROM that
+   commits a page at a time, with a power cut injected before every page commit of a save, for 1, 3, 5 and 9 games and for small,
+   shrinking, largest and tiny saves; commits that are silently lost; every bit flipped; a 1500-step random soak with cuts. Seven
+   deliberate defects (no recovery, no scratch, no read-back of either copy, no header or data CRC check, no tag check) each fail it.
+   On the board: the menu of five V4 stories, and a mix of three V3 stories (Restaurant, Hitchhiker's, Czech: 368 tests, 0
+   failed, 19 print tests) and two V4 stories, play, quit and save in their own areas; every game restores to its exact turn count
+   after a reset (`test_multi.py`, `test_multi_mixed.py`); with the test hooks, the board stopped at each of five points of a save
+   in two games and every restore returned a whole save, the old one before the scratch was committed and the new one after (the
+   recovery from the scratch worked on the hardware); the board's button returns to the menu from a line prompt, a key prompt and
+   the menu (`test_button.py`). The single-game V4 tests (screen, save, 21 KB save, identity, save over a large one) pass.
+   **Found on the way.** The SmartEEPROM can leave a game's record unreadable after a write that a reset interrupted, and an
+   identical re-save did not repair it while a save of different content did; it could not be reproduced once the board was left to
+   finish its writes, and the cause is not established (it is why the save is read back and why the tests never reset the board
+   during a save). The first save after a reset takes 2 to 3 seconds. Codex's adversarial review (14 findings) led to the save
+   store, the explicit build modes, the config stamp (objects used to survive a changed story buffer), the linker flash limit
+   (the size check used to run only in one recipe), the button at prompts, the probe that swallowed typing, stricter story
+   validation and the generation id; two findings are documented limits: **changing the menu moves the save areas** (old saves are
+   ignored, never misread), and the story tag is a CRC of the dynamic memory, so a modified story with the same dynamic memory
+   and header fields would be accepted as the same story.
+   **Not done.** Saves from deep in Trinity or A Mind Forever Voyaging (the area for five games is 2.5 KB; early saves were 0.4 to
+   0.6 KB); a power cut during the first save after programming a new image was not specifically tested; the RISC-V player still
+   identifies a story by header fields, not by the packing base.
 
 ### Proving "zero cost"
 

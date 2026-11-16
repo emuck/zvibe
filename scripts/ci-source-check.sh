@@ -38,6 +38,15 @@ run_step "Webterm tests" make -C target/webterm/tests test
 run_step "RISC-V V4 player (host)" make -C target/riscv/serv_zvibe/common/sw/tests clean
 run_step "RISC-V V4 player (host)" make -C target/riscv/serv_zvibe/common/sw/tests test
 
+# The SAM E51 save store (power cut before every page commit of a save, against a model of the SmartEEPROM) and the
+# menu generator: host tests, no board and no cross compiler needed.
+run_step "SAME51 save store (host)" make -C target/same51/tests/host clean
+run_step "SAME51 save store (host)" make -C target/same51/tests/host test
+run_step "SAME51 save store (host, sanitizers)" make -C target/same51/tests/host clean
+run_step "SAME51 save store (host, sanitizers)" make -C target/same51/tests/host test SAN=1
+run_step "SAME51 menu generator" python3 -m unittest discover -s games/tests
+make -C target/same51/tests/host clean >/dev/null 2>&1 || true
+
 if have_cmd riscv64-unknown-elf-gcc; then
     run_step "RISC-V build" make -C target/riscv/serv_zvibe/common/sw clean
     run_step "RISC-V build" make -C target/riscv/serv_zvibe/common/sw zvibe_riscv_multi.elf
@@ -58,6 +67,10 @@ if have_xc32; then
     run_step "SAME51 V4 build" make -C target/same51 clean
     run_step "SAME51 V4 build" make -C target/same51 v4
     rm -f target/same51/src/story_data.c
+    # the menu: Czech as a version 3 and as a version 4 story, in one firmware
+    run_step "SAME51 menu build" make -C target/same51 clean
+    run_step "SAME51 menu build" make -C target/same51 multi MULTI_ARGS="--story Czech3=../../games/catalog/czech.z3 --story Czech4=../../games/catalog/czech.z4"
+    make -C target/same51 clean >/dev/null 2>&1 || true
 else
     echo
     echo "==> Skipping SAME51 build (xc32-gcc not found)"

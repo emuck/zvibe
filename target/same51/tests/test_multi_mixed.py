@@ -63,41 +63,39 @@ def main():
     any_key()
     check("Nord and Bert: quit returns to the menu", quit_to_menu(), tail(300))
 
-    print("== saves: a slot each, V3 and V4, across a reset ==")
+    print("== saves: an area each, V3 and V4, across a reset; each game gets back exactly its own state ==")
+    # Restaurant and Hitchhiker are played to different, known turn counts and saved; Nord and Bert is saved too;
+    # then, after a reset, every game restores to its own count. A save that went to the wrong area, or was
+    # changed by another game's save, would show as the wrong count.
+    saved = {}
     reboot()
-    start_game("2")
-    type_line("turn on light", 3)
-    vary()
-    type_line("save", 5)
-    check("Hitchhiker: save completes", "Ok." in text(), tail(200))
-    check("Hitchhiker: reboot", reboot())
-    start_game("1")
-    vary()
-    type_line("save", 5)
-    check("Restaurant: save completes", "Ok." in text(), tail(200))
-    check("Restaurant: reboot", reboot())
+    for num, name in (("1", "Restaurant"), ("2", "Hitchhiker")):
+        start_game(num)
+        if name == "Hitchhiker":
+            type_line("turn on light", 3)
+        vary()
+        saved[name] = turns()
+        check(f"{name}: save completes", save_game("Ok.") is not None, tail(200))
+        check(f"{name}: reboot", reboot())
     start_game("5")
     any_key()
     vary()
-    type_line("save", 4)
-    check("Nord and Bert: save completes", "Save, completed" in text(), tail(200))
+    check("Nord and Bert: save completes", save_game("Save, completed") is not None, tail(200))
     check("Nord and Bert: reboot", reboot())
-
-    start_game("2")
-    type_line("look", 3)
-    check("Hitchhiker: a fresh game is in the dark", "pitch black" in text()[-300:], tail(200))
-    type_line("restore", 6)
-    type_line("look", 3)
-    check("Hitchhiker: restores its own save (the light is on)", "Near the exit leading south is a phone" in text(), tail(300))
-    check("Hitchhiker: back to the menu", reboot())
-    start_game("1")
-    type_line("restore", 6)
-    check("Restaurant: restores its own save", "Ok." in text()[-200:] and "failed" not in text().lower(), tail(200))
-    check("Restaurant: back to the menu", reboot())
+    check("the two V3 games were saved at different counts", saved["Restaurant"] != saved["Hitchhiker"], str(saved))
+    # restore in the opposite order to the saves, then again in the same order
+    for rnd in range(2):
+        for num, name in (("2", "Hitchhiker"), ("1", "Restaurant")) if rnd == 0 else (("1", "Restaurant"), ("2", "Hitchhiker")):
+            start_game(num)
+            check(f"{name}: the restore is accepted", restore_game("Ok."), tail(200))
+            check(f"{name}: back to exactly {saved[name]} turns", turns() == saved[name], f"turns={turns()} saved={saved}")
+            if name == "Hitchhiker":
+                type_line("look", 3)
+                check("Hitchhiker: the light is still on", "Near the exit leading south is a phone" in text(), tail(300))
+            check(f"{name}: back to the menu", reboot())
     start_game("5")
     any_key()
-    type_line("restore", 5)
-    check("Nord and Bert: restores its own save", "estored" in text() and "Beginning" in text(), tail(300))
+    check("Nord and Bert: restores its own save", restore_game("Okay, restored"), tail(300))
     return finish()
 
 

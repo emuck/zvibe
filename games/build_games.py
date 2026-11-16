@@ -40,6 +40,8 @@ def build_for_same51(args):
         return 1
 
     try:
+        if args.story and args.only:
+            raise ValueError("--story and --only cannot be combined: name the files, or pick registry games by id")
         games = same51.games_from_files(args.story) if args.story else None
         only = args.only.split(',') if args.only else None
         same51.build_same51(registry, output_dir, games, only)

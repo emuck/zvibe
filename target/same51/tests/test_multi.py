@@ -66,15 +66,14 @@ def main():
         for line in setup:
             type_line(line, 3)
         vary()
-        type_line("save", 4)
-        check(f"{name}: save completes", saved in text(), text()[-250:])
+        check(f"{name}: save completes", save_game(saved) is not None, text()[-250:])
         check(f"{name}: back to the menu", reboot())
     for num, name, setup, saved, shows, restored in SAVES:
         start_game(num)
         any_key()
-        type_line("restore", 5)
+        okr = restore_game(restored)
         t = text()
-        check(f"{name}: restores its own save after a reset", restored in t and shows in t and "failed" not in t.lower(), t[-300:])
+        check(f"{name}: restores its own save after a reset", okr and shows in t, t[-300:])
         check(f"{name}: back to the menu", reboot())
     return finish()
 

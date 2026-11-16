@@ -119,6 +119,55 @@ def quit_to_menu():
     return "Type a number" in text()
 
 
+def save_game(done, timeout=90):
+    """Type `save` and wait until the story says it is done (`done`) or the firmware says the save failed. A save
+    takes 0.1-0.3 s, the first one after a reset 2-3 s and, rarely, longer: never reset the board before it is
+    over (that is an interrupted write, which is a test of its own). Returns the text it ended with, or None."""
+    before = text().count(done)
+    ser.write(b"save\r")
+    end = time.time() + timeout
+    while time.time() < end:
+        pump(0.15)
+        if text().count(done) > before or "[Save failed" in text():
+            pump(1.0)
+            return last_line() if "[Save failed" not in text() else text()
+    return None
+
+
+def restore_game(done, timeout=30):
+    """Type `restore` and wait for the story's `done` message or the firmware's reason it could not."""
+    before = text().count(done)
+    ser.write(b"restore\r")
+    end = time.time() + timeout
+    while time.time() < end:
+        pump(0.15)
+        if text().count(done) > before:
+            pump(1.0)
+            return True
+        if "[No saved game" in text() or "[The saved game" in text() or "[That save" in text() or "[Restore failed" in text():
+            return False
+    return False
+
+
+def turns():
+    """The number of turns a V3 story says have passed: `score` first asks to "Hit RETURN" (the peril-sensitive
+    sunglasses), then prints "... in N turns", and takes no turn itself. None if it does not answer."""
+    import re
+    before = len(re.findall(r"in (\d+) turns?", text()))
+    ser.write(b"score\r")
+    end = time.time() + 20
+    while time.time() < end:
+        pump(0.4)
+        if "RETURN or ENTER" in last_line():
+            ser.write(b"\r")
+            pump(1.0)
+        m = re.findall(r"in (\d+) turns?", text())
+        if len(m) > before:
+            pump(0.5)
+            return int(m[-1])
+    return None
+
+
 def vary():
     """Make the game's state different from every earlier run's (a random number of turns pass), so a save
     always has new content: an identical re-save of a slot that an earlier interrupted write damaged

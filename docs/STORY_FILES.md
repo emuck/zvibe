@@ -75,7 +75,7 @@ in git.
 ```bash
 cd games
 ./build_games.py arty_s7_50  # Build for RISC-V (Arty S7-50)
-./build_games.py same51   # Build for SAM E51
+./build_games.py same51   # Generate the SAM E51 menu (versions 3 and 4); `make multi` in target/same51 runs it
 ```
 
 The build system reads from the registry and packages available games.

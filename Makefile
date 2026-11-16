@@ -30,7 +30,7 @@ help:
 	@echo "Individual targets:"
 	@echo "  Console:  cd target/console && make"
 	@echo "  Windows:  cd target/windows && make"
-	@echo "  SAM E51:  cd games && ./build_games.py same51 && cd ../target/same51 && make"
+	@echo "  SAM E51:  cd target/same51 && make multi-program      (the menu: versions 3 and 4)"
 	@echo "  RISC-V:   cd games && ./build_games.py arty_s7_50 && cd ../target/riscv/serv_zvibe/common/sw && make"
 	@echo ""
 	@echo "See docs/DEVELOPMENT.md for complete development guide"

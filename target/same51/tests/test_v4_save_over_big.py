@@ -43,7 +43,7 @@ def text():
     return "\n".join(l.rstrip() for l in screen.display)
 
 
-def wait_for(needle, timeout=15):
+def wait_for(needle, timeout=40):   # the first save after programming can take 10 s or more
     end = time.time() + timeout
     while time.time() < end:
         pump(0.1)

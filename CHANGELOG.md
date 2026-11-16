@@ -8,23 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- SAM E51: `make v4-multi`, one firmware with several version 4 stories and a menu (`V4_STORIES` picks the
-  games; the default is the five Infocom V4 stories, 993,612 bytes of the flash), a SmartEEPROM save slot
-  for each story, `tools/v4_games_to_c.py`, and `tests/test_v4_multi.py` (verified on the board). A
-  restart in the V4 firmware now measures the terminal again (as the Arty player does).
-
-### Fixed
-- Object 0 ("no object") is now accepted by every object opcode, in V3 and V4: `put_prop` on object 0 or on a
-  property the object lacks is ignored (it halted), `insert_obj` and `remove_obj` with object 0 are ignored (they
-  read and wrote through a null pointer: a segmentation fault on a host, silent corruption of RAM address 0 on
-  the RISC-V), `get_parent`, `get_sibling` and `get_child` return 0, and `jin` reads its branch for object 0
-  (it did not, so the branch bytes ran as code). Found when *Bureaucracy* hung on the Arty at `take mail`, after
-  giving a stamp away: the game sets property 31 of object 0. Frotz ignores these the same way. Costs 44 bytes
-  of flash on the RISC-V V3 firmware.
-- A fatal interpreter error on an embedded target (`ZVIBE_FREESTANDING`) used to spin silently, which looks like a
-  hung board; it now prints "The interpreter stopped on a fatal error. Reset the board." first.
-
-### Added
+- SAM E51: `make multi`, one firmware with a menu over up to nine games of version 3 or 4, and one generator for it
+  (`games/build_games.py same51`, from `games/registry.json` or `--story [Name=]file`; `--only id,id` picks registry games
+  including the version 4 ones, which live outside the catalog). The board's button returns to the menu from any story, also
+  one waiting for a key or a line. Verified on the board with the five Infocom V4 stories, and with V3 games (Czech included)
+  beside V4 games.
+- SAM E51 (V4 and menu firmware): saves that survive an interrupted save (`save_store.c`): one area per game and a write-ahead
+  scratch, a save read back before it is reported, an interrupted copy finished at the next start, records with sequence number,
+  CRCs and a story tag. Tested on the host against a model of the SmartEEPROM with a power cut before every page commit, and on the
+  board with a test hook that stops the board inside a save. A single-game V4 firmware has an 8 KB save area (it had 16 KB).
+  Saves of earlier firmware are ignored once.
+- SAM E51: `smarteeprom.c` (the SmartEEPROM as a byte store, shared by the V3 firmware, which includes it into its own file so
+  the V3 image stays byte for byte as it was), the flash limit as the linker's region (`FLASH_LIMIT`, 0xF4000), a config stamp
+  so that a changed story buffer or setting rebuilds what depends on it, and the generated table and makefile fragment sharing
+  a generation id the Makefile checks.
+- Board tests `test_multi.py`, `test_multi_mixed.py`, `test_save_power_cut.py` and `test_button.py` (the last two need a build
+  with `EXTRA_CFLAGS=-DSAVE_TEST_HOOKS=1`), host tests `tests/host/test_save_store.c` and `games/tests/test_same51_builder.py`.
+- A restart in the V4 firmware (SAM E51) measures the terminal again, as the Arty player does.
 - Arty S7-50 (RISC-V) version 4 firmware: `make flash-test V4=1 STORY=<file.z4>` in
   `target/riscv/serv_zvibe/boards/arty_s7_50/sw`. A V4 player on the screen layer with saves packed against
   the story (story identity and CRC-32), sized for the story: `make ram-kb` / `make ram-budget` say how much
@@ -36,6 +36,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for hosts where the project flow crashes after synthesis (Vivado 2025.1, kernel 7.0).
 - Board tests `test_v4_czech.py` and `test_v4_stories.py` (`boards/arty_s7_50/tests`).
 - The RISC-V link fails if `.data` and `.bss` leave less than 2 KB for the stack.
+
+### Changed
+- SAM E51: a plain `make` is always the single-game firmware; the menu is `make multi`. It used to switch to the menu when a
+  generated `game_registry.c` was lying around. `make multi` replaces the V3-only multi-game firmware and `./build_games.py same51
+  && make`; the old `zvibe_same51_multi.c` and `tools/v4_games_to_c.py` are gone.
+- SAM E51 V4 and menu firmware: the terminal-size probe no longer swallows what the player typed ahead, and a stream of digits can
+  no longer overflow it; a command may be as long as the story's text buffer takes (it was cut at 79 characters); a restore says why
+  it failed (no save, damaged, another story, unavailable).
+
+### Fixed
+- Object 0 ("no object") is now accepted by every object opcode, in V3 and V4: `put_prop` on object 0 or on a
+  property the object lacks is ignored (it halted), `insert_obj` and `remove_obj` with object 0 are ignored (they
+  read and wrote through a null pointer: a segmentation fault on a host, silent corruption of RAM address 0 on
+  the RISC-V), `get_parent`, `get_sibling` and `get_child` return 0, and `jin` reads its branch for object 0
+  (it did not, so the branch bytes ran as code). Found when *Bureaucracy* hung on the Arty at `take mail`, after
+  giving a stamp away: the game sets property 31 of object 0. Frotz ignores these the same way. Costs 44 bytes
+  of flash on the RISC-V V3 firmware.
+- A fatal interpreter error on an embedded target (`ZVIBE_FREESTANDING`) used to spin silently, which looks like a
+  hung board; it now prints "The interpreter stopped on a fatal error. Reset the board." first.
 
 ## [2.1.0] - 2026-11-05
 
