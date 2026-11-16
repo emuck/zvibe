@@ -8,7 +8,7 @@ Builds games for all embedded targets using a common game registry.
 Supports: SAM E51, RISC-V Arty S7-50, Console
 
 Usage:
-    ./build_games.py same51                    # Build multi-game for SAM E51
+    ./build_games.py same51                    # Build the multi-game menu (versions 3 and 4) for SAM E51
     ./build_games.py arty_s7_50                # Build multi-game for RISC-V
     ./build_games.py arty_s7_50 --game zork1   # Build single game (no menu)
 """
@@ -31,16 +31,18 @@ TARGET_DIRS = {
 
 
 def build_for_same51(args):
-    """Build multi-game system for SAM E51"""
+    """Build the multi-game firmware's game table for SAM E51 (versions 3 and 4)"""
     registry = common.load_registry()
-    output_dir = common.PROJECT_ROOT / TARGET_DIRS['same51']
+    output_dir = Path(args.out) if args.out else common.PROJECT_ROOT / TARGET_DIRS['same51']
 
     if not output_dir.exists():
         print(f"Error: Output directory not found: {output_dir}")
         return 1
 
     try:
-        same51.build_same51(registry, output_dir)
+        games = same51.games_from_files(args.story) if args.story else None
+        only = args.only.split(',') if args.only else None
+        same51.build_same51(registry, output_dir, games, only)
         return 0
     except Exception as e:
         print(f"\nError: Build failed: {e}")
@@ -56,7 +58,8 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  ./build_games.py same51                 # Build all games for SAM E51
+  ./build_games.py same51                 # Build the SAM E51 menu from the registry selection
+  ./build_games.py same51 --story a.z3 --story Bureaucracy=b.z4   # or from files (versions 3 and 4)
   ./build_games.py arty_s7_50            # Build games for Arty S7-50
 
 Or use the interactive game manager:
@@ -66,6 +69,13 @@ Or use the interactive game manager:
 
     parser.add_argument('target', choices=targets,
                         help='Target platform to build for')
+    parser.add_argument('--story', action='append', metavar='[NAME=]FILE',
+                        help='same51: use these story files (.z3 or .z4) instead of the registry selection; '
+                             'repeat for each game, NAME= sets the menu name')
+    parser.add_argument('--only', metavar='ID,ID',
+                        help='same51: exactly these registry games, in this order (even ones excluded by default)')
+    parser.add_argument('--out', metavar='DIR',
+                        help='same51: write the generated files here (default: target/same51/src)')
 
     args = parser.parse_args()
 

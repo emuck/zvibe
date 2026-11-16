@@ -58,6 +58,11 @@ def download_game(game: dict, force: bool = False) -> bool:
     Returns:
         True if download succeeded or file already exists
     """
+    if game.get('path'):                       # a story kept outside the catalog: nothing to download
+        found = Path(game['path']).expanduser().exists()
+        print(f"[{'ok' if found else 'skip'}] {game['name']:40} [{'local file' if found else 'local file missing: ' + game['path']}]")
+        return found
+
     output_path = CATALOG_DIR / game['filename']
 
     # Check if already exists
@@ -144,7 +149,7 @@ def cmd_list(args):
 
     for game in registry['games']:
         # Check if file exists
-        game_path = CATALOG_DIR / game['filename']
+        game_path = Path(game['path']).expanduser() if game.get('path') else CATALOG_DIR / game['filename']
         exists_marker = "*" if game_path.exists() else " "
 
         # Default marker

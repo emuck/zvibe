@@ -3,7 +3,7 @@
   "description": "ZVibe game registry - manages games for all targets",
   "targets": {
     "same51": {
-      "flash_available": 786432
+      "flash_available": 973824
     },
     "arty_s7_50": {
       "flash_available": 8388608
@@ -398,6 +398,71 @@
       "serial": "840727",
       "tags": [
         "infocom"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "bureaucracy",
+      "name": "Bureaucracy",
+      "filename": "bureaucracy-r116-s870602.z4",
+      "path": "~/infocom/library/z4/bureaucracy/bureaucracy-r116-s870602.z4",
+      "size": 243340,
+      "release": 116,
+      "serial": "870602",
+      "tags": [
+        "v4"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "trinity",
+      "name": "Trinity",
+      "filename": "trinity-r12-s860926.z4",
+      "path": "~/infocom/library/z4/trinity/trinity-r12-s860926.z4",
+      "size": 262064,
+      "release": 12,
+      "serial": "860926",
+      "tags": [
+        "v4"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "amfv",
+      "name": "A Mind Forever Voyaging",
+      "filename": "amfv-r77-s850814.z4",
+      "path": "~/infocom/library/z4/amfv/amfv-r77-s850814.z4",
+      "size": 262016,
+      "release": 77,
+      "serial": "850814",
+      "tags": [
+        "v4"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "nordandbert",
+      "name": "Nord and Bert",
+      "filename": "nordandbert-r19-s870722.z4",
+      "path": "~/infocom/library/z4/nordandbert/nordandbert-r19-s870722.z4",
+      "size": 170284,
+      "release": 19,
+      "serial": "870722",
+      "tags": [
+        "v4"
+      ],
+      "exclude": true
+    },
+    {
+      "id": "generic-v4",
+      "name": "Generic (version 4)",
+      "filename": "generic-r6-s850705.z4",
+      "path": "~/infocom/library/z4/generic/generic-r6-s850705.z4",
+      "size": 31772,
+      "release": 6,
+      "serial": "850705",
+      "tags": [
+        "v4"
       ],
       "exclude": true
     }

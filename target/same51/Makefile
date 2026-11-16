@@ -24,20 +24,12 @@ ifeq ($(V4),1)
     PROJECT_NAME = same51_zvibe_v4
 endif
 
-# Several version 4 stories with a menu: `make v4-multi [V4_STORIES="a.z4 b.z4 ..."]` (see README).
-# "Name=file.z4" sets a menu name. The firmware's story buffer is sized for the biggest of them.
-V4_MULTI ?= 0
-V4_LIB ?= $(HOME)/infocom/library/z4
-V4_STORIES ?= $(V4_LIB)/bureaucracy/bureaucracy-r116-s870602.z4 \
-              $(V4_LIB)/trinity/trinity-r12-s860926.z4 \
-              $(V4_LIB)/amfv/amfv-r77-s850814.z4 \
-              $(V4_LIB)/nordandbert/nordandbert-r19-s870722.z4 \
-              $(V4_LIB)/generic/generic-r6-s850705.z4
-V4_STORY_FILES = $(foreach s,$(V4_STORIES),$(lastword $(subst =, ,$(s))))
-ifeq ($(V4_MULTI),1)
-    PROJECT_NAME = same51_zvibe_v4_multi
-    V4_RAM := $(shell python3 tools/v4_games_to_c.py --buffer $(V4_STORIES))
-endif
+# Multi-game menu, versions 3 and 4 together: `make multi` (see README). The games come from
+# games/registry.json, or from MULTI_ARGS, e.g. MULTI_ARGS="--story a.z3 --story Name=b.z4".
+# games/build_games.py same51 writes src/game_registry.c (the stories and the menu table) and
+# src/game_registry.mk (STORY_BUFFER, STORY_COUNT); with game_registry.c present a plain `make`
+# builds the menu firmware too.
+-include src/game_registry.mk
 
 # Screen-layer exerciser: `make screen-demo` (see src/screen_demo.c)
 ifeq ($(SCREEN_DEMO),1)
@@ -50,12 +42,21 @@ GAME_REGISTRY = src/game_registry.c
 # Force single-game mode when STORY_FILE is explicitly specified
 ifeq ($(SCREEN_DEMO),1)
     MULTI_GAME_MODE := no
-else ifeq ($(V4_MULTI),1)
-    MULTI_GAME_MODE := no
 else ifeq ($(origin STORY_FILE),command line)
     MULTI_GAME_MODE := no
 else
     MULTI_GAME_MODE := $(shell test -f $(GAME_REGISTRY) && echo yes || echo no)
+endif
+
+# The menu firmware is the version 4 player (the core plays versions 3 and 4 alike), its story buffer
+# sized for the largest game by the generator.
+ifeq ($(MULTI_GAME_MODE),yes)
+    ifeq ($(STORY_BUFFER),)
+        $(error src/game_registry.mk is missing: run games/build_games.py same51 (or make multi))
+    endif
+    V4 := 1
+    V4_RAM := $(STORY_BUFFER)
+    PROJECT_NAME = same51_zvibe_multi
 endif
 
 # OS detection and toolchain configuration
@@ -136,8 +137,8 @@ CFLAGS += -I"$(ZVIBE_ROOT)/include" -I"$(ZVIBE_ROOT)/src"
 ifeq ($(V4),1)
 CFLAGS += -DZVIBE_ENABLE_V4=1 -DZVIBE_MEMORY_BUFFER_SIZE=$(V4_RAM)
 endif
-ifeq ($(V4_MULTI),1)
-CFLAGS += -DV4_MULTI=1
+ifeq ($(MULTI_GAME_MODE),yes)
+CFLAGS += -DMULTI_GAME=1
 endif
 CFLAGS += -DZVIBE_FREESTANDING=1 -DZVIBE_ENABLE_FILE_IO=0 -DZVIBE_ENABLE_STATUS_LINE=0 -DZVIBE_ENABLE_SAVE_RESTORE=1
 
@@ -160,24 +161,10 @@ ifeq ($(SCREEN_DEMO),1)
                     $(SRC_DIR)/system.c \
                     $(SRC_DIR)/flash.c \
                     $(SRC_DIR)/uart.c
-else ifeq ($(V4_MULTI),1)
-    # Several version 4 stories with a menu: the V4 player, and the generated story table
-    LOCAL_SOURCES = $(SRC_DIR)/zvibe_same51.c \
-                    $(SRC_DIR)/v4_games.c \
-                    startup/startup_xc32.c \
-                    $(SRC_DIR)/clock.c \
-                    $(SRC_DIR)/gpio.c \
-                    $(SRC_DIR)/timer.c \
-                    $(SRC_DIR)/dma.c \
-                    $(SRC_DIR)/system.c \
-                    $(SRC_DIR)/flash.c \
-                    $(SRC_DIR)/uart.c
 else ifeq ($(MULTI_GAME_MODE),yes)
-    # Multi-game mode - use multi version and game registry
-    # Game data sources will be determined after they're generated
-    LOCAL_SOURCES = $(SRC_DIR)/zvibe_same51_multi.c \
+    # Multi-game menu: the V4 player over the generated game table (games of version 3 and 4)
+    LOCAL_SOURCES = $(SRC_DIR)/zvibe_same51.c \
                     $(SRC_DIR)/game_registry.c \
-                    $(SRC_DIR)/save_delta.c \
                     startup/startup_xc32.c \
                     $(SRC_DIR)/clock.c \
                     $(SRC_DIR)/gpio.c \
@@ -233,10 +220,8 @@ TARGET = $(BIN_DIR)/$(PROJECT_NAME).bin
 # Default target - conditional based on build mode
 ifeq ($(SCREEN_DEMO),1)
 all: platform_info directories $(TARGET)
-else ifeq ($(V4_MULTI),1)
-all: platform_info directories v4_games $(TARGET)
 else ifeq ($(MULTI_GAME_MODE),yes)
-all: platform_info directories multi_game_data $(TARGET)
+all: platform_info directories $(TARGET)
 else
 all: platform_info directories story_data $(TARGET)
 endif
@@ -277,38 +262,6 @@ $(SRC_DIR)/story_data.c: $(STORY_FILE) $(STORY_STAMP) tools/z3_to_c_array.py
 	@echo "Converting story file $(STORY_FILE) to C array..."
 	python3 tools/z3_to_c_array.py --single-game $(STORY_FILE) $(SRC_DIR)/story_data.c
 
-# Story table for the multi-game V4 firmware (rebuilt when the list of stories changes)
-v4_games: $(SRC_DIR)/v4_games.c
-
-V4_GAMES_STAMP = $(SRC_DIR)/.v4_games.stamp
-$(V4_GAMES_STAMP): FORCE
-	@echo "$(V4_STORIES)" | cmp -s - $@ || echo "$(V4_STORIES)" > $@
-
-$(SRC_DIR)/v4_games.c: $(V4_STORY_FILES) $(V4_GAMES_STAMP) tools/v4_games_to_c.py
-	python3 tools/v4_games_to_c.py $@ $(V4_STORIES)
-
-# Multi-game data generation
-# Note: Multi-game files must be generated externally using the unified build system:
-#   cd ../../tools && ./build_games.py same51
-# This target is kept for compatibility but does not auto-generate files
-multi_game_data: $(SRC_DIR)/game_registry.c build_game_objects
-
-$(SRC_DIR)/game_registry.c:
-	@echo "ERROR: Multi-game files not found!"
-	@echo "Please run the unified build system first:"
-	@echo "  cd ../../tools && ./build_games.py same51"
-	@exit 1
-
-# Build game data objects (after data files are generated)
-build_game_objects: $(SRC_DIR)/game_registry.c
-	@echo "Building game data objects..."
-	@for file in $(shell find $(SRC_DIR) -name "*_data.c" 2>/dev/null); do \
-		obj_file="$(OBJ_DIR)/$${file%.c}.o"; \
-		dep_file="$(OBJ_DIR)/$${file%.c}.d"; \
-		echo "Compiling $$file -> $$obj_file"; \
-		$(CC) $(CFLAGS) -MF"$$dep_file" -o "$$obj_file" "$$file"; \
-	done
-
 # Compile rules for local files
 $(OBJ_DIR)/%.o: %.c | directories
 	$(CC) $(CFLAGS) -MF"$(@:.o=.d)" -o "$@" "$<"
@@ -318,14 +271,8 @@ $(OBJ_DIR)/zvibe/%.o: $(ZVIBE_CORE_DIR)/%.c | directories
 	$(CC) $(CFLAGS) -MF"$(@:.o=.d)" -o "$@" "$<"
 
 # Link to create ELF
-ifeq ($(MULTI_GAME_MODE),yes)
-$(BIN_DIR)/$(PROJECT_NAME).elf: $(OBJECTS) build_game_objects
-	@echo "Linking multi-game executable..."
-	$(CC) $(LDFLAGS) -o "$@" $(OBJECTS) $(shell find $(OBJ_DIR)/$(SRC_DIR) -name "*_data.o" 2>/dev/null)
-else
 $(BIN_DIR)/$(PROJECT_NAME).elf: $(OBJECTS)
 	$(CC) $(LDFLAGS) -o "$@" $(OBJECTS)
-endif
 
 # Create binary file
 # macOS: xc32-objcopy -O binary expands BSS to 512 MB with XC32 v5.0 due to ALLOC-only
@@ -363,24 +310,24 @@ v4-program:
 	rm -f $(SRC_DIR)/story_data.c
 	$(MAKE) V4=1 BUILD_DIR=build_v4 program
 
-# Several version 4 stories with a menu (see V4_STORIES above)
+# The menu firmware: generate the game table (from the registry, or MULTI_ARGS), then build.
 # The image must stay below the flash the SmartEEPROM leaves free: 1 MB less its reserved blocks.
 # Measured on the board (SBLK=3): an image of 998,983 bytes runs, one of 1,013,983 does not program.
 # 999,424 bytes (1 MB less 48 KB) is the limit used here.
-V4_FLASH_LIMIT ?= 999424
+MULTI_FLASH_LIMIT ?= 999424
 
-v4-multi:
-	$(MAKE) V4=1 V4_MULTI=1 BUILD_DIR=build_v4_multi all
-	@python3 -c "import os,sys; n=os.path.getsize('build_v4_multi/bin/same51_zvibe_v4_multi.bin'); l=$(V4_FLASH_LIMIT); print('image %d bytes, %d of %d left' % (n, l-n, l)); sys.exit(0 if n<=l else 'ERROR: the image is over the flash limit: drop a story (V4_STORIES)')"
+multi:
+	python3 ../../games/build_games.py same51 --out $(SRC_DIR) $(MULTI_ARGS)
+	$(MAKE) BUILD_DIR=build_multi all
+	@python3 -c "import os,sys; n=os.path.getsize('build_multi/bin/same51_zvibe_multi.bin'); l=$(MULTI_FLASH_LIMIT); print('image %d bytes, %d of %d left' % (n, l-n, l)); sys.exit(0 if n<=l else 'ERROR: the image is over the flash limit: take a game out')"
 
-v4-multi-program: v4-multi
-	$(MAKE) V4=1 V4_MULTI=1 BUILD_DIR=build_v4_multi program
+multi-program: multi
+	$(MAKE) BUILD_DIR=build_multi program
 
 # Clean target - removes both single-game and multi-game generated files
 clean:
-	rm -rf $(BUILD_DIR) build_screen_demo build_v4 build_v4_multi
-	rm -f $(SRC_DIR)/game_registry.c $(SRC_DIR)/*_data.c $(SRC_DIR)/story_data.c $(STORY_STAMP)
-	rm -f $(SRC_DIR)/v4_games.c $(SRC_DIR)/.v4_games.stamp
+	rm -rf $(BUILD_DIR) build_screen_demo build_v4 build_multi
+	rm -f $(SRC_DIR)/game_registry.c $(SRC_DIR)/game_registry.mk $(SRC_DIR)/*_data.c $(SRC_DIR)/story_data.c $(STORY_STAMP)
 
 # Help target
 help:
@@ -392,8 +339,9 @@ help:
 ifeq ($(MULTI_GAME_MODE),yes)
 	@echo "Current mode: MULTI-GAME ($(GAME_REGISTRY) detected)"
 	@echo "Available targets:"
-	@echo "  all              - Build multi-game project (default)"
-	@echo "  multi_game_data  - Convert all games to C arrays and generate registry"
+	@echo "  all              - Build the menu firmware from the existing game table (default)"
+	@echo "  multi            - Generate the game table (registry or MULTI_ARGS) and build"
+	@echo "  multi-program    - multi, then program the device using edbg"
 	@echo "  program          - Program the device using edbg"
 	@echo "  clean            - Remove all build files and generated game data"
 	@echo "  help             - Show this help message"
@@ -423,9 +371,9 @@ endif
 	@echo "  Binaries:     build/bin/"
 ifeq ($(MULTI_GAME_MODE),yes)
 	@echo ""
-	@echo "Multi-game setup (unified build system):"
-	@echo "  To add/update games:  cd ../../games && ./get_games.py browse"
-	@echo "  To rebuild registry:  cd ../../tools && ./build_games.py same51"
+	@echo "Multi-game setup (one generator for versions 3 and 4):"
+	@echo "  To add/update games:  cd ../../games && ./get_games.py browse   (or ./game_manager.py)"
+	@echo "  To rebuild the table: cd ../../games && ./build_games.py same51 [--story [Name=]file ...]"
 	@echo "  To disable multi-game: make clean  (removes $(GAME_REGISTRY))"
 endif
 
@@ -433,4 +381,4 @@ endif
 -include $(LOCAL_OBJECTS:.o=.d)
 -include $(ZVIBE_OBJECTS:.o=.d)
 
-.PHONY: all platform_info directories clean program help story_data screen-demo screen-demo-program v4 v4-program v4-multi v4-multi-program v4_games FORCE
+.PHONY: all platform_info directories clean program help story_data screen-demo screen-demo-program v4 v4-program multi multi-program FORCE
