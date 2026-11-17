@@ -340,7 +340,7 @@ python3 tests/test_button.py           # the button at a line prompt, at a key p
 - **RAM**: 256KB (sufficient for Z-machine execution)
 
 ### Development Tools
-- **XC32 Compiler**: Microchip toolchain (v4.60+ or v5.0+); see macOS notes below
+- **XC32 Compiler**: Microchip toolchain (v4.60+ or v5.0+); see the macOS and Linux notes below
 - **edbg Programmer**: Cross-platform CMSIS-DAP programmer
 - **Python 3**: For story file conversion
 - **Terminal Program**: 115200 baud serial connection (picocom, minicom, screen)
@@ -369,6 +369,15 @@ edbg -l    # should show: nEDBG CMSIS-DAP
 Both v4.60 and v5.0+ work correctly. v5.0+ requires the SAME51 Device Family Pack (DFP),
 which is installed automatically when you install MPLAB X or via `mchp-packs-cli`.
 The Makefile auto-detects the latest installed version; override with `make XC32_VERSION=v4.60`.
+
+### Linux Setup
+
+Tested on Ubuntu 24.04 with XC32 v4.60 and v6.25 installed under `/opt/microchip/xc32/`; the Makefile finds the
+newest version there on its own (`make XC32_VERSION=v4.60` picks one). Build `edbg` as above (`sudo cp edbg
+/usr/local/bin/`) and add a udev rule if `edbg -l` needs `sudo`. The board's serial port is `/dev/ttyACM0` (the
+tests in `tests/` look for `/dev/ttyACM*` as well as `/dev/cu.usbmodem*`, or take the port as an argument). Other USB
+serial adapters can come first: check `ls /dev/serial/by-id/`. The host tests (`tests/host`, the menu generator)
+need only a C compiler and Python 3, and run with `scripts/ci-source-check.sh`.
 
 #### UART Timing
 The firmware shows **"Press RETURN to start..."** at boot and waits — so you will never miss the game output.

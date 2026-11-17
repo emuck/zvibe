@@ -10,7 +10,8 @@ have_cmd() {
 }
 
 have_xc32() {
-    have_cmd xc32-gcc || [ -x /Applications/microchip/xc32/v5.00/bin/xc32-gcc ]
+    # the Makefile finds XC32 itself under /Applications/microchip/xc32 (macOS) or /opt/microchip/xc32 (Linux)
+    have_cmd xc32-gcc || compgen -G '/Applications/microchip/xc32/v*/bin/xc32-gcc' >/dev/null || compgen -G '/opt/microchip/xc32/v*/bin/xc32-gcc' >/dev/null
 }
 
 run_step() {
