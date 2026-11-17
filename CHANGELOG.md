@@ -36,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   board). The constraints now set `INTERNAL_VREF 0.675` for bank 34: the 100 MHz clock pin is SSTL135 and the board gives
   no reference at the VREF pin; Vivado 2025.1 supplied one on its own, 2026.2 does not, and without it the clock input
   is dead (no LED, no UART).
+- Arty S7-50: post-route physical optimization when timing is not met after routing (both Vivado scripts); the 128 KB
+  design was 9 ps short without it. Board tests `test_v4_bureaucracy.py` (Bureaucracy r116, 64 KB) and
+  `test_v4_big_stories.py` (Trinity r15 and A Mind Forever Voyaging r77, 128 KB), all passing with Vivado 2026.2;
+  `test_v4_stories.py` takes `ARTY_BITSTREAM=<file.bit>` to test a bitstream before it is in flash.
 - `make build-nonproject` in the Arty `fpga/` directory: the same bitstream by Vivado's non-project flow,
   for hosts where the project flow crashes after synthesis (Vivado 2025.1, kernel 7.0).
 - Board tests `test_v4_czech.py` and `test_v4_stories.py` (`boards/arty_s7_50/tests`).

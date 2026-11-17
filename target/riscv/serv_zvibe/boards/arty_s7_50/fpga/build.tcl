@@ -94,8 +94,10 @@ open_run synth_1
 ## Generate utilization report
 report_utilization -file $build_dir/utilization_synth.txt
 
-## Run implementation
-launch_runs impl_1 -to_step route_design
+## Run implementation. Post-route physical optimization runs only if timing is not met after routing (the 128 KB SoC was
+## 9 ps short); a design that meets timing is left as routed.
+set_property STEPS.POST_ROUTE_PHYS_OPT_DESIGN.IS_ENABLED true [get_runs impl_1]
+launch_runs impl_1 -to_step "phys_opt_design (Post-Route)"
 wait_on_run impl_1
 open_run impl_1
 

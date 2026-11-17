@@ -56,6 +56,10 @@ report_utilization -file $build_dir/utilization_synth.txt
 opt_design
 place_design
 route_design
+## A design a few picoseconds short of its clock (the 128 KB SoC was, by 9 ps) gets a post-route physical optimization
+if {[get_property SLACK [get_timing_paths -max_paths 1 -setup]] < 0} {
+    phys_opt_design
+}
 report_utilization -file $build_dir/utilization_impl.txt
 report_timing_summary -file $build_dir/timing_summary.txt
 

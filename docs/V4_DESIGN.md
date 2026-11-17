@@ -481,15 +481,24 @@ each is a separate commit.
    **Played through:** *Bureaucracy* r116 (serial 870602, "Masterpieces" file) was played by hand from start to
    finish on the 64 KB design, with save and restore, after the fixes below (13 November 2026). Release 160 hung
    at `take mail` and prints a blank object name (see below), which is why r116 is the release to use.
-   **Still not verified:** `RV_SPIN_PER_MS` is still the guess (the key and size-probe waits work
-   with it, since the bytes arrive together; no calibration was done); stack depth (the 4 KB
-   budget was not measured); a bitstream with 128 KB; *Trinity* and *A Mind Forever Voyaging*;
-   power-cycling with the 64 KB bitstream written to flash (it
-   was loaded into SRAM). Vivado's project flow (`make build`) crashes on the test machine after
-   a successful synthesis, with `main` as well, so the 64 KB bitstream was built with the new
-   non-project flow (`make build-nonproject`, same sources and part). `flash_save.c` still does
-   not check the CRC-16 it stores when reading (V3 saves are unaffected by this slice; V4 saves
-   carry their own CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
+   **Vivado 2026.2 (17 November 2026, sarastro).** The Arty builds with Vivado 2026.2 in both flows; the project flow
+   (`make build`) no longer crashes after synthesis. 2026.2 needed one change in the constraints: the 100 MHz clock pin
+   (R2) is `SSTL135` and needs a 0.675 V reference that the board does not supply at the bank's VREF pin; Vivado 2025.1
+   made one internally, 2026.2 does not, and the clock input was dead (no LED, no UART; found with a diagnostic
+   bitstream that showed the raw clock, the MMCM lock, the system clock and the reset on the LEDs).
+   `arty_s7_50.xdc` now sets `INTERNAL_VREF 0.675` for bank 34. Both scripts also run a post-route physical optimization
+   when timing is not met after routing (the 128 KB design was 9 ps short at first). With 2026.2, on the board:
+   the Czech V4 gate (386 performed, 367 passed, 0 failed, 19 print tests), the V4 test stories (63 checks), the V3
+   baseline (Restaurant, 212 steps) and a host test of 199 checks on the 32 KB design; *Bureaucracy* r116 on the 64 KB
+   design, and *Trinity* r15 and *A Mind Forever Voyaging* r77 on a 128 KB design: each plays, saves, moves, restores to
+   the saved place, and restores again after a power cycle (`tests/test_v4_bureaucracy.py`, `tests/test_v4_big_stories.py`).
+   Timing met for all three designs (worst setup slack +0.02 ns, +0.13 ns and +0.01 ns for 32, 64 and 128 KB; these are
+   thin margins). The bitstreams were loaded into the FPGA's SRAM; none was written to flash.
+   **Still not verified:** the 4 KB stack budget was not measured; the wait loops were calibrated on the board earlier
+   (247 iterations per millisecond); power-cycling with a 64 KB or 128 KB bitstream written to flash (they were loaded
+   into SRAM); a long play of *Trinity* and *A Mind Forever Voyaging* beyond the start and one move. `flash_save.c`
+   still does not check the CRC-16 it stores when reading (V3 saves are unaffected by this slice; V4 saves carry their own
+   CRC-32). The MAX10 board (176 KB flash for everything) is not attempted.
 
 10. **SAM E51 multi-game menu, versions 3 and 4.** `make multi` (`target/same51`) builds one firmware with a menu over up to
    nine stories of either version: the single-game V4 player (so every fix of it applies) with the menu on top; the core plays

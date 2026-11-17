@@ -13,6 +13,7 @@ connected with a bitstream whose SoC RAM is at least what the story needs (these
 32 KB). Run from this directory:
 
     python3 test_v4_stories.py [--port /dev/ttyUSB1] [--only keys,lines,screen,save,identity]
+    ARTY_BITSTREAM=../fpga/build/servant_zvibe_arty_s7_50.bit python3 test_v4_stories.py ...   # a build not yet in flash
 
 The stories are target/console/tests/data/v4*.z4 (sources beside them).
 """
@@ -101,8 +102,11 @@ class Board:
         """Reload the FPGA from flash: the same as a power-up (RAM is cleared, the game restarts)."""
         if self.ser:
             self.ser.close(); self.ser = None
-        subprocess.run(["openFPGALoader", "-b", "arty_s7_50", "-r"],
-                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # ARTY_BITSTREAM=<file.bit>: load that bitstream into the FPGA (what a power-up with it in flash would
+        # do) instead of reconfiguring from the one stored in flash; for testing a build before it is stored
+        bit = os.environ.get("ARTY_BITSTREAM")
+        cmd = ["openFPGALoader", "-b", "arty_s7_50"] + ([bit] if bit else ["-r"])
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         time.sleep(2.5)
         self.ser = serial.Serial(self.port, 115200, timeout=0.05)
         self.ser.reset_input_buffer()
