@@ -100,7 +100,7 @@ without a connected board; only the programming step needs hardware.
 | Target | Toolchain | Board |
 |---|---|---|
 | RISC-V MAX10 | `gcc-riscv64-unknown-elf` + Quartus Prime | Intel MAX10 08 Eval |
-| RISC-V Arty S7-50 | `gcc-riscv64-unknown-elf` + Vivado 2024+ | Xilinx Arty S7-50 |
+| RISC-V Arty S7-50 | `gcc-riscv64-unknown-elf` + Vivado 2025.1+ | Xilinx Arty S7-50 |
 | SAM E51 | `gcc-arm-none-eabi` | Microchip SAM E51 Xplained Pro |
 
 ### RISC-V (MAX10 or Arty)

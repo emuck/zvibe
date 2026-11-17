@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Host-tested, and run on the board: Czech V4 gate, the small V4 test stories (keys, lines, split screen,
   save and restore across a power cycle, story identity) on the 32 KB design, and *Bureaucracy* r160 on a
   64 KB design (r116 played through, with save and restore). V3 firmware was byte-identical to before this slice (the object-0 fix above then added 44 bytes).
+- Arty S7-50: the bitstream builds with Vivado 2026.2 (project flow works again, timing met, Czech V4 gate passed on the
+  board). The constraints now set `INTERNAL_VREF 0.675` for bank 34: the 100 MHz clock pin is SSTL135 and the board gives
+  no reference at the VREF pin; Vivado 2025.1 supplied one on its own, 2026.2 does not, and without it the clock input
+  is dead (no LED, no UART).
 - `make build-nonproject` in the Arty `fpga/` directory: the same bitstream by Vivado's non-project flow,
   for hosts where the project flow crashes after synthesis (Vivado 2025.1, kernel 7.0).
 - Board tests `test_v4_czech.py` and `test_v4_stories.py` (`boards/arty_s7_50/tests`).

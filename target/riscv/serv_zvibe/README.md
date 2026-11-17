@@ -121,7 +121,7 @@ serv_zvibe/
 | Python 3.8+ | Yes | Yes | Flash image builders |
 | Quartus Prime (Lite/Standard) | Yes | — | FPGA synthesis + programming (`quartus_sh`, `quartus_pgm`) |
 | USB-Blaster driver | Yes | — | JTAG programming |
-| Vivado 2024.x / 2025.1 | — | Yes | FPGA synthesis |
+| Vivado 2025.1 / 2026.2 | — | Yes | FPGA synthesis |
 | openFPGALoader | — | Yes | Flash programming |
 | Questa FSE / `vsim` | sim only | — | Vendor UFM model simulation |
 | Verilator 5.x | Yes | Yes | RTL unit tests |

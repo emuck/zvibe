@@ -22,7 +22,7 @@ Complete build and programming reference for both supported boards.
 ### Arty S7-50
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Xilinx Vivado 2024.x or 2025.1 | FPGA synthesis | `vivado` must be in PATH (a non-interactive `ssh` does not read `.bashrc`: export it in the command, e.g. `PATH=$PATH:<install>/2025.1/Vivado/bin`) |
+| Xilinx Vivado 2025.1 or 2026.2 (2026.2 needs a license that covers Spartan-7: the free ML Standard one; an Alveo-only license stops with "Specified part could not be found") | FPGA synthesis | `vivado` must be in PATH (a non-interactive `ssh` does not read `.bashrc`: export it in the command, e.g. `PATH=$PATH:<install>/2025.1/Vivado/bin`) |
 | openFPGALoader | Flash programming | `sudo apt install openfpgaloader` or build from source |
 
 ### Simulation Only
@@ -94,13 +94,20 @@ make build
 # Output: build/servant_zvibe_arty_s7_50.bit
 ```
 
-If `make build` stops after synthesis with `Abnormal program termination (7)` (Vivado 2025.1 on a
+Vivado 2026.2 builds the design with `make build` (3 minutes, timing met, tested on the board: the Czech gate
+passes). If `make build` stops after synthesis with `Abnormal program termination (7)` (Vivado 2025.1 on a
 new kernel crashed writing its hardware-definition file; seen with Ubuntu 24.04, kernel 7.0), use
 the non-project flow, which builds the same design without that step:
 
 ```bash
 make build-nonproject               # same output: build/servant_zvibe_arty_s7_50.bit
 ```
+
+**Board shows nothing after a new Vivado version (all LEDs off, no UART).** The 100 MHz clock pin is SSTL135 and needs
+a 0.675 V reference, which the board does not supply: `arty_s7_50.xdc` sets `INTERNAL_VREF 0.675` for bank 34. Vivado
+2025.1 happened to do that on its own; 2026.2 does not, and without the line the clock input is dead. Keep it.
+On a host with other USB serial adapters, the Arty's UART is the `-if01` entry in `/dev/serial/by-id/` (the `-if00` one
+is its JTAG interface); `ttyUSB` numbers change when devices come and go.
 
 ### 2. Build Firmware + Flash Image
 

@@ -7,6 +7,11 @@
 set_property -dict {PACKAGE_PIN R2 IOSTANDARD SSTL135} [get_ports clk_100mhz]
 create_clock -period 10.000 -name clk_100mhz [get_ports clk_100mhz]
 
+## The clock pin is SSTL135 (bank 34 runs at 1.35 V for the DDR3), which needs a 0.675 V reference. The board does not
+## supply one at the VREF pin (M5), so use the one inside the FPGA. Vivado 2025.1 did this on its own; 2026.2 does not,
+## and without it the clock input is dead (no LED, no UART).
+set_property INTERNAL_VREF 0.675 [get_iobanks 34]
+
 ## Generated Clock from MMCM
 ## Vivado automatically derives the generated clock from the MMCM primitive
 ## based on CLKFBOUT_MULT_F and CLKOUT0_DIVIDE_F parameters
