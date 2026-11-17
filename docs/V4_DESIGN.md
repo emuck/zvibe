@@ -499,8 +499,9 @@ each is a separate commit.
    into SRAM); a long play of *Trinity* and *A Mind Forever Voyaging* beyond the start and one move. `flash_save.c`
    writes a slot's header before its data, so a power cut during a save used to leave the newest slot looking valid and a
    restore failed although the save before it was intact. It now checks the CRC-16 it stores: a slot whose data does not
-   match is passed over for the next newest, the next save goes to that damaged slot (never erasing the good one), and only
-   when no slot is whole does the newest written one come back, for the caller's own check to report as damaged. Host test
+   match is passed over for the next newest, the next save goes to that damaged slot (never erasing the good one), and when
+   no slot is whole the read says SAVE_ERR_DAMAGED (the V3 player has no checksum of its own, so it must not be handed damaged
+   bytes). A sequence number past 2^24 is read as a torn field and ignored. Host test
    with 2 and 4 slots and five cut points; not yet run on the board's real flash (the board tests of saves still apply). The MAX10 board (176 KB flash for everything) is not attempted.
 
 10. **SAM E51 multi-game menu, versions 3 and 4.** `make multi` (`target/same51`) builds one firmware with a menu over up to
@@ -535,6 +536,12 @@ each is a separate commit.
    validation and the generation id; two findings are documented limits: **changing the menu moves the save areas** (old saves are
    ignored, never misread), and the story tag is a CRC of the dynamic memory, so a modified story with the same dynamic memory
    and header fields would be accepted as the same story.
+   **Known limits (a second adversarial review).** Every save first finishes a copy still pending in the scratch; if that copy
+   fails again (the media refusing writes twice) the save goes on and reuses the scratch, so a cut during it can lose the pending
+   save as well. Typing ahead during the terminal-size probe is kept up to 16 bytes (a longer escape candidate is kept up to 24);
+   more is dropped, and a receive interrupt that fills the last free slot of the 256-byte ring between the pushback's check and
+   its write could make the ring look empty (needs a ring that is nearly full while the probe runs). The recovery's repeated
+   record scans cost a few header reads per save.
    **Not done.** Saves from deep in Trinity or A Mind Forever Voyaging (the area for five games is 2.5 KB; early saves were 0.4 to
    0.6 KB); a power cut during the first save after programming a new image was not specifically tested; the RISC-V player still
    identifies a story by header fields, not by the packing base.

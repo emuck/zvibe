@@ -344,7 +344,7 @@ static void test_the_newest_of_several_saves_wins(void) {
 static void test_an_interrupted_save_does_not_hide_the_previous_one(void) {
     static uint8_t a[3000], b[3000], c[500], got[4096];
     static const int slot_counts[] = { 2, 4 };
-    static const int keep[] = { 0, 1, 100, 1500, 2999, -1 };       /* bytes of b's data that were written; -1: only the magic */
+    static const int keep[] = { 0, 1, 100, 1500, 2999, -1, -2 };    /* bytes of b's data that were written; -1: only the magic; -2: the magic and a sequence number with an erased byte */
     size_t i, k, v;
     for (i = 0; i < sizeof a; i++) { a[i] = (uint8_t)(i * 7 + 1); b[i] = (uint8_t)(i * 13 + 5); }
     for (i = 0; i < sizeof c; i++) c[i] = (uint8_t)(i * 3 + 9);
@@ -355,17 +355,22 @@ static void test_an_interrupted_save_does_not_hide_the_previous_one(void) {
             int ok_older, ok_next;
             flash_wipe();
             flash_save_init(0, slots);
+            if (keep[v] == -2)                  /* b is save number 254: its sequence byte 0xFE, the rest erased, reads 0xFFFFFFFE */
+                for (i = 0; i < 252; i++) CHECK(flash_save_write(c, 10) == SAVE_OK);
             CHECK(flash_save_write(a, sizeof a) == SAVE_OK);
             CHECK(flash_save_write(b, sizeof b) == SAVE_OK);
             if (keep[v] >= 0) memset(s1 + SAVE_HEADER_SIZE + keep[v], 0xFF, sizeof b - (size_t)keep[v]);
-            else memset(s1 + 4, 0xFF, SAVE_HEADER_SIZE - 4 + sizeof b);
+            else if (keep[v] == -1) memset(s1 + 4, 0xFF, SAVE_HEADER_SIZE - 4 + sizeof b);
+            else memset(s1 + 5, 0xFF, SAVE_HEADER_SIZE - 5 + sizeof b);   /* seq reads 0xFFFFFFFE */
             flash_save_init(0, slots);                                 /* the board comes back */
             ok_older = flash_save_read(got, sizeof got) == (int)sizeof a && memcmp(got, a, sizeof a) == 0;
             CHECK(ok_older);
             /* the next save must not erase the good one: make it fail after its erase, then read again */
-            flash_fail_program = 1;
-            flash_save_write(c, sizeof c);
-            flash_fail_program = 0;
+            if (keep[v] != -2) {                /* (not for the torn sequence number: that save must be numbered right straight away) */
+                flash_fail_program = 1;
+                flash_save_write(c, sizeof c);
+                flash_fail_program = 0;
+            }
             ok_next = flash_save_read(got, sizeof got) == (int)sizeof a && memcmp(got, a, sizeof a) == 0;
             CHECK(ok_next);
             flash_save_init(0, slots);
@@ -374,6 +379,21 @@ static void test_an_interrupted_save_does_not_hide_the_previous_one(void) {
             if (!ok_older || !ok_next) printf("  slots %d, kept %d\n", slots, keep[v]);
         }
     }
+}
+
+/* Every slot damaged: the read says so (the V3 player would otherwise decode the damaged bytes), not "no save". */
+static void test_no_whole_slot_reads_as_damaged(void) {
+    static uint8_t a[2000], got[4096];
+    size_t i;
+    for (i = 0; i < sizeof a; i++) a[i] = (uint8_t)(i * 5 + 3);
+    flash_wipe();
+    flash_save_init(0, 2);
+    CHECK(flash_save_read(got, sizeof got) == SAVE_ERR_NOT_FOUND);
+    CHECK(flash_save_write(a, sizeof a) == SAVE_OK);
+    flash_img[SAVE_HEADER_SIZE + 700] ^= 0x10;
+    flash_save_init(0, 2);
+    CHECK(flash_save_exists());
+    CHECK(flash_save_read(got, sizeof got) == SAVE_ERR_DAMAGED);
 }
 
 static void test_line_input(void) {
@@ -544,6 +564,7 @@ int main(void) {
     test_a_flash_write_error_is_reported();
     test_the_newest_of_several_saves_wins();
     test_an_interrupted_save_does_not_hide_the_previous_one();
+    test_no_whole_slot_reads_as_damaged();
     test_line_input();
     test_line_longer_than_the_story_buffer();
     test_reset_command_returns_to_the_caller();

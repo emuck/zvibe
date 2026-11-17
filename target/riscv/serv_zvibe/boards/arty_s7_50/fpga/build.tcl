@@ -105,6 +105,13 @@ open_run impl_1
 report_utilization -file $build_dir/utilization_impl.txt
 report_timing_summary -file $build_dir/timing_summary.txt
 
+## A bitstream that does not meet timing is not written (set ARTY_ALLOW_NEGATIVE_SLACK=1 to build one anyway)
+set wns [get_property SLACK [get_timing_paths -max_paths 1 -setup]]
+puts "Worst setup slack after implementation: $wns ns"
+if {$wns < 0 && ![info exists ::env(ARTY_ALLOW_NEGATIVE_SLACK)]} {
+    error "timing not met: worst setup slack $wns ns (see $build_dir/timing_summary.txt)"
+}
+
 ## Generate bitstream
 launch_runs impl_1 -to_step write_bitstream
 wait_on_run impl_1

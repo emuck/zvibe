@@ -25,6 +25,9 @@ ARTY_RAM_KB := $(shell $(MAKE) --no-print-directory -s -C $(SW_DIR) ram-kb GAME=
 export ARTY_RAM_KB
 RAM_STAMP = .ram_kb.stamp
 
+# (the stamp rule below must not become the default goal)
+.DEFAULT_GOAL := all
+
 # Firmware + flash image (built by ../sw/Makefile)
 # Override on command line for multi-game: make program-complete ARTY_FLASH=../sw/arty_flash_all.bin
 ARTY_FLASH ?= $(SW_DIR)/arty_flash_test.bin
@@ -87,8 +90,7 @@ program-complete: $(BUILD_DIR)/$(DESIGN).bit
 	@echo "=========================================="
 	@echo "Programming Arty S7-50 (complete)..."
 	@echo "=========================================="
-	@echo "Building firmware and flash image (GAME=$(GAME), SoC RAM $(ARTY_RAM_KB) KB)..."
-	@$(MAKE) -C $(SW_DIR) flash-test GAME=$(GAME) $(SW_ARGS)
+	@$(if $(filter command line,$(origin ARTY_FLASH)),echo "Using the flash image $(ARTY_FLASH) as given (not rebuilt)...",echo "Building firmware and flash image (GAME=$(GAME), SoC RAM $(ARTY_RAM_KB) KB)..." && $(MAKE) -C $(SW_DIR) flash-test GAME=$(GAME) $(SW_ARGS))
 	@echo ""
 	@echo "Step 1: Programming bitstream to flash offset 0x000000..."
 	$(OPENFPGALOADER) -b $(BOARD) -f $(BUILD_DIR)/$(DESIGN).bit

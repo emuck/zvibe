@@ -271,8 +271,12 @@ def scenario_save(b):
     b.send("i")
     check("the game goes on", b.wait_for("counter=4", 5))
     # a second save on top, then restore after another power cycle (the newest wins)
+    before = b.text.count("save result 1")
     b.send("s")
-    check("a second save", b.wait_for("save result 1", 20) and b.text.count("save result 1") >= 1)
+    end = time.time() + 20
+    while time.time() < end and b.text.count("save result 1") <= before:
+        b.pump(0.2)
+    check("a second save", b.text.count("save result 1") > before)
     b.power_cycle()
     b.start_game(); b.wait_for("v4save ready", 8)
     b.send("r")

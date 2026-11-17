@@ -21,7 +21,7 @@
  *
  * A power cut during a write leaves its slot with a header and missing or partial data. Such a slot
  * fails its CRC, so it is skipped and the save before it is used; the next write goes to that damaged
- * slot rather than erasing the good one.
+ * slot rather than erasing the good one. When no slot is whole, the read says DAMAGED (not "no save").
  *
  * CRITICAL: write/erase carry .ramfunc — XIP fetch is unavailable while
  * flash is being erased or programmed.
@@ -67,10 +67,12 @@ static uint16_t crc16(const void *data, size_t len) {
     return crc16_update(0xFFFF, data, len);
 }
 
-/* A header that was written: the magic, and a sequence number that is not 0 (never used) or all ones
- * (the field of a header cut short before its sequence number was programmed). */
+/* A header that was written: the magic, and a plausible sequence number. 0 was never used, and a number past
+ * 2^24 (far beyond what the flash's erase cycles allow) is the field of a header cut short, with some of its bytes
+ * still erased (0xFF): it must not be taken as the highest and have the next save numbered past the end. */
+#define SEQ_LIMIT 0x01000000u
 static int hdr_written(const save_hdr_t *h) {
-    return h->magic == SAVE_MAGIC && h->seq != 0 && h->seq != 0xFFFFFFFFu;
+    return h->magic == SAVE_MAGIC && h->seq != 0 && h->seq < SEQ_LIMIT;
 }
 
 /* Does slot idx hold data that matches the CRC in its header? (the data is read in small pieces) */
@@ -176,8 +178,7 @@ int flash_save_write(const void *data, size_t data_len) {
     return SAVE_OK;
 }
 
-/* The slot with the highest sequence number whose header was written, whole or not. When no slot is whole, the
- * caller still gets this one, so that its own checks report a damaged save (and not "no save"). */
+/* The slot with the highest sequence number whose header was written, whole or not (to tell "damaged" from "none"). */
 static int newest_written_slot(void) {
     uint32_t best_seq = 0;
     int      best     = -1;
@@ -203,9 +204,7 @@ int flash_save_has_slots(void) {
 int flash_save_read(void *buf, size_t buf_len) {
     int idx = find_slot();
     if (idx < 0)
-        idx = newest_written_slot();
-    if (idx < 0)
-        return SAVE_ERR_NOT_FOUND;
+        return newest_written_slot() >= 0 ? SAVE_ERR_DAMAGED : SAVE_ERR_NOT_FOUND;
 
     save_hdr_t hdr;
     flash_read_bytes(slot_base(idx), &hdr, sizeof(hdr));

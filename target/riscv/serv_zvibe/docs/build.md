@@ -95,7 +95,7 @@ make build
 ```
 
 Vivado 2026.2 builds the design with `make build` (3 minutes, timing met, tested on the board: the Czech gate
-passes). If `make build` stops after synthesis with `Abnormal program termination (7)` (Vivado 2025.1 on a
+passes). A build stops with an error if the worst setup slack is negative after implementation (`ARTY_ALLOW_NEGATIVE_SLACK=1` builds one anyway). If `make build` stops after synthesis with `Abnormal program termination (7)` (Vivado 2025.1 on a
 new kernel crashed writing its hardware-definition file; seen with Ubuntu 24.04, kernel 7.0), use
 the non-project flow, which builds the same design without that step:
 
