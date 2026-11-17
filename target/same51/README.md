@@ -99,6 +99,7 @@ make STORY_FILE=mygame.z3 program
 - **Hardware wear leveling** for reliability (214x wear leveling factor)
 - **Persistent saves** survive power cycles
 - **Version 3 single-game firmware**: one delta-compressed save in the whole SmartEEPROM, with a magic number and a CRC-32
+  (written in place, so a power cut during a save loses that save and the one before it; the menu and V4 firmware below do not)
 - **Version 4 and menu firmware**: the save store below. Saves are packed against the story in flash (only the bytes the game
   changed, typically 0.4 to 2 KB), and an interrupted save never costs the save before it
 
@@ -287,7 +288,8 @@ a target, `q` quits. Notes:
 - Your choices are saved into `games/registry.json` (the `exclude` flags), so they also set what a plain `make multi` builds.
 - The budget line adds up everything ticked, V3 and V4 together, against the story budget (973,824 bytes, about 951 KB). If it is
   over, SAM E51 is not offered as a target: untick games first (the default V3 games are ticked until you change them).
-- `b` only writes `src/game_registry.c` and `.mk`. Then run `make multi-program` to compile and program.
+- Quit with `q`: that saves your choices to `games/registry.json`. Then run `make multi-program`, which regenerates `src/game_registry.c`
+  and `.mk` from the registry (so it uses what `q` saved; `b` writes those files at once, which is only needed to look at them) and compiles and programs.
 
 **The menu.** Type a number to start a game. RETURN draws the menu again and measures the terminal (do that after
 connecting). When a story ends, RETURN brings the menu back. **The board's button** (SW0) returns to the menu from any story,
@@ -438,7 +440,7 @@ The mode is never guessed from the files present: a plain `make` is the single-g
 | No UART output after programming | Firmware waits at "Press RETURN to start..." — connect terminal and press Enter; or type `~reset~` + Enter |
 | No UART output at all | Check 115200 baud, 8N1 settings; verify edbg programmed device (check `edbg -l`) |
 | Game doesn't start | Verify story file exists and is valid Z-machine |
-| Save/restore fails | Run `make test` to verify SmartEEPROM |
+| Save/restore fails | Run the save tests (`tests/test_save_power_cut.py` for the menu firmware, `tests/test_uart.py` for the single-game one) |
 | Build errors | Check XC32 compiler installation |
 | Programming fails | Verify edbg and SAM E51 connection |
 | **Multi-Game Issues** | |
@@ -458,7 +460,7 @@ The mode is never guessed from the files present: a plain `make` is the single-g
 
 ### Getting Help
 1. **Check build output**: Error messages are usually descriptive
-2. **Run tests**: `make test` for hardware validation
+2. **Run tests**: the board tests in `tests/` (each file says how to build and flash for it); `make -C tests/host test` needs no board
 3. **Check documentation**: `tests/smarteeprom/README_SMARTEEPROM.md` for details
 4. **Verify connections**: UART at 115200 baud, USB connected
 
@@ -469,7 +471,7 @@ The mode is never guessed from the files present: a plain `make` is the single-g
 - **Multi-Game Mode**: ~430KB flash, ~25KB RAM (4 games embedded)
 - **SmartEEPROM**: 16KB allocated, 2-12KB used per save
 - **Z-machine Games**: Variable RAM usage based on game complexity
-- **Game Storage**: Each game 80-130KB in flash (compressed)
+- **Game Storage**: Each game 80-130KB in flash (stored as is, not compressed)
 - **Flash Limits**: Conservative 550KB / Aggressive 750KB / Max 950KB game data
 
 ### Performance

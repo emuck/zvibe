@@ -102,7 +102,7 @@ ifeq ($(V4),1)
     ARTY_RAM_KB := $(shell $(RAM_BUDGET) kb $(V4_STORY) 2>/dev/null)
   endif
   V4_DYN      := $(shell $(RAM_BUDGET) dyn $(V4_STORY) 2>/dev/null)
-  ifeq ($(or $(ARTY_RAM_KB),$(V4_DYN)),)
+  ifeq ($(and $(ARTY_RAM_KB),$(V4_DYN)),)
     $(error Cannot size the V4 build for "$(V4_STORY)": it must be a version 4 story file, and not too large (see common/sw/ram_budget.py))
   endif
   ZVIBE_V4_FLAGS = -DZVIBE_ENABLE_V4=1 -DZVIBE_MEMORY_BUFFER_SIZE=$(V4_DYN)

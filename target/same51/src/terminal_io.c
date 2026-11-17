@@ -73,11 +73,12 @@ void term_put_byte(uint8_t b) { SERCOM5_USART_WriteByte(b); }
 void term_probe_size(void) {
     static const char q[] = "\033[999;999H\033[6n";
     unsigned long spin;
-    int state = 0, row = 0, col = 0, c, n, kept = 0;
-    uint8_t other[16];
+    int state = 0, row = 0, col = 0, c, n, kept = 0, nc = 0;
+    uint8_t other[16], cand[24];        /* cand: the bytes taken so far as the start of the answer */
     const char *p;
     for (p = q; *p; p++) term_put_byte((uint8_t)*p);
     for (spin = 0; spin < 20000000UL; spin++) {
+        int adv = 1;
         c = term_rx_get();
         if (c < 0) continue;
         if (state == 0 && c == 0x1B) state = 1;
@@ -90,13 +91,19 @@ void term_probe_size(void) {
                 term_rows = (uint8_t)row;
                 term_cols = (uint8_t)(col > 255 ? 255 : col);     /* the screen layer caps it at 80 */
             }
+            nc = 0;
             break;
         }
-        else {
-            if (kept < (int)sizeof other) other[kept++] = (uint8_t)c;       /* not part of the answer */
-            state = 0; row = col = 0;
-        }
+        else adv = 0;
+        if (adv) { if (nc < (int)sizeof cand) cand[nc++] = (uint8_t)c; continue; }
+        /* Not (all of) the answer: what was taken for it, and this byte, belong to the typist (an arrow key typed
+         * ahead is ESC [ A). An ESC starts a new candidate. */
+        for (n = 0; n < nc; n++) if (kept < (int)sizeof other) other[kept++] = cand[n];
+        nc = 0; row = col = 0;
+        if (c == 0x1B) { state = 1; cand[nc++] = (uint8_t)c; }
+        else { state = 0; if (kept < (int)sizeof other) other[kept++] = (uint8_t)c; }
     }
+    for (n = 0; n < nc; n++) if (kept < (int)sizeof other) other[kept++] = cand[n];    /* a half answer at the timeout */
     for (n = kept - 1; n >= 0; n--) rx_unget(other[n]);       /* in the order they came */
 }
 

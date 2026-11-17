@@ -119,7 +119,6 @@ SIZE = $(XC32_PATH)/xc32-size
 # Build from source: https://github.com/ataradov/edbg  (see README for macOS setup)
 # On macOS: clone, run make, copy edbg binary to /usr/local/bin
 PROGRAMMER = edbg -b -t $(EDBG_TARGET) -c 1000 -p -f
-PROG_FILE_EXT = bin
 
 # Directories - following top-level project structure
 SRC_DIR = src

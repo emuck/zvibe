@@ -262,4 +262,4 @@ See [`common/tb/README.md`](common/tb/README.md) for the full testbench inventor
 ## References
 
 - [SERV CPU](https://github.com/olofk/serv) — World's smallest RISC-V
-- [ZVibe Project](../../../../README.md) — Main project README
+- [ZVibe Project](../../../README.md) — Main project README

@@ -221,6 +221,65 @@ static void test_lost_commits(void) {
     (void)got; (void)len;
 }
 
+/* A save for a different story (another tag) in a slot that holds a whole save of the old one, cut at every commit:
+ * once the scratch is complete the new save must come back (recovery used to refuse to finish a copy over a save with a
+ * different tag, and the new save was stranded). */
+static void test_cut_with_story_change(void) {
+    static uint8_t s0[900], s1[1300];
+    uint32_t area = area_size_for(3);
+    int k, clean, scratch_done, bad = 0;
+    fill(s0, 900, 51); fill(s1, 1300, 52);
+    mock_erase(); boot(area, 3);
+    save_store_write(1, 5, s0, 900);
+    mock_reset_counters();
+    CHECK(save_store_write(1, 6, s1, 1300) == SAVE_OK);
+    clean = mock_commits;
+    scratch_done = (int)(((24 + 1300 + 4 + 3) / 4 * 4 + SMARTEEPROM_PAGE - 1) / SMARTEEPROM_PAGE);
+    for (k = 0; k <= clean; k++) {
+        int r;
+        mock_erase(); boot(area, 3);
+        save_store_write(1, 5, s0, 900);
+        mock_reset_counters(); mock_cut_at = k;
+        r = setjmp(mock_power_cut);
+        if (r == 0) save_store_write(1, 6, s1, 1300);
+        boot(area, 3);
+        if (!read_is(1, 5, s0, 900) && !read_is(1, 6, s1, 1300)) { bad++; printf("  cut %d: neither save survived\n", k); }
+        if (k >= scratch_done && !read_is(1, 6, s1, 1300)) { bad++; printf("  cut %d: the new story's save was stranded\n", k); }
+    }
+    CHECK(bad == 0);
+}
+
+/* A save that was refused (the game's area did not take it twice) leaves the new save only in the scratch. The next
+ * save, even before a restart, must not put it at risk: at every cut of that next save one of the two is still there. */
+static void test_save_after_failed_save(void) {
+    static uint8_t s0[1000], s1[1500], s2[700];
+    uint32_t area = area_size_for(2);
+    int k, clean, next, bad = 0;
+    fill(s0, 1000, 61); fill(s1, 1500, 62); fill(s2, 700, 63);
+    mock_erase(); boot(area, 2);
+    save_store_write(0, 4, s0, 1000);
+    mock_reset_counters();
+    save_store_write(0, 4, s1, 1500);
+    clean = mock_commits;
+    mock_reset_counters();
+    save_store_write(0, 4, s2, 700);
+    next = mock_commits + 4;
+    for (k = 0; k <= next; k++) {
+        int r;
+        mock_erase(); boot(area, 2);
+        save_store_write(0, 4, s0, 1000);
+        mock_reset_counters(); mock_drop_at = clean / 2; mock_drop_count = 1000;
+        if (save_store_write(0, 4, s1, 1500) != SAVE_E_VERIFY) { bad++; break; }
+        mock_reset_counters();          /* the same power-up: no restart in between */
+        mock_cut_at = k;
+        r = setjmp(mock_power_cut);
+        if (r == 0) save_store_write(0, 4, s2, 700);
+        boot(area, 2);
+        if (!read_is(0, 4, s1, 1500) && !read_is(0, 4, s2, 700)) { bad++; printf("  cut %d: both the refused and the next save were lost\n", k); }
+    }
+    CHECK(bad == 0);
+}
+
 static void test_damage(void) {
     static uint8_t s0[1500], got[1500];
     uint32_t area = area_size_for(2);
@@ -305,6 +364,8 @@ int main(void) {
     }
     test_cut_during_first_save();
     test_lost_commits();
+    test_cut_with_story_change();
+    test_save_after_failed_save();
     test_damage();
     test_soak(1);
     test_soak(5);

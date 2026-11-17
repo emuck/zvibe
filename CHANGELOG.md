@@ -54,6 +54,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it failed (no save, damaged, another story, unavailable).
 
 ### Fixed
+- SAM E51 save store: the first save of a story that replaced another in its slot could be stranded by a power cut (recovery
+  compared story tags and refused to finish the copy; it now goes by sequence number), and a save right after a refused one
+  could put the only whole copy at risk (every save now first finishes a copy still pending in the scratch). The menu's size
+  probe put back only the byte that broke the answer, so an arrow key typed ahead arrived as a stray letter; it now puts back
+  the whole sequence. Found by an adversarial review; each has a host or board test.
 - Object 0 ("no object") is now accepted by every object opcode, in V3 and V4: `put_prop` on object 0 or on a
   property the object lacks is ignored (it halted), `insert_obj` and `remove_obj` with object 0 are ignored (they
   read and wrote through a null pointer: a segmentation fault on a host, silent corruption of RAM address 0 on

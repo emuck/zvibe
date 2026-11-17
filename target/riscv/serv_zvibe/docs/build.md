@@ -113,7 +113,7 @@ is its JTAG interface); `ttyUSB` numbers change when devices come and go.
 
 ```bash
 cd ../sw
-make flash-test                    # Single game (Plundered Hearts)
+make flash-test                    # Single game (Restaurant)
 make flash-test GAME=hitchhiker    # Different game
 make all-games                     # All 24 catalog games
 make check-layout                  # Preview layout

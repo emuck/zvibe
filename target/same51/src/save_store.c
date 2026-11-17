@@ -162,6 +162,10 @@ save_result_t save_store_write(int game, uint32_t tag, const void *data, size_t 
     if (game < 0 || game >= g_games || len == 0) return SAVE_E_WRITE;                 /* a caller's mistake */
     if (len > save_store_capacity()) return SAVE_E_TOO_LARGE;
 
+    /* A refused save left its record only in the scratch. Put it into its area first: the scratch is about to be reused,
+     * and a cut during that must not find the only whole copy in it. (Does nothing when nothing is pending.) */
+    save_store_recover();
+
     seq = g_seq;
     data_crc = ~crc_step(0xFFFFFFFFUL, (const uint8_t *)data, len);
 
@@ -217,7 +221,9 @@ void save_store_recover(void) {
     if (scratch.whole && scratch.h.game < g_games) {
         int g = scratch.h.game;
         record_info_t own = read_record(g);
-        bool newer = !own.whole || (own.h.tag == scratch.h.tag && own.h.seq < scratch.h.seq);
+        /* Newer by sequence alone: the numbers are global, and a normal save replaces whatever the area held, a save
+         * of another story included. (Comparing tags here stranded the first save of a replaced story.) */
+        bool newer = !own.whole || own.h.seq < scratch.h.seq;
         if (newer) {
             int attempt;
             for (attempt = 0; attempt < 2; attempt++) {
