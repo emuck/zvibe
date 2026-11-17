@@ -338,6 +338,44 @@ static void test_the_newest_of_several_saves_wins(void) {
     CHECK(screen_has("counter=5"));
 }
 
+/* A save cut short by a power failure (the header is written before the data, and the slot was erased first) must not hide
+ * the save before it, and the next save must go to the damaged slot, not erase the only good one. The damage is made by
+ * unwriting the tail of the newest slot's data (NOR flash: unwritten is 0xFF) or all but the magic of its header. */
+static void test_an_interrupted_save_does_not_hide_the_previous_one(void) {
+    static uint8_t a[3000], b[3000], c[500], got[4096];
+    static const int slot_counts[] = { 2, 4 };
+    static const int keep[] = { 0, 1, 100, 1500, 2999, -1 };       /* bytes of b's data that were written; -1: only the magic */
+    size_t i, k, v;
+    for (i = 0; i < sizeof a; i++) { a[i] = (uint8_t)(i * 7 + 1); b[i] = (uint8_t)(i * 13 + 5); }
+    for (i = 0; i < sizeof c; i++) c[i] = (uint8_t)(i * 3 + 9);
+    for (k = 0; k < 2; k++) {
+        int slots = slot_counts[k];
+        for (v = 0; v < sizeof keep / sizeof keep[0]; v++) {
+            uint8_t *s1 = flash_img + SLOT_SIZE;                      /* the second save went to slot 1 */
+            int ok_older, ok_next;
+            flash_wipe();
+            flash_save_init(0, slots);
+            CHECK(flash_save_write(a, sizeof a) == SAVE_OK);
+            CHECK(flash_save_write(b, sizeof b) == SAVE_OK);
+            if (keep[v] >= 0) memset(s1 + SAVE_HEADER_SIZE + keep[v], 0xFF, sizeof b - (size_t)keep[v]);
+            else memset(s1 + 4, 0xFF, SAVE_HEADER_SIZE - 4 + sizeof b);
+            flash_save_init(0, slots);                                 /* the board comes back */
+            ok_older = flash_save_read(got, sizeof got) == (int)sizeof a && memcmp(got, a, sizeof a) == 0;
+            CHECK(ok_older);
+            /* the next save must not erase the good one: make it fail after its erase, then read again */
+            flash_fail_program = 1;
+            flash_save_write(c, sizeof c);
+            flash_fail_program = 0;
+            ok_next = flash_save_read(got, sizeof got) == (int)sizeof a && memcmp(got, a, sizeof a) == 0;
+            CHECK(ok_next);
+            flash_save_init(0, slots);
+            CHECK(flash_save_write(c, sizeof c) == SAVE_OK);
+            CHECK(flash_save_read(got, sizeof got) == (int)sizeof c && memcmp(got, c, sizeof c) == 0);
+            if (!ok_older || !ok_next) printf("  slots %d, kept %d\n", slots, keep[v]);
+        }
+    }
+}
+
 static void test_line_input(void) {
     int r;
     /* typing, backspace, a Return that ends the line, and a command typed over the row's end */
@@ -505,6 +543,7 @@ int main(void) {
     test_a_save_too_large_for_a_slot_fails_cleanly();
     test_a_flash_write_error_is_reported();
     test_the_newest_of_several_saves_wins();
+    test_an_interrupted_save_does_not_hide_the_previous_one();
     test_line_input();
     test_line_longer_than_the_story_buffer();
     test_reset_command_returns_to_the_caller();

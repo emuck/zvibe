@@ -54,6 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it failed (no save, damaged, another story, unavailable).
 
 ### Fixed
+- RISC-V flash saves (Arty and MAX10, V3 and V4): a power cut during a save left the newest slot with its header and
+  partial data, and a restore then failed although the save before it was intact. The reader now checks each slot's CRC-16 and
+  falls back to the next newest, and the next save goes to the damaged slot instead of erasing the good one.
 - SAM E51 save store: the first save of a story that replaced another in its slot could be stranded by a power cut (recovery
   compared story tags and refused to finish the copy; it now goes by sequence number), and a save right after a refused one
   could put the only whole copy at risk (every save now first finishes a copy still pending in the scratch). The menu's size

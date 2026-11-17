@@ -497,9 +497,11 @@ each is a separate commit.
    **Still not verified:** the 4 KB stack budget was not measured; the wait loops were calibrated on the board earlier
    (247 iterations per millisecond); power-cycling with a 64 KB or 128 KB bitstream written to flash (they were loaded
    into SRAM); a long play of *Trinity* and *A Mind Forever Voyaging* beyond the start and one move. `flash_save.c`
-   still does not check the CRC-16 it stores when reading, and it writes a slot's header before its data: a power cut
-   during a save leaves the newest slot looking valid, so a restore fails although the save before it is intact (a V4 save's
-   own CRC-32 catches the damaged one; falling back to the older slot, or writing the header last, is not done). The MAX10 board (176 KB flash for everything) is not attempted.
+   writes a slot's header before its data, so a power cut during a save used to leave the newest slot looking valid and a
+   restore failed although the save before it was intact. It now checks the CRC-16 it stores: a slot whose data does not
+   match is passed over for the next newest, the next save goes to that damaged slot (never erasing the good one), and only
+   when no slot is whole does the newest written one come back, for the caller's own check to report as damaged. Host test
+   with 2 and 4 slots and five cut points; not yet run on the board's real flash (the board tests of saves still apply). The MAX10 board (176 KB flash for everything) is not attempted.
 
 10. **SAM E51 multi-game menu, versions 3 and 4.** `make multi` (`target/same51`) builds one firmware with a menu over up to
    nine stories of either version: the single-game V4 player (so every fix of it applies) with the menu on top; the core plays
