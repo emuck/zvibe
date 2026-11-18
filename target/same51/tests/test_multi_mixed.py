@@ -75,6 +75,9 @@ def main():
             type_line("turn on light", 3)
         vary()
         saved[name] = turns()
+        while name == "Hitchhiker" and saved[name] == saved["Restaurant"]:
+            type_line("look", 1.5)              # the two games must be saved at different counts (the random turns can coincide)
+            saved[name] = turns()
         check(f"{name}: save completes", save_game("Ok.") is not None, tail(200))
         check(f"{name}: reboot", reboot())
     start_game("5")
