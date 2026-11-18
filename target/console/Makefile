@@ -13,7 +13,9 @@ ifneq (,$(findstring ZVIBE_ENABLE_V4=1,$(EXTRA_CFLAGS)))
 override CFLAGS += -DZVIBE_MEMORY_BUFFER_SIZE=$(shell echo $$((72*1024)))
 endif
 SHARED_CFLAGS = $(CFLAGS) -fPIC
-MINIMAL_API_CFLAGS = $(CFLAGS) -DZVIBE_ENABLE_SAVE_RESTORE=0 -DZVIBE_ENABLE_STATUS_LINE=0
+# save/restore stays on in the minimal player (it follows CFLAGS: off only for a ZVIBE_MINIMAL_FEATURES build);
+# the status line is not drawn by this player
+MINIMAL_API_CFLAGS = $(CFLAGS) -DZVIBE_ENABLE_STATUS_LINE=0
 
 # Platform-specific shared library settings
 UNAME_S := $(shell uname -s)

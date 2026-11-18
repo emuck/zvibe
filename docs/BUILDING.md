@@ -42,7 +42,7 @@ make clean && make
 target/console/build/
 ├── bin/
 │   ├── zvibe_console    # Full-featured interpreter (status line, saves)
-│   └── zvibe_minimal    # Lightweight interpreter (scripting / testing)
+│   └── zvibe_minimal    # Lightweight interpreter (scripting / testing; saves to <story>.sav)
 └── lib/
     └── libzvibe.so      # Shared library (Linux)
     or libzvibe.dylib    # Shared library (macOS)

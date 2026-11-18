@@ -24,7 +24,7 @@ TEST_TARGETS = test_split_memory test_screen test_config_v3 test_config_v4 test_
                test_objects_v3 test_objects_v4 test_dict_v3 test_dict_v4 test_opcodes_v3 test_opcodes_v4 test_v4_ops test_screen_v4 test_restart_screen test_save_restore_san test_delta_pack test_delta_pack_san
 
 # Integration test scripts
-INTEGRATION_TESTS = test_czech.sh
+INTEGRATION_TESTS = test_czech.sh test_minimal_save.sh
 
 # Default target
 all: $(TEST_TARGETS)
@@ -229,6 +229,9 @@ test-integration: ensure-binaries
 	@echo
 	@echo "Running Czech Z3 functionality test..."
 	@./test_czech.sh
+	@echo
+	@echo "Running zvibe_minimal save/restore test..."
+	@./test_minimal_save.sh
 	@echo
 	@echo "Running Plundered Hearts integration test (skipped if the game is not downloaded)..."
 	@./test_script.sh plunderedhearts --skip-missing

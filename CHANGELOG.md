@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- `zvibe_minimal` saves and restores (it could not before): `save` writes `<story>.sav` beside the story, named as the console
+  player names it, so either player restores the other's save; a missing, damaged or unwritable file is refused with a message
+  and the game goes on; a game's RESTART works too. It grows by 4.8 KB (31,616 to 36,392 bytes). Test:
+  `target/console/tests/test_minimal_save.sh` (part of `make test-integration`). The minimal player's API object used to be built
+  with save/restore forced off while the player itself was built with it on, so the result codes did not agree in V4 builds.
 - SAM E51: `make multi`, one firmware with a menu over up to nine games of version 3 or 4, and one generator for it
   (`games/build_games.py same51`, from `games/registry.json` or `--story [Name=]file`; `--only id,id` picks registry games
   including the version 4 ones, which live outside the catalog). The board's button returns to the menu from any story, also
