@@ -39,6 +39,9 @@ int snprintf(char *str, size_t size, const char *format, ...);
 #include "flash_save.h"
 #include "save_delta.h"
 
+// Version 4 stories (built with ZVIBE_ENABLE_V4=1) are played by their own module
+#include "zvibe_riscv_v4.h"
+
 //=============================================================================
 // Hardware Definitions
 //=============================================================================
@@ -256,6 +259,109 @@ static int do_delta_restore(void) {
     return 1;
 }
 
+#if ZVIBE_ENABLE_V4
+//=============================================================================
+// Version 4 stories (see zvibe_riscv_v4.c)
+//=============================================================================
+
+// Terminal port for the V4 player: the UART, polled
+void rv_put_byte(uint8_t b) { uart_putc((char)b); }
+
+int rv_rx_get(void) {
+    if (UART_STATUS & RX_AVAILABLE) return (int)(UART_RX_DATA & 0xFF);
+    return -1;
+}
+
+void rv_idle(void) {}
+
+static bool game_is_v4(int game_index) {
+    const game_entry_t *game = get_game(game_index);
+    return game && rv_v4_is_v4_story(game->data, game->size);
+}
+
+// Play a V4 game until it ends. The V3 path keeps its context in main(); a V4 story needs
+// only the player's own state, so this runs the whole session.
+static void run_v4_session(int game_index) {
+    const game_entry_t *game = get_game(game_index);
+    if (!game) return;
+
+    // This game's save slots, as for a V3 game
+    {
+        const flash_toc_t *toc = (const flash_toc_t *)
+            (FLASH_XIP_BASE + g_flash_metadata->games_toc_offset);
+        const flash_toc_entry_t *entry = &toc->entries[game_index];
+        if (entry->saves_offset != 0 && entry->save_slot_count > 0) {
+            flash_save_init(entry->saves_offset, (int)entry->save_slot_count);
+        }
+    }
+
+    GPIO_LEDS = 0x2;
+    for (;;) {
+        rv_v4_result r = rv_v4_play(game->data, game->size);
+        if (r == RV_V4_RESET) continue;                 // ~reset~ from a test script: start afresh
+        if (r == RV_V4_ERROR) {
+            uart_puts("\r\nERROR: the version 4 game stopped\r\n");
+        }
+        break;
+    }
+    GPIO_LEDS = 0x0;
+    uart_puts("\r\n");
+}
+#endif /* ZVIBE_ENABLE_V4 */
+
+#ifdef RV_PROBE
+//=============================================================================
+// Measurement build (make PROBE=1): stack high-water mark and wait-loop speed.
+// Type ~stack~ or "~spin~ N" (N thousand iterations) at any V4 command prompt.
+//=============================================================================
+extern char __bss_end[], __stack_end[];
+#define RV_STACK_PAINT 0xA5A5A5A5u
+
+static void rv_stack_paint(void) {
+    uint32_t *p = (uint32_t *)(((uintptr_t)__bss_end + 3u) & ~3u);
+    uint32_t sp;
+    __asm__ volatile ("mv %0, sp" : "=r"(sp));
+    // paint up to just below the live stack (leave a margin for this function's own frame)
+    while ((uintptr_t)p < (uintptr_t)sp - 128u) *p++ = RV_STACK_PAINT;
+}
+
+static void rv_put_dec(unsigned long v) {
+    char b[12]; int n = 0;
+    if (v == 0) b[n++] = '0';
+    while (v) { b[n++] = (char)('0' + v % 10); v /= 10; }
+    while (n) uart_putc(b[--n]);
+}
+
+int rv_probe(const char *line) {
+    if (line[0] != '~') return 0;
+    if (strcmp(line, "~stack~") == 0) {
+        const uint32_t *p = (const uint32_t *)(((uintptr_t)__bss_end + 3u) & ~3u);
+        while ((uintptr_t)p < (uintptr_t)__stack_end && *p == RV_STACK_PAINT) p++;
+        uart_puts("\r\n[stack: high-water ");
+        rv_put_dec((unsigned long)((uintptr_t)__stack_end - (uintptr_t)p));
+        uart_puts(" bytes of ");
+        rv_put_dec((unsigned long)((uintptr_t)__stack_end - (uintptr_t)__bss_end));
+        uart_puts(" free]\r\n");
+        return 1;
+    }
+    if (line[1] == 's' && line[2] == 'p' && line[3] == 'i' && line[4] == 'n' && line[5] == '~' && line[6] == ' ') {
+        unsigned long n = 0, i;
+        const char *q = line + 7;
+        volatile int sink = 0;
+        while (*q >= '0' && *q <= '9') n = n * 10 + (unsigned long)(*q++ - '0');
+        n *= 1000;
+        uart_puts("\r\n[spin start]\r\n");
+        for (i = 0; i < n; i++) sink += rv_rx_get();     // what the player's waits do
+        (void)sink;
+        uart_puts("[spin done ");
+        rv_put_dec(n);
+        uart_puts("]\r\n");
+        return 1;
+    }
+    return 0;
+}
+#endif /* RV_PROBE */
+
 //=============================================================================
 // Game Initialization
 //=============================================================================
@@ -321,6 +427,9 @@ static bool init_zvibe_game(zvibeContext **ctx, int game_index) {
 //=============================================================================
 
 int main(void) {
+#ifdef RV_PROBE
+    rv_stack_paint();
+#endif
     zvibeContext *ctx = NULL;
     zvibeResult result;
     char input_buffer[256];
@@ -351,6 +460,14 @@ int main(void) {
     if (num_games == 1) {
         single_game_wait_for_return();
 
+#if ZVIBE_ENABLE_V4
+        if (game_is_v4(0)) {
+            for (;;) {                      // a V4 game restarts after RETURN when it ends
+                run_v4_session(0);
+                single_game_wait_for_return();
+            }
+        }
+#endif
         if (init_zvibe_game(&ctx, 0)) {
             in_menu_mode = false;
             GPIO_LEDS = 0x1;  // LED 0 on = game mode
@@ -372,6 +489,13 @@ int main(void) {
 
             int selected_index;
             if (menu_parse_input(input_buffer, num_games, &selected_index)) {
+#if ZVIBE_ENABLE_V4
+                if (game_is_v4(selected_index)) {
+                    run_v4_session(selected_index);
+                    print_menu();
+                    continue;
+                }
+#endif
                 // Valid selection - initialize game
                 if (init_zvibe_game(&ctx, selected_index)) {
                     in_menu_mode = false;

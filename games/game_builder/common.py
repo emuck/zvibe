@@ -35,11 +35,31 @@ def load_registry(registry_path: Optional[Path] = None) -> Dict:
         return json.load(f)
 
 
+def story_path(game: Dict) -> Path:
+    """
+    Where a game's story file is: games/catalog/<filename>, or the game's own "path" (a story that is
+    not distributed with the project, e.g. a version 4 story from a personal library; "~" is expanded).
+    """
+    if game.get('path'):
+        return Path(game['path']).expanduser()
+    return CATALOG_DIR / game['filename']
+
+
+def story_exists(game: Dict) -> bool:
+    return story_path(game).exists()
+
+
+def story_size(game: Dict) -> int:
+    """The story file's real size when it is present (the registry's size can be stale), else the registry's."""
+    p = story_path(game)
+    return p.stat().st_size if p.exists() else game.get('size', 0)
+
+
 def get_games(registry: Optional[Dict] = None) -> List[Dict]:
     """
     Get list of all games in registry order.
 
-    All games are universal .z3 files and work on all targets.
+    Games are .z3 or .z4 story files; a target takes the ones it can play.
     """
     if registry is None:
         registry = load_registry()
@@ -71,7 +91,7 @@ def get_downloaded_games(target: str, registry: Dict) -> List[Dict]:
     in registry order until flash_available is reached.
     """
     all_games = get_games(registry)
-    available = [g for g in all_games if (CATALOG_DIR / g['filename']).exists()]
+    available = [g for g in all_games if story_exists(g)]
     available = [g for g in available if not g.get('exclude', False)]
 
     if not available:
@@ -84,11 +104,12 @@ def get_downloaded_games(target: str, registry: Dict) -> List[Dict]:
     fitted = []
     total = 0
     for game in available:
-        if total + game['size'] <= flash_available:
+        size = story_size(game)
+        if total + size <= flash_available:
             fitted.append(game)
-            total += game['size']
+            total += size
         else:
-            print(f"[skip] {game['name']} ({game['size'] // 1024}KB) — exceeds flash limit")
+            print(f"[skip] {game['name']} ({size // 1024}KB) — exceeds flash limit")
 
     if not fitted:
         raise ValueError(f"No games fit within {target} flash budget ({flash_available // 1024}KB)")
@@ -104,9 +125,9 @@ def compute_flash_budgets(registry: Dict) -> Dict:
     Returns {target: {'used': bytes, 'available': bytes_or_None}}
     """
     selected = [g for g in registry['games']
-                if (CATALOG_DIR / g['filename']).exists()
+                if story_exists(g)
                 and not g.get('exclude', False)]
-    used = sum(g['size'] for g in selected)
+    used = sum(story_size(g) for g in selected)
 
     budgets = {}
     for target, info in registry.get('targets', {}).items():
@@ -136,16 +157,17 @@ def z3_to_bytes(z3_path: Path) -> bytes:
 
 def get_z3_info(data: bytes) -> Dict:
     """
-    Extract Z-machine header information
+    Extract Z-machine header information (any version: the fields are at the same places)
 
     Args:
-        data: Z3 file data as bytes
+        data: story file data as bytes
 
     Returns:
-        Dictionary with version, release, serial, size
+        Dictionary with version, release, serial, checksum, dynamic (the size of dynamic memory,
+        the story's static memory base), size
     """
     if len(data) < 64:
-        raise ValueError("Invalid Z3 file: too short")
+        raise ValueError("Invalid story file: too short")
 
     version = data[0]
     release = (data[2] << 8) | data[3]
@@ -160,6 +182,8 @@ def get_z3_info(data: bytes) -> Dict:
         'version': version,
         'release': release,
         'serial': serial,
+        'checksum': (data[0x1C] << 8) | data[0x1D],
+        'dynamic': (data[14] << 8) | data[15],
         'size': len(data)
     }
 

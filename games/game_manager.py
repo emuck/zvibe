@@ -28,7 +28,7 @@ def save_registry(registry):
 
 
 def is_downloaded(game):
-    return (common.CATALOG_DIR / game['filename']).exists()
+    return common.story_exists(game)
 
 
 def is_selected(game):

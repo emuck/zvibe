@@ -16,8 +16,12 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifndef ROWS
 #define ROWS 24
+#endif
+#ifndef COLS
 #define COLS 80
+#endif
 
 /* ---- Minimal VT100 emulator ---- */
 

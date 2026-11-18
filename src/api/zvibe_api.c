@@ -100,6 +100,12 @@ static void error_callback(const char *fmt, ...) {
 #if !ZVIBE_FREESTANDING
     abort();
 #else
+    /* No way to return to the caller from here: say so, then stop. Without this a fatal
+     * interpreter error looks like a hung board. */
+    if (g_ctx && g_ctx->output_func) {
+        static const char msg[] = "\n[The interpreter stopped on a fatal error. Reset the board.]\n";
+        g_ctx->output_func(msg, sizeof msg - 1);
+    }
     for (;;) {
     }
 #endif

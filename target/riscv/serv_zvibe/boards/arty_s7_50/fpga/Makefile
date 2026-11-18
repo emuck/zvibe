@@ -14,6 +14,20 @@ SW_DIR = ../sw
 # Game selection (matches key in games/registry.json)
 GAME ?= restaurant
 
+# Version 4 stories: `make program-complete V4=1 GAME=bureaucracy` (or STORY=<file.z4>).
+# The V4 firmware keeps the story's dynamic memory in RAM, so a big story needs more SoC
+# RAM than the 32 KB of V3 builds. The firmware build works out how much (sw/Makefile
+# `ram-kb`); the bitstream is built with the same number (RAM_KB generic, build.tcl).
+# Override with ARTY_RAM_KB=<power of two>. V3 builds: 32.
+V4 ?= 0
+SW_ARGS = V4=$(V4) $(if $(STORY),STORY=$(STORY)) $(if $(ARTY_RAM_KB),ARTY_RAM_KB=$(ARTY_RAM_KB))
+ARTY_RAM_KB := $(shell $(MAKE) --no-print-directory -s -C $(SW_DIR) ram-kb GAME=$(GAME) $(SW_ARGS) 2>/dev/null)
+export ARTY_RAM_KB
+RAM_STAMP = .ram_kb.stamp
+
+# (the stamp rule below must not become the default goal)
+.DEFAULT_GOAL := all
+
 # Firmware + flash image (built by ../sw/Makefile)
 # Override on command line for multi-game: make program-complete ARTY_FLASH=../sw/arty_flash_all.bin
 ARTY_FLASH ?= $(SW_DIR)/arty_flash_test.bin
@@ -32,9 +46,15 @@ RTL_SOURCES = $(BOARD_RTL) $(COMMON_RTL_V) $(COMMON_RTL_SV) $(QSPI_RTL) $(SERV_R
 CONSTRAINTS = $(wildcard *.xdc)
 
 # All dependencies for bitstream build
-BITSTREAM_DEPS = build.tcl $(RTL_SOURCES) $(CONSTRAINTS)
+BITSTREAM_DEPS = build.tcl $(RTL_SOURCES) $(CONSTRAINTS) $(RAM_STAMP)
 
-.PHONY: all build clean program program-complete program-flash program-sram \
+# The bitstream depends on the RAM size too: rewrite the stamp only when it changes
+$(RAM_STAMP): FORCE
+	@echo $(ARTY_RAM_KB) | cmp -s - $@ || echo $(ARTY_RAM_KB) > $@
+
+FORCE:
+
+.PHONY: all build build-nonproject clean program program-complete program-flash program-sram \
         reports show-deps help
 
 all: build
@@ -57,13 +77,20 @@ $(BUILD_DIR)/$(DESIGN).bit: $(BITSTREAM_DEPS)
 	@echo "Bitstream: $(BUILD_DIR)/$(DESIGN).bit"
 	@echo "=========================================="
 
+# Same bitstream by the plain (non-project) Vivado flow: use this if `make build` ends in
+# "Abnormal program termination (7)" after synthesis (see build_nonproject.tcl).
+# Leaves build/$(DESIGN).bit, so the program-* targets work unchanged.
+build-nonproject: $(BITSTREAM_DEPS) build_nonproject.tcl
+	@mkdir -p $(BUILD_DIR)
+	$(VIVADO) -mode batch -source build_nonproject.tcl -notrace
+	@echo "Bitstream: $(BUILD_DIR)/$(DESIGN).bit"
+
 # One-command full programming: bitstream + user flash region
 program-complete: $(BUILD_DIR)/$(DESIGN).bit
 	@echo "=========================================="
 	@echo "Programming Arty S7-50 (complete)..."
 	@echo "=========================================="
-	@echo "Building firmware and flash image (GAME=$(GAME))..."
-	@$(MAKE) -C $(SW_DIR) flash-test GAME=$(GAME)
+	@$(if $(filter command line,$(origin ARTY_FLASH)),echo "Using the flash image $(ARTY_FLASH) as given (not rebuilt)...",echo "Building firmware and flash image (GAME=$(GAME), SoC RAM $(ARTY_RAM_KB) KB)..." && $(MAKE) -C $(SW_DIR) flash-test GAME=$(GAME) $(SW_ARGS))
 	@echo ""
 	@echo "Step 1: Programming bitstream to flash offset 0x000000..."
 	$(OPENFPGALOADER) -b $(BOARD) -f $(BUILD_DIR)/$(DESIGN).bit
@@ -144,6 +171,7 @@ show-deps:
 # Clean build artifacts
 clean:
 	rm -rf $(BUILD_DIR)
+	rm -f $(RAM_STAMP)
 	rm -f *.jou *.log *.str
 	rm -rf .Xil
 

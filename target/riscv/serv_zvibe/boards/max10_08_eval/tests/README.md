@@ -27,7 +27,8 @@ The script:
 
 ```bash
 python3 test_uart.py                        # Auto-detect port
-python3 test_uart.py --port /dev/ttyUSB0    # Override port
+python3 test_uart.py --port /dev/ttyUSB0    # Override port (ttyUSB numbers change: /dev/serial/by-id/*CP210* is stable)
+python3 test_save_restore.py                # save, restore and a power cycle of the saves (needs quartus_pgm in PATH)
 python3 test_uart.py --auto-program         # Build + flash game image first, then test
 python3 test_uart.py --save-test            # Shorter script that exercises SAVE/RESTORE
 ```

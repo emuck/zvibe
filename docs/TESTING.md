@@ -91,6 +91,47 @@ For hand testing, build with V4 enabled (`make validate-v4` leaves the binary at
 `zvibe_console story.z4` switches to the full-screen player automatically. With
 `-s`, or when stdin or stdout is not a terminal, it uses the plain line mode.
 
+### RISC-V V4 player (host)
+
+`make -C target/riscv/serv_zvibe/common/sw/tests test` (add `SAN=1` for ASan and UBSan) builds
+the Arty firmware's own V4 player (`zvibe_riscv_v4.c`), the real interpreter and screen layer, and
+the firmware's flash save layer (`flash_save.c`, with the Arty's slot configuration) against a mock
+NOR flash that counts erase-before-program violations, with the console tests' VT100 emulator as
+the terminal. 191 checks, using the console test stories (`v4save`, `v4bigsave`, `v4keys`,
+`v4lines`, `v4screen`): save and restore across a simulated power cycle, the newest of several
+saves, a save from another story (each identity field flipped in turn), a damaged save, a save too
+large for its buffer, a flash write error, line editing and the story's input limit, Return, arrows,
+Escape and CR LF as keys, the terminal-size probe (no answer, noise, too-small and good answers),
+the split screen, and the terminal's state after a game ends. It cannot cover the board: the UART,
+the timing of the busy-wait loops, the QSPI flash. Mutations that must fail it: remove the CRC check,
+any identity byte, the input limit, the lone-Escape handling, the CR LF rule, the flash error report,
+the size sanity check.
+
+### SAM E51 menu: save store and generator
+
+`make -C target/same51/tests/host test` (add `SAN=1` for ASan and UBSan; run by CI) builds `save_store.c` against a model of the
+SmartEEPROM (`mock_smarteeprom.c`: a 16 KB array committed a 512-byte page at a time, a page buffer, atomic page commits) and
+checks, in 187 checks: a fresh store, a round trip, another story's tag, the largest save and one byte more, isolation (a save of
+one game changes that game's area and the scratch and nothing else, for 1 to 9 games), **a power cut before every page commit of a
+save** (small over small, small over large, the largest over the largest, tiny over the largest; 1, 3, 5 and 9 games; after each
+cut the board "comes back", recovers, and the game's save must be the old one or the new one, whole, and the new one whenever the
+scratch was complete; the store must take another save afterwards), a cut during the very first save, commits that are silently
+lost (the save must be refused and the old one untouched, or recovered from the scratch), every bit of a record flipped (never
+returned as a good save), and a 1500-step soak of random saves with random cuts. To trust it, break it: removing recovery, writing
+the area before the scratch, skipping either read-back, either CRC check or the tag check each fails it.
+
+`python3 -m unittest discover -s games/tests` (run by CI) tests the generator: versions 3 and 4 accepted, others, truncated files
+and each bad header address rejected, the core's size limits, one to nine games, menu names escaped and validated, names kept out of
+comments, an unchanged selection leaving the files alone, the two generated files sharing a generation id, and the command line.
+
+On the board (SAM E51 attached; `pip install pyserial pyte`; see each file's header for the flashing command):
+`tests/test_multi.py` (the five V4 stories), `tests/test_multi_mixed.py` (V3 and V4 together: Czech as the V3 conformance suite, a long
+line, quit, and saves of Restaurant, Hitchhiker's and Nord and Bert restored after resets to their exact turn counts),
+`tests/test_save_power_cut.py` and `tests/test_button.py` (a build with `EXTRA_CFLAGS=-DSAVE_TEST_HOOKS=1`, which adds hidden commands
+that stop the board inside a save or "press" the button on a timer; never a release build). The tests wait for a save to finish: a
+save takes 0.1-0.3 s, the first one after a reset 2-3 s, and resetting the board during one is an interrupted write, a test of its
+own.
+
 ### Build configuration and restore safety (V3 / V4 switch)
 
 **Files:** `test_config.c`, `test_save_restore.c`, `test_story.h`

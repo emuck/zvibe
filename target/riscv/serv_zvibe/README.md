@@ -10,7 +10,7 @@ moved inside this directory.
 ## Overview
 
 - **CPU**: SERV (bit-serial RV32I, ~200 LUTs)
-- **RAM**: 32KB BRAM for data/stack
+- **RAM**: 32KB BRAM for data/stack (Arty: a bitstream parameter, 64 or 128 KB for large version 4 stories)
 - **Flash**: On-chip UFM (MAX10) or external QSPI (Arty) for XIP execution and saves
 - **Peripherals**: UART (115200 baud), Timer, GPIO
 - **Application**: ZVibe Z-machine interpreter with SAVE/RESTORE support
@@ -121,7 +121,7 @@ serv_zvibe/
 | Python 3.8+ | Yes | Yes | Flash image builders |
 | Quartus Prime (Lite/Standard) | Yes | — | FPGA synthesis + programming (`quartus_sh`, `quartus_pgm`) |
 | USB-Blaster driver | Yes | — | JTAG programming |
-| Vivado 2024.x / 2025.1 | — | Yes | FPGA synthesis |
+| Vivado 2025.1 / 2026.2 | — | Yes | FPGA synthesis |
 | openFPGALoader | — | Yes | Flash programming |
 | Questa FSE / `vsim` | sim only | — | Vendor UFM model simulation |
 | Verilator 5.x | Yes | Yes | RTL unit tests |
@@ -262,4 +262,4 @@ See [`common/tb/README.md`](common/tb/README.md) for the full testbench inventor
 ## References
 
 - [SERV CPU](https://github.com/olofk/serv) — World's smallest RISC-V
-- [ZVibe Project](../../../../README.md) — Main project README
+- [ZVibe Project](../../../README.md) — Main project README

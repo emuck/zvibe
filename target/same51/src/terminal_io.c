@@ -38,39 +38,73 @@ int term_rx_get(void) {
     return c;
 }
 
+static volatile uint8_t abort_requested;
+
+void term_request_abort(void) { abort_requested = 1; }
+
+int term_take_abort(void) {
+    if (!abort_requested) return 0;
+    abort_requested = 0;
+    return 1;
+}
+
 int term_rx_wait(void) {
     int c;
-    while ((c = term_rx_get()) < 0) {}
+    while ((c = term_rx_get()) < 0) {
+        if (abort_requested) { abort_requested = 0; return TERM_ABORT; }
+    }
     return c;
+}
+
+/* Put a byte back at the front of the ring (what the size probe read but was not its answer). Only the main loop
+ * moves the tail, so this does not race the receive interrupt; a full ring drops the byte. */
+static void rx_unget(uint8_t c) {
+    uint16_t before = (uint16_t)((rx_tail + RX_RING - 1) % RX_RING);
+    if (before == rx_head) return;
+    rx_ring[before] = c;
+    rx_tail = before;
 }
 
 void term_put_byte(uint8_t b) { SERCOM5_USART_WriteByte(b); }
 
 /* Park the cursor far off-screen (the terminal clamps it to the corner) and read back
- * the position report ESC [ r ; c R. */
+ * the position report ESC [ r ; c R. Whatever else arrives while waiting (typing ahead, say) is not the answer:
+ * it is put back for whoever reads next. The numbers stop growing past 3 digits (no overflow from a stream of digits). */
 void term_probe_size(void) {
     static const char q[] = "\033[999;999H\033[6n";
     unsigned long spin;
-    int state = 0, row = 0, col = 0, c;
+    int state = 0, row = 0, col = 0, c, n, kept = 0, nc = 0;
+    uint8_t other[16], cand[24];        /* cand: the bytes taken so far as the start of the answer */
     const char *p;
     for (p = q; *p; p++) term_put_byte((uint8_t)*p);
     for (spin = 0; spin < 20000000UL; spin++) {
+        int adv = 1;
         c = term_rx_get();
         if (c < 0) continue;
         if (state == 0 && c == 0x1B) state = 1;
         else if (state == 1 && c == '[') state = 2;
-        else if (state == 2 && c >= '0' && c <= '9') row = row * 10 + (c - '0');
+        else if (state == 2 && c >= '0' && c <= '9') { if (row < 1000) row = row * 10 + (c - '0'); }
         else if (state == 2 && c == ';') state = 3;
-        else if (state == 3 && c >= '0' && c <= '9') col = col * 10 + (c - '0');
+        else if (state == 3 && c >= '0' && c <= '9') { if (col < 1000) col = col * 10 + (c - '0'); }
         else if (state == 3 && c == 'R') {
             if (row >= 10 && row <= 250 && col >= 56) {
                 term_rows = (uint8_t)row;
                 term_cols = (uint8_t)(col > 255 ? 255 : col);     /* the screen layer caps it at 80 */
             }
-            return;
+            nc = 0;
+            break;
         }
-        else state = 0;
+        else adv = 0;
+        if (adv) { if (nc < (int)sizeof cand) cand[nc++] = (uint8_t)c; continue; }
+        /* Not (all of) the answer: what was taken for it, and this byte, belong to the typist (an arrow key typed
+         * ahead is ESC [ A). An ESC starts a new candidate. */
+        for (n = 0; n < nc; n++) if (kept < (int)sizeof other) other[kept++] = cand[n];
+        nc = 0; row = col = 0;
+        if (c == 0x1B) { state = 1; cand[nc++] = (uint8_t)c; }
+        else { state = 0; if (kept < (int)sizeof other) other[kept++] = (uint8_t)c; }
     }
+    for (n = 0; n < nc; n++) if (kept < (int)sizeof other) other[kept++] = cand[n];    /* a half answer at the timeout */
+    for (n = kept - 1; n >= 0; n--) rx_unget(other[n]);       /* in the order they came */
 }
 
 /* A lone ESC eats the key after it. */
@@ -79,6 +113,7 @@ int term_next_key(void) {
     static int last_cr = 0;
     for (;;) {
         int c = term_rx_wait();
+        if (c == TERM_ABORT) { state = 0; return TERM_ABORT; }
         if (state == 1) { state = (c == '[' || c == 'O') ? 2 : 0; continue; }
         if (state == 2) { if (c >= 0x40 && c <= 0x7E) state = 0; continue; }
         if (c == 0x1B) { state = 1; continue; }
@@ -104,6 +139,7 @@ int term_next_zscii(void) {
         int c;
         if (pending >= 0) { c = pending; pending = -1; }
         else c = term_rx_wait();
+        if (c == TERM_ABORT) return TERM_ABORT;
         if (c == '\n' && last_cr) { last_cr = 0; continue; }       /* the LF of CR+LF */
         last_cr = (c == '\r');
         if (c == '\r' || c == '\n') return 13;

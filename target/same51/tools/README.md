@@ -13,11 +13,8 @@ The ZVibe project now uses a unified multi-target build system located at the re
 cd ../../games
 ./get_games.py browse          # Download games interactively
 
-./build_games.py same51        # Build multi-game system for SAM E51
-
 cd ../target/same51
-make                           # Compile firmware
-make program                   # Program device
+make multi-program             # Generate the menu from the registry (versions 3 and 4), build, program
 ```
 
 ### Documentation

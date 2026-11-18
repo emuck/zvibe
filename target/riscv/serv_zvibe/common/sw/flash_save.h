@@ -22,6 +22,7 @@
 #define SAVE_ERR_TOO_LARGE  -3
 #define SAVE_ERR_NO_SPACE   -4
 #define SAVE_ERR_FLASH      -7
+#define SAVE_ERR_DAMAGED    -8      /* saves were written, but none is whole (a CRC mismatch) */
 
 /*
  * Scan all slots and initialize internal state (next write slot + sequence).
@@ -42,13 +43,14 @@ int flash_save_init(uint32_t base, int num_slots);
 int flash_save_write(const void *data, size_t data_len);
 
 /*
- * Read the most recent save into buf.
- * Returns number of bytes read, or SAVE_ERR_*.
+ * Read the most recent whole save into buf (a newer save that was cut short is skipped for
+ * the one before it). Returns number of bytes read, or SAVE_ERR_*: NOT_FOUND when nothing was
+ * ever written, DAMAGED when something was but no slot matches its CRC.
  */
 int flash_save_read(void *buf, size_t buf_len);
 
 /*
- * Returns 1 if a valid save exists, 0 otherwise.
+ * Returns 1 if a whole save exists (one that matches its CRC), 0 otherwise (damaged saves included).
  */
 int flash_save_exists(void);
 

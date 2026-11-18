@@ -8,7 +8,7 @@ Get ZVibe running on hardware in ~15 minutes.
 - Python 3.8+
 - UART terminal (`picocom`)
 - **MAX10**: Quartus Prime (Lite or Standard) in PATH + USB-Blaster + USB-to-UART adapter (CP2102/FT232R/CH340)
-- **Arty S7-50**: Vivado 2024.x or 2025.1 in PATH + openFPGALoader
+- **Arty S7-50**: Vivado 2025.1 or 2026.2 in PATH + openFPGALoader
 
 One-time submodule init — see [First-Time Setup](../README.md#first-time-setup--serv-submodule) for the correct command.
 

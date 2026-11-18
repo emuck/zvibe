@@ -4,7 +4,7 @@
 
 | Binary | Size | Notes |
 |--------|------|-------|
-| `zvibe_minimal` | 31,488 bytes | Host file I/O enabled; status line and save/restore disabled |
+| `zvibe_minimal` | 36,392 bytes | Host file I/O and save/restore enabled (a `.sav` file beside the story); status line disabled. 31,616 bytes before save/restore was added (measured on macOS, V3 build) |
 | `zvibe_console` | 45,456 bytes | Full-featured desktop build |
 
 The split memory architecture added ~1.2 KB (+2%) to the console binary despite a 19% source code increase — the abstraction layer compiles away almost entirely at `-O2`.

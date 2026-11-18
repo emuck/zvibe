@@ -22,4 +22,8 @@ typedef struct {
 extern const game_entry_t games[];
 extern const int num_games;
 
+/* Bytes of SmartEEPROM for each game's saves: num_games areas of this size and one more, the scratch, after them
+ * (save_store.h). Decided by the generator, games/game_builder/same51.py. */
+extern const uint32_t save_area_size;
+
 #endif /* GAME_REGISTRY_H */

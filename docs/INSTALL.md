@@ -106,7 +106,7 @@ sudo udevadm control --reload-rules
 
 ### Arty S7-50
 
-- Xilinx Vivado 2024.x or 2025.1 — `vivado` must be in PATH
+- Xilinx Vivado 2025.1 or 2026.2 (the free ML Standard license covers the Arty S7-50's Spartan-7) — `vivado` must be in PATH
 - openFPGALoader
 
 ```bash

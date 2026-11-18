@@ -10,7 +10,8 @@ have_cmd() {
 }
 
 have_xc32() {
-    have_cmd xc32-gcc || [ -x /Applications/microchip/xc32/v5.00/bin/xc32-gcc ]
+    # the Makefile finds XC32 itself under /Applications/microchip/xc32 (macOS) or /opt/microchip/xc32 (Linux)
+    have_cmd xc32-gcc || compgen -G '/Applications/microchip/xc32/v*/bin/xc32-gcc' >/dev/null || compgen -G '/opt/microchip/xc32/v*/bin/xc32-gcc' >/dev/null
 }
 
 run_step() {
@@ -33,9 +34,28 @@ run_step "Host validation (V4 enabled)" make validate-v4
 run_step "Webterm tests" make -C target/webterm/tests clean
 run_step "Webterm tests" make -C target/webterm/tests test
 
+# The RISC-V firmware's V4 player on the host: the real interpreter, screen layer and flash save
+# layer against a mock flash and a VT100 emulator (needs only the host C compiler).
+run_step "RISC-V V4 player (host)" make -C target/riscv/serv_zvibe/common/sw/tests clean
+run_step "RISC-V V4 player (host)" make -C target/riscv/serv_zvibe/common/sw/tests test
+
+# The SAM E51 save store (power cut before every page commit of a save, against a model of the SmartEEPROM) and the
+# menu generator: host tests, no board and no cross compiler needed.
+run_step "SAME51 save store (host)" make -C target/same51/tests/host clean
+run_step "SAME51 save store (host)" make -C target/same51/tests/host test
+run_step "SAME51 save store (host, sanitizers)" make -C target/same51/tests/host clean
+run_step "SAME51 save store (host, sanitizers)" make -C target/same51/tests/host test SAN=1
+run_step "SAME51 menu generator" python3 -m unittest discover -s games/tests
+make -C target/same51/tests/host clean >/dev/null 2>&1 || true
+
 if have_cmd riscv64-unknown-elf-gcc; then
     run_step "RISC-V build" make -C target/riscv/serv_zvibe/common/sw clean
     run_step "RISC-V build" make -C target/riscv/serv_zvibe/common/sw zvibe_riscv_multi.elf
+    run_step "Arty V3 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw clean
+    run_step "Arty V3 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw firmware
+    run_step "Arty V4 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw clean
+    run_step "Arty V4 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw firmware V4=1 GAME=czech
+    run_step "Arty V4 build" make -C target/riscv/serv_zvibe/boards/arty_s7_50/sw clean
 else
     echo
     echo "==> Skipping RISC-V build (riscv64-unknown-elf-gcc not found)"
@@ -48,6 +68,10 @@ if have_xc32; then
     run_step "SAME51 V4 build" make -C target/same51 clean
     run_step "SAME51 V4 build" make -C target/same51 v4
     rm -f target/same51/src/story_data.c
+    # the menu: Czech as a version 3 and as a version 4 story, in one firmware
+    run_step "SAME51 menu build" make -C target/same51 clean
+    run_step "SAME51 menu build" make -C target/same51 multi MULTI_ARGS="--story Czech3=../../games/catalog/czech.z3 --story Czech4=../../games/catalog/czech.z4"
+    make -C target/same51 clean >/dev/null 2>&1 || true
 else
     echo
     echo "==> Skipping SAME51 build (xc32-gcc not found)"

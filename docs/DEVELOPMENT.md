@@ -146,7 +146,7 @@ Or individually:
 
 ### For SAM E51 Changes
 
-1. Build multi-game: `cd games && ./build_games.py same51 && cd ../target/same51 && make`
+1. Build the multi-game menu (versions 3 and 4): `cd target/same51 && make multi` (it runs `games/build_games.py same51`)
 2. Build single-game: `make clean && make STORY_FILE=../../games/catalog/czech.z3`
 3. Test on hardware if available
 
@@ -236,4 +236,4 @@ See `.gitignore`. Key exclusions:
 - Build artifacts (`*.o`, `*.bin`, `*.bit`)
 - Simulation outputs (`*.vcd`, `*.wdb`)
 - Downloaded games (`games/catalog/*.z3` except czech.z3)
-- Generated code (`*_data.c`, `game_registry.c`)
+- Generated code (`game_registry.c`, `game_registry.mk`, `story_data.c`)

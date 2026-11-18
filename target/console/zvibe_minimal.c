@@ -8,7 +8,12 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <limits.h>
 #include "zvibe_api.h"
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
 
 static char input_buffer[256];
 
@@ -33,6 +38,89 @@ static size_t read_input(char *buffer, size_t max_length) {
     return len;
 }
 
+#if ZVIBE_ENABLE_SAVE_RESTORE
+/* Saves go to a file beside the story, named as the console player names it (game.z3 -> game.sav, any other
+ * name gets .sav appended), so a save made by either player restores in the other. */
+static char save_filename[PATH_MAX];
+
+static void setup_save_filename(const char *story) {
+    size_t len = strlen(story);
+    const char *dot = strrchr(story, '.');
+    int z3 = dot && (strcmp(dot, ".z3") == 0 || strcmp(dot, ".Z3") == 0);
+    /* ".z3" -> ".sav" is one byte longer; anything else gets ".sav" appended. Too long: no saving (never truncated). */
+    if (len + (z3 ? 1 : 4) + 1 > PATH_MAX) {
+        save_filename[0] = '\0';
+        return;
+    }
+    memcpy(save_filename, story, len + 1);
+    strcpy(save_filename + len - (z3 ? 3 : 0), ".sav");
+}
+
+/* A save file is a RAM image plus a stack: far below this. A bigger file is refused before it is read. */
+#define MAX_SAVE_FILE (1L << 20)
+
+static void do_save(zvibeContext *ctx) {
+    size_t size = zvibe_get_save_size(ctx), got;
+    int ok = 0;
+    void *buf = size ? malloc(size) : NULL;
+    if (save_filename[0] == '\0') {
+        printf("\n[Error: No save filename set]\n");
+    } else if (!buf) {
+        printf("\n[Error: Cannot save]\n");
+    } else if ((got = zvibe_get_save_data(ctx, buf, size)) == 0) {
+        printf("\n[Error: Cannot save]\n");
+    } else {
+        /* Written beside the save under another name and renamed over it, so a write that fails (a full disk) leaves the
+         * previous save as it was. */
+        char tmp_name[PATH_MAX + 5];
+        FILE *f;
+        snprintf(tmp_name, sizeof tmp_name, "%s.tmp", save_filename);
+        f = fopen(tmp_name, "wb");
+        if (!f) {
+            printf("\n[Error: Cannot create save file %s]\n", save_filename);
+        } else {
+            ok = fwrite(buf, 1, got, f) == got;
+            ok = (fclose(f) == 0) && ok;
+#ifdef _WIN32
+            if (ok) remove(save_filename);          /* rename() will not replace a file on Windows */
+#endif
+            ok = ok && rename(tmp_name, save_filename) == 0;
+            if (ok) printf("\n[Game saved to %s]\n", save_filename);
+            else { remove(tmp_name); printf("\n[Error: Failed to write save data]\n"); }
+        }
+    }
+    free(buf);
+    zvibe_save_completed(ctx, ok);
+}
+
+static void do_restore(zvibeContext *ctx) {
+    int ok = 0;
+    FILE *f = save_filename[0] ? fopen(save_filename, "rb") : NULL;
+    if (!f) {
+        printf("\n[No save file found: %s]\n", save_filename);
+    } else {
+        long size = -1;
+        if (fseek(f, 0, SEEK_END) == 0) size = ftell(f);
+        if (size >= 0 && fseek(f, 0, SEEK_SET) != 0) size = -1;
+        if (size <= 0 || size > MAX_SAVE_FILE) {
+            printf("\n[Error: Invalid save file size]\n");
+        } else {
+            void *buf = malloc((size_t)size);
+            if (buf && fread(buf, 1, (size_t)size, f) == (size_t)size) {
+                ok = zvibe_restore_data(ctx, buf, (size_t)size) == ZVIBE_OK;
+                if (ok) printf("\n[Game restored from %s]\n", save_filename);
+                else printf("\n[Error: That save does not fit this game]\n");
+            } else {
+                printf("\n[Error: Failed to read save data]\n");
+            }
+            free(buf);
+        }
+        fclose(f);
+    }
+    zvibe_restore_completed(ctx, ok);
+}
+#endif
+
 /* Records the build configuration inside the binary, so tests can verify which
  * configuration they are exercising (see `verify-console-config` in
  * tests/Makefile). Host frontends only; costs nothing on embedded targets. */
@@ -54,6 +142,9 @@ int main(int argc, char *argv[]) {
     }
 
     zvibe_set_random_seed(ctx, (int)time(NULL));
+#if ZVIBE_ENABLE_SAVE_RESTORE
+    setup_save_filename(argv[1]);
+#endif
     
     if (zvibe_load_story(ctx, argv[1]) != ZVIBE_OK) {
         fprintf(stderr, "Failed to load story\n");
@@ -73,6 +164,15 @@ int main(int argc, char *argv[]) {
             }
         } else if (result == ZVIBE_GAME_FINISHED) {
             break;
+#if ZVIBE_ENABLE_SAVE_RESTORE
+        } else if (result == ZVIBE_SAVE_REQUESTED) {
+            do_save(ctx);
+        } else if (result == ZVIBE_RESTORE_REQUESTED) {
+            do_restore(ctx);
+        } else if (result == ZVIBE_RESTART_REQUESTED) {
+            printf("\n[Restarting game]\n");
+            zvibe_restart_completed(ctx);
+#endif
         } else {
             fprintf(stderr, "Error: %d\n", result);
             break;

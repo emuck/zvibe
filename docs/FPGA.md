@@ -94,7 +94,7 @@ varies      Per-game save rings (offset stored in TOC entry)
 |------|-------|------|
 | `riscv64-unknown-elf-gcc` | ✅ | ✅ |
 | Quartus Prime (Lite/Standard) | ✅ | — |
-| Vivado 2024.x / 2025.1 | — | ✅ |
+| Vivado 2025.1 / 2026.2 | — | ✅ |
 | openFPGALoader | — | ✅ |
 
 ### MAX10

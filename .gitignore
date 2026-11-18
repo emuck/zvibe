@@ -210,3 +210,6 @@ save.dat
 # Log files
 *.logtarget/webterm/platform/posix/zvibe_webterm
 target/same51/src/.story_data.stamp
+
+# Multi-game menu firmware: generated game table and its makefile fragment
+target/same51/src/game_registry.mk

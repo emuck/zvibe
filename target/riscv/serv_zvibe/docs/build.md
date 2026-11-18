@@ -16,13 +16,13 @@ Complete build and programming reference for both supported boards.
 ### MAX10 08 Eval Board
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Quartus Prime (Lite or Standard) | FPGA synthesis + programming | `quartus_sh`, `quartus_pgm`, `quartus_cpf` must be in PATH |
+| Quartus Prime (Lite or Standard; 25.1 Lite verified) | FPGA synthesis + programming | `quartus_sh`, `quartus_pgm`, `quartus_cpf` must be in PATH (e.g. `<install>/25.1std/quartus/bin`) |
 | USB-Blaster driver | JTAG programming | Typically needs udev rule on Linux |
 
 ### Arty S7-50
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Xilinx Vivado 2024.x or 2025.1 | FPGA synthesis | `vivado` must be in PATH |
+| Xilinx Vivado 2025.1 or 2026.2 (2026.2 needs a license that covers Spartan-7: the free ML Standard one; an Alveo-only license stops with "Specified part could not be found") | FPGA synthesis | `vivado` must be in PATH (a non-interactive `ssh` does not read `.bashrc`: export it in the command, e.g. `PATH=$PATH:<install>/2025.1/Vivado/bin`) |
 | openFPGALoader | Flash programming | `sudo apt install openfpgaloader` or build from source |
 
 ### Simulation Only
@@ -94,11 +94,26 @@ make build
 # Output: build/servant_zvibe_arty_s7_50.bit
 ```
 
+Vivado 2026.2 builds the design with `make build` (3 minutes, timing met, tested on the board: the Czech gate
+passes). A build stops with an error if the worst setup slack is negative after implementation (`ARTY_ALLOW_NEGATIVE_SLACK=1` builds one anyway). If `make build` stops after synthesis with `Abnormal program termination (7)` (Vivado 2025.1 on a
+new kernel crashed writing its hardware-definition file; seen with Ubuntu 24.04, kernel 7.0), use
+the non-project flow, which builds the same design without that step:
+
+```bash
+make build-nonproject               # same output: build/servant_zvibe_arty_s7_50.bit
+```
+
+**Board shows nothing after a new Vivado version (all LEDs off, no UART).** The 100 MHz clock pin is SSTL135 and needs
+a 0.675 V reference, which the board does not supply: `arty_s7_50.xdc` sets `INTERNAL_VREF 0.675` for bank 34. Vivado
+2025.1 happened to do that on its own; 2026.2 does not, and without the line the clock input is dead. Keep it.
+On a host with other USB serial adapters, the Arty's UART is the `-if01` entry in `/dev/serial/by-id/` (the `-if00` one
+is its JTAG interface); `ttyUSB` numbers change when devices come and go.
+
 ### 2. Build Firmware + Flash Image
 
 ```bash
 cd ../sw
-make flash-test                    # Single game (Plundered Hearts)
+make flash-test                    # Single game (Restaurant)
 make flash-test GAME=hitchhiker    # Different game
 make all-games                     # All 24 catalog games
 make check-layout                  # Preview layout
@@ -118,6 +133,56 @@ make program-flash ARTY_FLASH=../sw/arty_flash_all.bin
 # Flash image only — fast update when bitstream unchanged (~30s)
 make program-flash
 ```
+
+### Version 4 stories
+
+*Status: verified on the board with Czech, the console's small test stories and Bureaucracy r160
+(see "Board results" in [V4_DESIGN.md](../../../../docs/V4_DESIGN.md)). Board tests:
+`boards/arty_s7_50/tests/test_v4_czech.py` and `test_v4_stories.py`.*
+
+A version 4 story draws its own screen, so the V4 firmware plays it through the ANSI screen
+layer on the serial terminal (use a terminal of at least 56 columns and 10 rows; the player
+asks it for its size). Build a V4 image with `V4=1` and the story:
+
+```bash
+cd boards/arty_s7_50/sw
+make ram-budget V4=1 STORY=/path/story.z4          # what it needs, line by line
+make ram-kb     V4=1 STORY=/path/story.z4          # the SoC RAM it needs: 32, 64 or 128 KB
+make flash-test V4=1 STORY=/path/story.z4          # firmware + flash image (V4=1 GAME=czech finds czech.z4)
+```
+
+The story's dynamic memory lives in RAM, with a second buffer for saves, so a big story needs
+more RAM than the 32 KB the SoC has had so far. The SoC's RAM is a bitstream parameter, and
+the firmware is linked for the size that was computed; **the two must agree.** From `fpga/`
+the same arguments do both (the Makefile asks `sw/Makefile` for the size and builds the bitstream
+with it):
+
+```bash
+cd ../fpga
+make program-complete V4=1 STORY=/path/story.z4     # bitstream (RAM_KB from the story) + flash image
+
+# or, when the bitstream on the board already has enough RAM, only the flash image
+# built above (sw/arty_flash_test.bin):
+make program-flash
+```
+
+| Story | SoC RAM |
+|---|---|
+| `czech.z4`, `generic` | 32 KB: the bitstream already on the board works, `program-flash` is enough |
+| *Nord and Bert*, *Bureaucracy* | 64 KB: rebuild the bitstream |
+| *A Mind Forever Voyaging*, *Trinity* | 128 KB: rebuild the bitstream |
+
+The player measures the terminal's size when the game starts and again at a restart, never in
+between. If you connect (or resize the window) after the game has started, the screen layout will
+not match: restart the game (a game's own RESTART, or type `~reset~` at a command prompt) and it
+measures your terminal. Connect a terminal before starting the game; a test script that answers the
+size question for you (the board tests answer 80 x 24) leaves the game with that size.
+
+Switching V4, the story or the RAM size cleans the build (`sw/.build_mode`). A V3 build is
+unchanged (byte-identical firmware). A flash image holds one V4 story for now (the firmware
+buffers are sized for it); a V3 game in the same image still takes the V3 path.
+Saves are one slot ring of 64 KB flash sectors, as for V3; a save from another release of the
+story is refused.
 
 ### UART Connection
 

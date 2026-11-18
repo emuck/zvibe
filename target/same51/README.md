@@ -18,18 +18,17 @@ make program                               # Build and program device
 - **Automatic startup**: Game launches immediately after power-on
 - **Smaller memory footprint**: Only one game in flash
 
-### Multi-Game Mode (Automatic Detection)
+### Multi-Game Menu (versions 3 and 4)
 ```bash
 cd ../../games
-./get_games.py sync                       # Regenerate registry.json from eblong.com
-./get_games.py browse                     # Download game collection
-./build_games.py same51                   # Generate multi-game files
-cd ../target/same51 && make program       # Build and program device
+./get_games.py browse                     # Download game collection (version 3 games)
+cd ../target/same51
+make multi-program                        # Generate the menu from games/registry.json, build, program
 ```
-- **Multiple games**: Interactive menu system
-- **Game selection**: Choose from menu at startup
-- **Button navigation**: Press button to return to game menu
-- **Larger game library**: Multiple Infocom classics included
+- **One firmware for both versions**: the menu plays version 3 and version 4 stories (see "The multi-game menu" below)
+- **Explicit mode**: a plain `make` is always the single-game firmware; the menu is always `make multi`
+- **Button**: the board's button returns to the menu, even from a story waiting for a key or a line
+- **Saves that survive an interrupted save**: one area per game and a write-ahead scratch (see "Saves")
 
 ## Quick Start
 
@@ -71,39 +70,38 @@ make STORY_FILE=~/games/mygame.z3 program
 ### Multi-Game Setup
 
 ```bash
-# Set up multi-game mode
 cd ../../games
-./get_games.py sync                        # Regenerate registry.json from eblong.com
-./get_games.py browse                      # Download game collection
-./build_games.py same51                    # Build multi-game system
+./get_games.py browse                      # Download game collection (version 3 games)
 cd ../target/same51
-make                                       # Build firmware with generated files
+make multi-program                         # The registry selection (games/registry.json)
 
-# Return to single-game mode
-make clean
-make STORY_FILE=mygame.z3                  # Back to single-game mode
+# the version 4 games of the registry (they live outside the catalog, excluded by default):
+make multi-program MULTI_ARGS="--only bureaucracy,trinity,amfv,nordandbert,generic-v4"
+# or any files, V3 and V4 together, with menu names:
+make multi-program MULTI_ARGS="--story Restaurant=../../games/catalog/restaurant.z3 --story Bureaucracy=~/infocom/bureaucracy.z4"
+
+# the single-game firmware again
+make STORY_FILE=mygame.z3 program
 ```
 
 ## Features
 
 ### Multi-Game System
-- **Automatic mode detection**: Builds single-game or multi-game based on `src/game_registry.c`
-- **Interactive game menu**: Select from 9+ classic Infocom games
-- **Seamless switching**: Button press returns to game selection menu
-- **Individual game saves**: Each game maintains its own save state
-- **Game library management**: Easy addition/removal of games via Python scripts
-- **Memory efficient**: Games loaded on-demand from flash
+- **Explicit build**: `make multi` generates the menu and builds it; a plain `make` is the single-game firmware
+- **Interactive game menu**: up to nine games, versions 3 and 4 in one menu
+- **Button returns to the menu**: from any story, whatever it is waiting for
+- **Individual game saves**: each game has its own save area
+- **Game library management**: `games/registry.json` and the Python scripts in `games/`, or a list of files
+- **Memory efficient**: stories are read in place from flash
 
-### SmartEEPROM Save/Restore (Both Modes)
-- **Delta compression**: Saves only bytes that differ from original game data (typically 500-2000 bytes vs 14KB+ for full saves)
-- **Per-game save slots**: 16KB SmartEEPROM divided into 8 x 2KB slots — each game gets its own independent save
-- **Graceful overflow**: Games beyond slot 8 are marked `[no save]` in the menu with clear error messages
-- **Optimized configuration**: SBLK=3, PSZ=7 (512-byte pages) for maximum performance
+### SmartEEPROM Save/Restore
+- **Optimized configuration**: SBLK=3, PSZ=7 (512-byte pages) for maximum performance, set automatically (the board resets itself once)
 - **Hardware wear leveling** for reliability (214x wear leveling factor)
-- **Fast writes**: BUFFERED mode + 32-bit word access + automatic page reallocation
 - **Persistent saves** survive power cycles
-- **Data validation** with delta magic number header
-- **Automatic fuse configuration** for optimal 16KB operation
+- **Version 3 single-game firmware**: one delta-compressed save in the whole SmartEEPROM, with a magic number and a CRC-32
+  (written in place, so a power cut during a save loses that save and the one before it; the menu and V4 firmware below do not)
+- **Version 4 and menu firmware**: the save store below. Saves are packed against the story in flash (only the bytes the game
+  changed, typically 0.4 to 2 KB), and an interrupted save never costs the save before it
 
 ### UART Interface
 - **115200 baud** serial communication
@@ -121,14 +119,15 @@ make STORY_FILE=mygame.z3                  # Back to single-game mode
 
 ```
 target/same51/
-├── Makefile                           # Auto-detecting build system (single/multi-game)
+├── Makefile                           # Build system (single game; `make multi` for the menu)
 ├── README.md                          # This file  
 ├── src/                               # Simplified peripheral drivers
 │   ├── zvibe_same51.c                 # Single-game implementation
-│   ├── zvibe_same51_multi.c           # Multi-game implementation
-│   ├── story_data.c                   # Generated from .z3 file (single-game)
-│   ├── game_registry.c                # Generated game registry (multi-game)
-│   ├── *_data.c                       # Generated game data files (multi-game)
+│   ├── story_data.c                   # Generated from the story file (single-game)
+│   ├── game_registry.c / .mk          # Generated by games/build_games.py same51 (menu)
+│   ├── smarteeprom.c                  # SmartEEPROM as a byte store (word writes, end mark, flush)
+│   ├── save_store.c                   # Saves that survive an interrupted save (areas + write-ahead scratch)
+│   ├── terminal_io.c                  # Receive ring, key decoding, size probe, button abort (V4 and menu)
 │   ├── save_delta.c                   # Delta compression for saves
 │   ├── clock.c                        # System clock configuration
 │   ├── dma.c                          # DMA controller
@@ -157,7 +156,7 @@ target/same51/
     └── README.md                      # Migration guide to unified build system
 ```
 
-**Note:** Multi-game files (game_registry.c, *_data.c) are generated by `../../games/build_games.py` and placed in the `src/` directory. Game files are managed centrally in `../../games/`.
+**Note:** the menu's files (`game_registry.c`, `game_registry.mk`) are generated by `../../games/build_games.py same51` (run by `make multi`) into `src/`. Game files are managed centrally in `../../games/`.
 
 ### Peripheral Drivers
 
@@ -258,6 +257,83 @@ Save and restore of Bureaucracy has been verified on the board.
 `terminal_io.c` holds the interrupt-driven receive ring and key decoding that
 the screen demo shares.
 
+### The multi-game menu (versions 3 and 4)
+
+`make multi` builds one firmware with several stories and a menu; `make multi-program` builds and programs it.
+There is one firmware and one generator for the menu, whatever mix of versions: the interpreter core plays version 3 and
+version 4 stories alike, and the version 4 player (the screen layer, the hardened save code) plays both.
+
+**Which games.** The generator is `games/build_games.py same51` (`games/game_builder/same51.py`); `make multi` runs it.
+
+```
+make multi-program                                   # the games selected in games/registry.json
+make multi-program MULTI_ARGS="--only bureaucracy,trinity,amfv,nordandbert,generic-v4"
+make multi-program MULTI_ARGS="--story Restaurant=../../games/catalog/restaurant.z3 \
+                               --story Hitchhiker=$HOME/infocom/hitchhiker.z3 \
+                               --story Bureaucracy=$HOME/infocom/library/z4/bureaucracy/bureaucracy-r116-s870602.z4"
+```
+- `registry.json` is the catalog: each entry has an `id`, a `name`, a story file (in `games/catalog/`, or a `path` elsewhere,
+  as the version 4 stories of a personal library are) and `exclude: true` for the ones that are not in the default selection.
+  The default selection is packed into the flash budget in registry order; `--only id,id` picks exactly those, in that order,
+  even excluded ones. `./game_manager.py` edits the selection. `--story [Menu name=]file` ignores the registry.
+- The generator checks every story the way the firmware's loader does (a version 3 or 4 story within the core's size limit,
+  header addresses inside the file) and writes `src/game_registry.c` (the stories and the table) and `src/game_registry.mk`
+  (story buffer, game count), both carrying one generation id that the Makefile checks. Nothing is rewritten when nothing changed.
+- Up to nine games (the menu takes one digit). The story buffer is sized for the largest.
+
+**The TUI.** `games/game_manager.py` is an interactive way to choose the games (`pip install -r ../../games/requirements.txt`
+gives the nicer menu; a plain text one is the fallback). It lists every registry game, version 3 and 4, with its size and whether
+the story file is present. Type a number to tick or untick a game, `d` downloads missing ones, `b` writes the generated files for
+a target, `q` quits. Notes:
+- Your choices are saved into `games/registry.json` (the `exclude` flags), so they also set what a plain `make multi` builds.
+- The budget line adds up everything ticked, V3 and V4 together, against the story budget (973,824 bytes, about 951 KB). If it is
+  over, SAM E51 is not offered as a target: untick games first (the default V3 games are ticked until you change them).
+- Quit with `q`: that saves your choices to `games/registry.json`. Then run `make multi-program`, which regenerates `src/game_registry.c`
+  and `.mk` from the registry (so it uses what `q` saved; `b` writes those files at once, which is only needed to look at them) and compiles and programs.
+
+**The menu.** Type a number to start a game. RETURN draws the menu again and measures the terminal (do that after
+connecting). When a story ends, RETURN brings the menu back. **The board's button** (SW0) returns to the menu from any story,
+including one waiting for a key or a line; `~reset~` restarts the story that is running. Games are played at the terminal's
+size, measured at the start and at each restart.
+
+**Saves** (`include/save_store.h`, `src/save_store.c`, tested on the host in `tests/host`). The 16 KB SmartEEPROM is divided
+into *n* + 1 equal areas, in whole 512-byte pages: one per game and one shared scratch. A save is written to the scratch and read
+back, then copied into the game's area and read back again; the board says it is saved only after that. At every start, a copy
+that was interrupted (a reset, a power cut) is finished. So the previous save or the new one is always whole, in the game's
+area or in the scratch. Every record has a sequence number, a CRC-32 of its data and of its header, and a tag of the story it
+belongs to (a CRC of the story's dynamic memory, the bytes the save is packed against), so a save is never given to another
+story or release. A save that does not fit its area fails with a message and changes nothing.
+
+| games | save area | largest save |
+|---|---|---|
+| 1 (a single-game firmware) | 8,192 bytes | 8,164 |
+| 3 | 4,096 | 4,068 |
+| 5 | 2,560 | 2,532 |
+| 9 | 1,536 | 1,508 |
+
+Typical packed saves are 0.4 to 2 KB (1.7 KB for Bureaucracy after a long session). **Changing the menu moves the areas**: adding,
+removing or reordering games changes where each game's save lives, so saves made under another menu are not found (they are
+ignored, never misread). The first save after a reset can take 2 to 3 seconds; do not reset the board during a save (the store
+survives it, but the save in progress is lost).
+
+**Flash.** The SmartEEPROM takes the top of the 1 MB flash, so an image must stay under 999,424 bytes (`FLASH_LIMIT`, given to the
+linker: a bigger image does not link). Measured on the board: an image of 998,983 bytes runs and one of 1,013,983 does not
+program. The five Infocom version 4 stories (969 KB) and the 23 KB firmware make 992,244 bytes: 7 KB to spare.
+
+**Build and tests.** Settings that change what is compiled (the story buffer, the mode, any flag) are written to
+`build_*/.config`, which every object depends on, so changing them rebuilds what they affect.
+
+```
+python3 tests/test_multi.py            # the five version 4 stories: starts, quit, a save each, restore after a reset
+python3 tests/test_multi_mixed.py      # version 3 and 4 together, Czech (the V3 conformance suite), exact states after restore
+make -C tests/host test                # the save store against a model of the SmartEEPROM (power cut before every page commit)
+python3 -m unittest discover -s ../../games/tests     # the generator
+# with test hooks (EXTRA_CFLAGS=-DSAVE_TEST_HOOKS=1, never a release build): the board is made to stop at each point of a save,
+# or to "press" its button on a timer
+python3 tests/test_save_power_cut.py   # a power cut at each of five points of a save: the old or the new save comes back whole
+python3 tests/test_button.py           # the button at a line prompt, at a key prompt, at the menu
+```
+
 ## Hardware Requirements
 
 ### SAM E51 Curiosity Nano
@@ -266,7 +342,7 @@ the screen demo shares.
 - **RAM**: 256KB (sufficient for Z-machine execution)
 
 ### Development Tools
-- **XC32 Compiler**: Microchip toolchain (v4.60+ or v5.0+); see macOS notes below
+- **XC32 Compiler**: Microchip toolchain (v4.60+ or v5.0+); see the macOS and Linux notes below
 - **edbg Programmer**: Cross-platform CMSIS-DAP programmer
 - **Python 3**: For story file conversion
 - **Terminal Program**: 115200 baud serial connection (picocom, minicom, screen)
@@ -295,6 +371,15 @@ edbg -l    # should show: nEDBG CMSIS-DAP
 Both v4.60 and v5.0+ work correctly. v5.0+ requires the SAME51 Device Family Pack (DFP),
 which is installed automatically when you install MPLAB X or via `mchp-packs-cli`.
 The Makefile auto-detects the latest installed version; override with `make XC32_VERSION=v4.60`.
+
+### Linux Setup
+
+Tested on Ubuntu 24.04 with XC32 v4.60 and v6.25 installed under `/opt/microchip/xc32/`; the Makefile finds the
+newest version there on its own (`make XC32_VERSION=v4.60` picks one). Build `edbg` as above (`sudo cp edbg
+/usr/local/bin/`) and add a udev rule if `edbg -l` needs `sudo`. The board's serial port is `/dev/ttyACM0` (the
+tests in `tests/` look for `/dev/ttyACM*` as well as `/dev/cu.usbmodem*`, or take the port as an argument). Other USB
+serial adapters can come first: check `ls /dev/serial/by-id/`. The host tests (`tests/host`, the menu generator)
+need only a C compiler and Python 3, and run with `scripts/ci-source-check.sh`.
 
 #### UART Timing
 The firmware shows **"Press RETURN to start..."** at boot and waits — so you will never miss the game output.
@@ -333,43 +418,13 @@ rm catalog/unwanted_game.z3
 cat registry.json                          # View game metadata
 ```
 
-### Build Mode Switching
+### Build Modes
 ```bash
-# Switch to multi-game mode
-cd ../../games
-./get_games.py sync                        # Regenerate registry.json from eblong.com
-./get_games.py browse                      # Download games to registry
-./build_games.py same51                    # Generate multi-game files
-cd ../target/same51
-make clean && make                         # Builds multi-game
-
-# Switch to single-game mode
-make clean && make STORY_FILE=mygame.z3    # Builds single-game
+make multi                                  # the menu (generates src/game_registry.c and .mk first)
+make STORY_FILE=mygame.z3                   # one version 3 game
+make v4 STORY_FILE=mygame.z4                # one version 4 game (the full-screen player)
 ```
-
-### Testing SmartEEPROM
-```bash
-make test                           # Run comprehensive hardware tests
-# Connect terminal at 115200 baud, press button to start tests
-```
-
-### Running UART Game Tests
-To run the fully automated test suite:
-
-```bash
-cd tests
-./test_uart.py
-```
-
-The test script will automatically:
-2. **Build** the firmware with the game embedded  
-3. **Program** the SAM E51 device via edbg
-4. **Execute** the complete game test via UART
-5. **Verify** successful game completion
-
-**Prerequisites**: SAM E51 Curiosity Nano connected via USB, XC32 compiler, edbg programmer installed.
-
-Automated testing requires only device connection.
+The mode is never guessed from the files present: a plain `make` is the single-game firmware, `make multi` the menu.
 
 ### Build Variants
 - **Production**: Use SmartEEPROM variant for release builds
@@ -385,17 +440,17 @@ Automated testing requires only device connection.
 | No UART output after programming | Firmware waits at "Press RETURN to start..." — connect terminal and press Enter; or type `~reset~` + Enter |
 | No UART output at all | Check 115200 baud, 8N1 settings; verify edbg programmed device (check `edbg -l`) |
 | Game doesn't start | Verify story file exists and is valid Z-machine |
-| Save/restore fails | Run `make test` to verify SmartEEPROM |
+| Save/restore fails | Run the save tests (`tests/test_save_power_cut.py` for the menu firmware, `tests/test_uart.py` for the single-game one) |
 | Build errors | Check XC32 compiler installation |
 | Programming fails | Verify edbg and SAM E51 connection |
 | **Multi-Game Issues** | |
-| Menu doesn't appear | Verify games are in `../../games/registry.json` and downloaded |
-| Game selection fails | Check game number (1-9) and press Enter |
-| Button doesn't return to menu | Hardware button should be connected to EIC_PIN_15 |
-| Build fails in multi-game mode | Run `cd ../../games && ./build_games.py same51` to regenerate |
+| Menu doesn't appear | Press RETURN (the board draws it before a terminal is connected); check `make multi` found the stories |
+| Game selection fails | Type the game's number (1-9); RETURN redraws the menu |
+| Button doesn't return to menu | The button is SW0 on the Curiosity Nano (EIC_PIN_15) |
+| "not from the same generation" | Run `make multi` again (the two generated files must come from one run) |
+| Link error "Unable to find space" | The image is over `FLASH_LIMIT`: take a game out |
+| A restore says "[The saved game is damaged]" / "[No saved game found]" | The message says what was found; a menu change moves the saves (see the menu section) |
 | **Single-Game Issues** | |
-| Wrong build mode detected | Use `make STORY_FILE=<file> program` (combined command) |
-| `make program` switches to multi-game | Run `make STORY_FILE=<file> program` in single command |
 | Custom game not found | Check `STORY_FILE` path is correct and file exists |
 
 ### Debug Information
@@ -405,7 +460,7 @@ Automated testing requires only device connection.
 
 ### Getting Help
 1. **Check build output**: Error messages are usually descriptive
-2. **Run tests**: `make test` for hardware validation
+2. **Run tests**: the board tests in `tests/` (each file says how to build and flash for it); `make -C tests/host test` needs no board
 3. **Check documentation**: `tests/smarteeprom/README_SMARTEEPROM.md` for details
 4. **Verify connections**: UART at 115200 baud, USB connected
 
@@ -416,7 +471,7 @@ Automated testing requires only device connection.
 - **Multi-Game Mode**: ~430KB flash, ~25KB RAM (4 games embedded)
 - **SmartEEPROM**: 16KB allocated, 2-12KB used per save
 - **Z-machine Games**: Variable RAM usage based on game complexity
-- **Game Storage**: Each game 80-130KB in flash (compressed)
+- **Game Storage**: Each game 80-130KB in flash (stored as is, not compressed)
 - **Flash Limits**: Conservative 550KB / Aggressive 750KB / Max 950KB game data
 
 ### Performance

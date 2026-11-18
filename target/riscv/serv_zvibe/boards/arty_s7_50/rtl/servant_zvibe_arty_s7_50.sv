@@ -10,7 +10,13 @@
  */
 
 
-module servant_zvibe_arty_s7_50 (
+module servant_zvibe_arty_s7_50 #(
+    // SoC RAM in KB: a power of two, 32 for version 3 games. Larger version 4 stories need
+    // more (the firmware's `make ram-kb` says how much). Override: Vivado -generic RAM_KB=64,
+    // set by fpga/build.tcl from the ARTY_RAM_KB environment variable. The firmware must be
+    // linked for the same size (sw/Makefile passes --defsym=__ram_size).
+    parameter int RAM_KB = 32
+) (
     // 100MHz clock input
     input  logic clk_100mhz,
 
@@ -165,7 +171,7 @@ module servant_zvibe_arty_s7_50 (
     servant_zvibe #(
         .memfile(""),                      // No preload — XIP direct boot
         .reset_pc(32'h80100100),           // Boot directly into XIP firmware
-        .memsize(32*1024),                 // 32KB RAM
+        .memsize(RAM_KB*1024),             // RAM (32KB unless built for a large V4 story)
         .reset_strategy("MINI"),
         .with_csr(0),                      // Minimal RV32I
         .UART_PRESCALE(181),               // 166.66MHz / (115200 * 8) ≈ 181

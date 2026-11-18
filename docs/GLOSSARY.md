@@ -54,7 +54,7 @@ Canonical terminology for the ZVibe project.
 | Artifact | Description |
 |----------|-------------|
 | `zvibe_console` | Console executable with full features |
-| `zvibe_minimal` | Console executable without save support |
+| `zvibe_minimal` | Console executable without the status line or terminal handling (it does save and restore, to a `.sav` file beside the story) |
 | `zvibe_riscv_multi.bin` | Multi-game RISC-V firmware |
 | `games.bin` | TOC and concatenated game data |
 | `flash_image_multi.bin` | Combined firmware and games for flash programming |

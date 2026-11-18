@@ -9,6 +9,9 @@ set design_name "servant_zvibe_arty_s7_50"
 set part "xc7s50csga324-1"
 set build_dir "build"
 
+## A bitstream from an earlier build must not survive a build that fails (timing, an error): the Makefile would program it
+file delete -force $build_dir/$design_name.bit
+
 ## Create project
 create_project -force $design_name $build_dir -part $part
 
@@ -16,6 +19,12 @@ create_project -force $design_name $build_dir -part $part
 set_property target_language Verilog [current_project]
 set_property default_lib work [current_project]
 set_property top servant_zvibe_arty_s7_50 [current_fileset]
+
+## SoC RAM size in KB (default 32; larger for version 4 stories, see sw/Makefile `ram-kb`)
+set ram_kb 32
+if {[info exists ::env(ARTY_RAM_KB)]} { set ram_kb $::env(ARTY_RAM_KB) }
+puts "SoC RAM: ${ram_kb} KB"
+set_property generic "RAM_KB=${ram_kb}" [current_fileset]
 
 ## Path configuration
 # Common RTL (shared across boards)
@@ -88,14 +97,23 @@ open_run synth_1
 ## Generate utilization report
 report_utilization -file $build_dir/utilization_synth.txt
 
-## Run implementation
-launch_runs impl_1 -to_step route_design
+## Run implementation. Post-route physical optimization runs only if timing is not met after routing (the 128 KB SoC was
+## 9 ps short); a design that meets timing is left as routed.
+set_property STEPS.POST_ROUTE_PHYS_OPT_DESIGN.IS_ENABLED true [get_runs impl_1]
+launch_runs impl_1 -to_step "phys_opt_design (Post-Route)"
 wait_on_run impl_1
 open_run impl_1
 
 ## Generate post-implementation reports
 report_utilization -file $build_dir/utilization_impl.txt
 report_timing_summary -file $build_dir/timing_summary.txt
+
+## A bitstream that does not meet timing is not written (set ARTY_ALLOW_NEGATIVE_SLACK=1 to build one anyway)
+set wns [get_property SLACK [get_timing_paths -max_paths 1 -setup]]
+puts "Worst setup slack after implementation: $wns ns"
+if {$wns < 0 && ![info exists ::env(ARTY_ALLOW_NEGATIVE_SLACK)]} {
+    error "timing not met: worst setup slack $wns ns (see $build_dir/timing_summary.txt)"
+}
 
 ## Generate bitstream
 launch_runs impl_1 -to_step write_bitstream

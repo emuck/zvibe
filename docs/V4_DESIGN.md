@@ -354,8 +354,8 @@ each is a separate commit.
      covers the opcodes and streams directly; `test_screen.c` the layer alone.
 
    **Deferred from this slice:**
-   - Frontend migrations are separate work: RISC-V firmware. The console and the SAME51 single-game firmware are
-     done, see below.
+   - Frontend migrations are separate work: the console, the SAME51 single-game firmware and the
+     Arty S7-50 firmware (host-tested and run on the board) are done, see below.
    - Public status and room queries are V3-shaped.
    - `get_next_prop` on a property that does not exist.
    - Timed input.
@@ -419,7 +419,8 @@ each is a separate commit.
      `v4bigsave.z4` (21 KB save) pass their scripts; a save from another release
      of a story is refused.
    - Bureaucracy (r116) played on the board with a real save and restore: verified.
-   - Not yet done: the multi-game SAME51 firmware and RISC-V firmware.
+   - Not yet done: the multi-game SAME51 firmware, the MAX10 firmware, and the open Arty items in
+     item 9 (see there).
 8. **Webterm.** In a `ZVIBE_ENABLE_V4` build a V4 story gets a 24x80 ANSI screen
    layer in the session; its terminal bytes go to the browser in `screen` frames
    and `zterm.js` (a small VT100 emulator, checked against the console tests' C
@@ -430,6 +431,120 @@ each is a separate commit.
    cartographer follows V3 stories only. Future upgrade: phone keyboard (a hidden focused input and on-screen arrow/Escape keys; the page takes keys from `keydown`, so no keyboard appears on a phone). Not done: window
    resizing (the size is fixed by the server), scrollback of the lower window, and
    `zvibe-duo.html`. `make -C target/webterm/tests test` runs everything.
+
+9. **RISC-V (Arty S7-50).** `make flash-test V4=1 STORY=<file.z4>` in
+   `target/riscv/serv_zvibe/boards/arty_s7_50/sw` builds the V4 firmware: the interpreter with
+   `ZVIBE_ENABLE_V4`, the screen layer, and a V4 player (`common/sw/zvibe_riscv_v4.c`) that
+   follows the SAME51 one: size probe, line and key input, saves packed against the story with
+   a story identity and a CRC-32 into the flash save slots. A story that is not V4 takes the
+   unchanged V3 path, so one flash image can mix both. The firmware is sized for the story: the
+   Makefile works out the RAM it needs (`ram_budget.py`), links for it, and `fpga/Makefile`
+   builds the bitstream with the same `RAM_KB` (the SoC's RAM was a hard-wired 32 KB; the
+   default is unchanged). Small V4 stories (Czech, `generic`) fit the 32 KB bitstream already
+   on the board; *Bureaucracy* and *Nord and Bert* need 64 KB, *AMFV* and *Trinity* 128 KB
+   (table in [V4_MEMORY.md](V4_MEMORY.md)). **V3 firmware was byte-identical** to the build
+   before this slice (`cmp` of the `.bin`; the later object-0 fix added 44 bytes). The player is tested on the host
+   (`common/sw/tests`, 191 checks): the real interpreter, screen layer and flash save layer
+   on a mock NOR flash that enforces erase-before-program, with a VT100 emulator as the
+   terminal; mutation-checked (CRC, each identity field, input limit, key decoding, flash
+   errors, size probe).
+   **Board results (Arty S7-50, 13 November 2026):** on the 32 KB bitstream already on the board
+   (user flash region written only): Czech V4 gate, 386 performed, 367 passed, 0 failed, 19 print
+   tests, the same as frotz and the console (`tests/test_v4_czech.py`); `v4keys` (Return, the four
+   arrows, Delete, a lone Escape and the key after it, CR LF as one key), `v4lines` (editing, the
+   39-character limit), `v4screen` (reverse-video bar, bold, positioned text, 80 x 24 reported to
+   the story), `v4save` (save, power cycle, restore with result 2, the newer of two saves), and
+   story identity (a changed release, serial number or checksum refused) all pass
+   (`tests/test_v4_stories.py`, 61 checks). On a 64 KB bitstream (`ARTY_RAM_KB=64`): *Bureaucracy*
+   r160 plays, with the licence form, the status line, a save, a restart of the SoC and a restore
+   back to the saved room. That bitstream meets timing (worst setup slack +0.043 ns against +0.288 ns
+   for the 32 KB design) and uses 17.5 of 75 block RAM tiles.
+   **A hang found by playing *Bureaucracy* (r160) on the board:** after the stamp, `take mail` stopped the game
+   dead. Replayed on the host from the published walkthrough, it ended in the interpreter's fatal-error handler,
+   which spins forever on an embedded target: "Missing property obj=0, prop=1F", a `put_prop` on object 0. Fixing
+   that exposed `insert_obj` on object 0 (a null-pointer write). Every object opcode now takes object 0 as "no
+   object" (`test_objects.c`, V3 and V4), and the handler prints a message before it stops.
+   **The blank object name is not an interpreter bug:** in release 160 (serial 880521) the same turn prints
+   "You do find a , though." and a room text prints "lies at your feet  .". Release 116 (serial 870602, the
+   "Masterpieces" file) prints "You do find a Popular Paranoia magazine, though." through the same interpreter.
+   The cause is release 160's data: the routine that rotates through the mail list reads the list's words from
+   offset 3 of the table, and the table's words start at offset 4 (one header byte too many; release 116's routine
+   and table agree). `dfrotz`, run on a patched copy of the story that calls the routine directly, returns the same
+   values as zvibe (0, 0xCF00, 0xF700), so frotz shows the blank too. Nothing in zvibe is changed for it; play
+   release 116 if the blank matters.
+   **Terminal size:** the player measures it at the start of a game and at a restart (a restart
+   found stale text when the game believed the terminal was smaller than it was: a script had
+   answered the size question at game start, and a bigger terminal connected later; the layer
+   clears only the rows it believes exist). It does not follow a resize in between, which a serial
+   line cannot report: restart the game after resizing. `test_restart_measures_the_terminal_again`
+   covers the restart.
+   **Played through:** *Bureaucracy* r116 (serial 870602, "Masterpieces" file) was played by hand from start to
+   finish on the 64 KB design, with save and restore, after the fixes below (13 November 2026). Release 160 hung
+   at `take mail` and prints a blank object name (see below), which is why r116 is the release to use.
+   **Vivado 2026.2 (17 November 2026, sarastro).** The Arty builds with Vivado 2026.2 in both flows; the project flow
+   (`make build`) no longer crashes after synthesis. 2026.2 needed one change in the constraints: the 100 MHz clock pin
+   (R2) is `SSTL135` and needs a 0.675 V reference that the board does not supply at the bank's VREF pin; Vivado 2025.1
+   made one internally, 2026.2 does not, and the clock input was dead (no LED, no UART; found with a diagnostic
+   bitstream that showed the raw clock, the MMCM lock, the system clock and the reset on the LEDs).
+   `arty_s7_50.xdc` now sets `INTERNAL_VREF 0.675` for bank 34. Both scripts also run a post-route physical optimization
+   when timing is not met after routing (the 128 KB design was 9 ps short at first). With 2026.2, on the board:
+   the Czech V4 gate (386 performed, 367 passed, 0 failed, 19 print tests), the V4 test stories (63 checks), the V3
+   baseline (Restaurant, 212 steps) and a host test of 199 checks on the 32 KB design; *Bureaucracy* r116 on the 64 KB
+   design, and *Trinity* r15 and *A Mind Forever Voyaging* r77 on a 128 KB design: each plays, saves, moves, restores to
+   the saved place, and restores again after a power cycle (`tests/test_v4_bureaucracy.py`, `tests/test_v4_big_stories.py`).
+   Timing met for all three designs (worst setup slack +0.02 ns, +0.13 ns and +0.01 ns for 32, 64 and 128 KB; these are
+   thin margins). The bitstreams were loaded into the FPGA's SRAM; none was written to flash.
+   **Still not verified:** the 4 KB stack budget was not measured; the wait loops were calibrated on the board earlier
+   (247 iterations per millisecond); power-cycling with a 64 KB or 128 KB bitstream written to flash (they were loaded
+   into SRAM); a long play of *Trinity* and *A Mind Forever Voyaging* beyond the start and one move. `flash_save.c`
+   writes a slot's header before its data, so a power cut during a save used to leave the newest slot looking valid and a
+   restore failed although the save before it was intact. It now checks the CRC-16 it stores: a slot whose data does not
+   match is passed over for the next newest, the next save goes to that damaged slot (never erasing the good one), and when
+   no slot is whole the read says SAVE_ERR_DAMAGED (the V3 player has no checksum of its own, so it must not be handed damaged
+   bytes). A sequence number past 2^24 is read as a torn field and ignored. Host test
+   with 2 and 4 slots and five cut points; not yet run on the board's real flash (the board tests of saves still apply). The MAX10 board (176 KB flash for everything) is not attempted.
+
+10. **SAM E51 multi-game menu, versions 3 and 4.** `make multi` (`target/same51`) builds one firmware with a menu over up to
+   nine stories of either version: the single-game V4 player (so every fix of it applies) with the menu on top; the core plays
+   V3 and V4 alike. One generator (`games/build_games.py same51`) reads `games/registry.json` (the V4 entries point at files
+   outside the catalog) or a list of files, checks every story as the loader does, and writes the story table and the story
+   buffer size with one generation id. The older V3-only multi firmware and the V4-only generator were removed; a plain `make`
+   is always the single-game firmware (the mode used to be guessed from the generated file's presence).
+   **Saves** are a separate module, `save_store.c`, on a SmartEEPROM module of its own (`smarteeprom.c`): the 16 KB is *n* + 1
+   equal areas, one per game and a write-ahead scratch. A save goes to the scratch and is read back, then to the game's area and is
+   read back; at every start an interrupted copy is finished. Records carry a sequence number, CRCs of header and data, and a tag
+   of the story (a CRC of the packing base, the story's dynamic memory). Why the scratch: a save that overwrites the old one in
+   place can lose both to a reset (found by an adversarial review; two records per game would have halved every area, which does not
+   leave a 7-game V3 menu room for the Restaurant's first save). A single-game firmware has a 8 KB area and an 8 KB scratch (it
+   had 16 KB); a V3-only firmware is unchanged, byte for byte, and keeps its single record.
+   **Verified.** On the host (`tests/host/test_save_store.c`, 187 checks, ASan and UBSan clean): a model of the SmartEEPROM that
+   commits a page at a time, with a power cut injected before every page commit of a save, for 1, 3, 5 and 9 games and for small,
+   shrinking, largest and tiny saves; commits that are silently lost; every bit flipped; a 1500-step random soak with cuts. Seven
+   deliberate defects (no recovery, no scratch, no read-back of either copy, no header or data CRC check, no tag check) each fail it.
+   On the board: the menu of five V4 stories, and a mix of three V3 stories (Restaurant, Hitchhiker's, Czech: 368 tests, 0
+   failed, 19 print tests) and two V4 stories, play, quit and save in their own areas; every game restores to its exact turn count
+   after a reset (`test_multi.py`, `test_multi_mixed.py`); with the test hooks, the board stopped at each of five points of a save
+   in two games and every restore returned a whole save, the old one before the scratch was committed and the new one after (the
+   recovery from the scratch worked on the hardware); the board's button returns to the menu from a line prompt, a key prompt and
+   the menu (`test_button.py`). The single-game V4 tests (screen, save, 21 KB save, identity, save over a large one) pass.
+   **Found on the way.** The SmartEEPROM can leave a game's record unreadable after a write that a reset interrupted, and an
+   identical re-save did not repair it while a save of different content did; it could not be reproduced once the board was left to
+   finish its writes, and the cause is not established (it is why the save is read back and why the tests never reset the board
+   during a save). The first save after a reset takes 2 to 3 seconds. Codex's adversarial review (14 findings) led to the save
+   store, the explicit build modes, the config stamp (objects used to survive a changed story buffer), the linker flash limit
+   (the size check used to run only in one recipe), the button at prompts, the probe that swallowed typing, stricter story
+   validation and the generation id; two findings are documented limits: **changing the menu moves the save areas** (old saves are
+   ignored, never misread), and the story tag is a CRC of the dynamic memory, so a modified story with the same dynamic memory
+   and header fields would be accepted as the same story.
+   **Known limits (a second adversarial review).** Every save first finishes a copy still pending in the scratch; if that copy
+   fails again (the media refusing writes twice) the save goes on and reuses the scratch, so a cut during it can lose the pending
+   save as well. Typing ahead during the terminal-size probe is kept up to 16 bytes (a longer escape candidate is kept up to 24);
+   more is dropped, and a receive interrupt that fills the last free slot of the 256-byte ring between the pushback's check and
+   its write could make the ring look empty (needs a ring that is nearly full while the probe runs). The recovery's repeated
+   record scans cost a few header reads per save.
+   **Not done.** Saves from deep in Trinity or A Mind Forever Voyaging (the area for five games is 2.5 KB; early saves were 0.4 to
+   0.6 KB); a power cut during the first save after programming a new image was not specifically tested; the RISC-V player still
+   identifies a story by header fields, not by the packing base.
 
 ### Proving "zero cost"
 

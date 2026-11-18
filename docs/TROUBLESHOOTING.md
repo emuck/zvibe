@@ -125,7 +125,7 @@ lsusb | grep Altera   # verify USB-Blaster appears
 
 **Fix:**
 1. Clean and rebuild: `make clean && make build`
-2. Check Vivado version (2024.x or 2025.1 required)
+2. Check Vivado version (2025.1 or 2026.2)
 3. Review `build/servant_zvibe_arty_s7_50.runs/synth_1/runme.log`
 
 ## SAM E51 Target

@@ -5,6 +5,89 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `zvibe_minimal` saves and restores (it could not before): `save` writes `<story>.sav` beside the story, named as the console
+  player names it, so either player restores the other's save; a missing, damaged or unwritable file is refused with a message
+  and the game goes on; a game's RESTART works too. It grows by 4.8 KB (31,616 to 36,392 bytes). Test:
+  `target/console/tests/test_minimal_save.sh` (part of `make test-integration`). The minimal player's API object used to be built
+  with save/restore forced off while the player itself was built with it on, so the result codes did not agree in V4 builds.
+- SAM E51: `make multi`, one firmware with a menu over up to nine games of version 3 or 4, and one generator for it
+  (`games/build_games.py same51`, from `games/registry.json` or `--story [Name=]file`; `--only id,id` picks registry games
+  including the version 4 ones, which live outside the catalog). The board's button returns to the menu from any story, also
+  one waiting for a key or a line. Verified on the board with the five Infocom V4 stories, and with V3 games (Czech included)
+  beside V4 games.
+- SAM E51 (V4 and menu firmware): saves that survive an interrupted save (`save_store.c`): one area per game and a write-ahead
+  scratch, a save read back before it is reported, an interrupted copy finished at the next start, records with sequence number,
+  CRCs and a story tag. Tested on the host against a model of the SmartEEPROM with a power cut before every page commit, and on the
+  board with a test hook that stops the board inside a save. A single-game V4 firmware has an 8 KB save area (it had 16 KB).
+  Saves of earlier firmware are ignored once.
+- SAM E51: `smarteeprom.c` (the SmartEEPROM as a byte store, shared by the V3 firmware, which includes it into its own file so
+  the V3 image stays byte for byte as it was), the flash limit as the linker's region (`FLASH_LIMIT`, 0xF4000), a config stamp
+  so that a changed story buffer or setting rebuilds what depends on it, and the generated table and makefile fragment sharing
+  a generation id the Makefile checks.
+- Board tests `test_multi.py`, `test_multi_mixed.py`, `test_save_power_cut.py` and `test_button.py` (the last two need a build
+  with `EXTRA_CFLAGS=-DSAVE_TEST_HOOKS=1`), host tests `tests/host/test_save_store.c` and `games/tests/test_same51_builder.py`.
+- A restart in the V4 firmware (SAM E51) measures the terminal again, as the Arty player does.
+- Arty S7-50 (RISC-V) version 4 firmware: `make flash-test V4=1 STORY=<file.z4>` in
+  `target/riscv/serv_zvibe/boards/arty_s7_50/sw`. A V4 player on the screen layer with saves packed against
+  the story (story identity and CRC-32), sized for the story: `make ram-kb` / `make ram-budget` say how much
+  SoC RAM it needs, and the SoC's RAM is now a bitstream parameter (`ARTY_RAM_KB`, default 32, unchanged).
+  Host-tested, and run on the board: Czech V4 gate, the small V4 test stories (keys, lines, split screen,
+  save and restore across a power cycle, story identity) on the 32 KB design, and *Bureaucracy* r160 on a
+  64 KB design (r116 played through, with save and restore). V3 firmware was byte-identical to before this slice (the object-0 fix above then added 44 bytes).
+- Arty S7-50: the bitstream builds with Vivado 2026.2 (project flow works again, timing met, Czech V4 gate passed on the
+  board). The constraints now set `INTERNAL_VREF 0.675` for bank 34: the 100 MHz clock pin is SSTL135 and the board gives
+  no reference at the VREF pin; Vivado 2025.1 supplied one on its own, 2026.2 does not, and without it the clock input
+  is dead (no LED, no UART).
+- Arty S7-50: post-route physical optimization when timing is not met after routing (both Vivado scripts); the 128 KB
+  design was 9 ps short without it. Board tests `test_v4_bureaucracy.py` (Bureaucracy r116, 64 KB) and
+  `test_v4_big_stories.py` (Trinity r15 and A Mind Forever Voyaging r77, 128 KB), all passing with Vivado 2026.2;
+  `test_v4_stories.py` takes `ARTY_BITSTREAM=<file.bit>` to test a bitstream before it is in flash.
+- `make build-nonproject` in the Arty `fpga/` directory: the same bitstream by Vivado's non-project flow,
+  for hosts where the project flow crashes after synthesis (Vivado 2025.1, kernel 7.0).
+- Board tests `test_v4_czech.py` and `test_v4_stories.py` (`boards/arty_s7_50/tests`).
+- The RISC-V link fails if `.data` and `.bss` leave less than 2 KB for the stack.
+
+### Changed
+- SAM E51: a plain `make` is always the single-game firmware; the menu is `make multi`. It used to switch to the menu when a
+  generated `game_registry.c` was lying around. `make multi` replaces the V3-only multi-game firmware and `./build_games.py same51
+  && make`; the old `zvibe_same51_multi.c` and `tools/v4_games_to_c.py` are gone.
+- SAM E51 V4 and menu firmware: the terminal-size probe no longer swallows what the player typed ahead, and a stream of digits can
+  no longer overflow it; a command may be as long as the story's text buffer takes (it was cut at 79 characters); a restore says why
+  it failed (no save, damaged, another story, unavailable).
+
+### Fixed
+- A save file with a wild program counter or base pointer is refused by the core's restore (the base pointer indexes the stack
+  unchecked, so a hand-edited save could reach outside it); the frames on the stack are still trusted. The console and minimal
+  players wrote one byte past their save-file-name buffer for a story path of exactly the buffer's length ending in `.z3`
+  (found with AddressSanitizer); a path too long gets no save file name. The minimal player writes a save through a temporary
+  file and renames it, so a failed write keeps the previous save, and refuses a save file over 1 MB before reading it.
+- RISC-V flash saves (Arty and MAX10, V3 and V4): a power cut during a save left the newest slot with its header and
+  partial data, and a restore then failed although the save before it was intact. The reader now checks each slot's CRC-16 and
+  falls back to the next newest, and the next save goes to the damaged slot instead of erasing the good one.
+  A sequence number past 2^24 (a header cut short) is ignored, a ring with no whole slot reads as damaged (the V3 player
+  has no checksum of its own), and `flash_save_exists()` means a whole save exists. Verified on the MAX10 with Quartus 25.1
+  (`tests/test_save_restore.py`) and on the host.
+- Arty build: a RAM-size query or a dry run of `sw/Makefile` no longer deletes the flash image (the documented `program-flash`
+  flow did), plain `make` in `fpga/` builds the bitstream, a flash image given to `program-complete` is not rebuilt, a build
+  with negative setup slack stops, and a failed build leaves no older bitstream to be programmed.
+- SAM E51 save store: the first save of a story that replaced another in its slot could be stranded by a power cut (recovery
+  compared story tags and refused to finish the copy; it now goes by sequence number), and a save right after a refused one
+  could put the only whole copy at risk (every save now first finishes a copy still pending in the scratch). The menu's size
+  probe put back only the byte that broke the answer, so an arrow key typed ahead arrived as a stray letter; it now puts back
+  the whole sequence. Found by an adversarial review; each has a host or board test.
+- Object 0 ("no object") is now accepted by every object opcode, in V3 and V4: `put_prop` on object 0 or on a
+  property the object lacks is ignored (it halted), `insert_obj` and `remove_obj` with object 0 are ignored (they
+  read and wrote through a null pointer: a segmentation fault on a host, silent corruption of RAM address 0 on
+  the RISC-V), `get_parent`, `get_sibling` and `get_child` return 0, and `jin` reads its branch for object 0
+  (it did not, so the branch bytes ran as code). Found when *Bureaucracy* hung on the Arty at `take mail`, after
+  giving a stamp away: the game sets property 31 of object 0. Frotz ignores these the same way. Costs 44 bytes
+  of flash on the RISC-V V3 firmware.
+- A fatal interpreter error on an embedded target (`ZVIBE_FREESTANDING`) used to spin silently, which looks like a
+  hung board; it now prints "The interpreter stopped on a fatal error. Reset the board." first.
+
 ## [2.1.0] - 2026-11-05
 
 ### Added

@@ -105,12 +105,17 @@ make flash-test GAME=zork1
 ### SAM E51
 
 ```bash
-./build_games.py same51
-cd ../target/same51 && make all && make program
+cd ../target/same51 && make multi-program                 # the registry selection
+# (make multi runs ./build_games.py same51 for you; run it by hand to see what it would build)
+./build_games.py same51 --only bureaucracy,trinity        # exactly these registry games, in this order
+./build_games.py same51 --story a.z3 --story Name=b.z4    # or these files (versions 3 and 4 mix freely)
 ```
 
-Generates per-game C arrays and a game registry in `target/same51/src/`. All
-selected games compile into a single firmware image (~768KB available).
+Generates `target/same51/src/game_registry.c` (the stories and the menu table) and `game_registry.mk` (the story buffer
+size); every selected game compiles into one firmware image (up to 973,824 bytes of stories in the registry's budget, nine games).
+The menu firmware plays version 3 and version 4 stories alike. The version 4 entries of `registry.json` point at story files
+outside the catalog (`path`, `~` is expanded) and are excluded from the default selection: pick them with `--only`.
+Tests of the generator: `python3 -m unittest discover -s tests`.
 
 ### Console
 
