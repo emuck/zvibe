@@ -68,23 +68,17 @@ static void setup_save_filename(const char *game_file) {
         return;
     }
     
-    /* Create save filename by replacing .z3 extension with .sav */
-    strncpy(save_filename, game_file, PATH_MAX - 1);
-    save_filename[PATH_MAX - 1] = '\0';
-    
-    /* Find the last dot to replace extension */
-    char *dot = strrchr(save_filename, '.');
-    if (dot && (strcmp(dot, ".z3") == 0 || strcmp(dot, ".Z3") == 0)) {
-        strcpy(dot, ".sav");
-    } else {
-        /* No .z3 extension, just append .sav */
-        size_t len = strlen(save_filename);
-        if (len < PATH_MAX - 5) {
-            strcat(save_filename, ".sav");
-        } else {
-            save_filename[0] = '\0';  /* Path too long */
-        }
+    /* Create save filename by replacing .z3 extension with .sav (one byte longer), or appending .sav; a path too
+     * long for either gets no save file name (it used to write one byte past the buffer for a path ending in .z3). */
+    size_t len = strlen(game_file);
+    const char *dot = strrchr(game_file, '.');
+    int z3 = dot && (strcmp(dot, ".z3") == 0 || strcmp(dot, ".Z3") == 0);
+    if (len + (z3 ? 1 : 4) + 1 > PATH_MAX) {
+        save_filename[0] = '\0';
+        return;
     }
+    memcpy(save_filename, game_file, len + 1);
+    strcpy(save_filename + len - (z3 ? 3 : 0), ".sav");
 }
 
 /* ==================== UTILITY FUNCTIONS ==================== */

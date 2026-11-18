@@ -103,6 +103,28 @@ static void test_raw_restore(void) {
     CHECK(same(&mutated));
     free(bad);
 
+    /* (a2) an execution state that points outside the machine: a program counter past the story, a base pointer past the
+     *      saved stack (it indexes the stack): both refused, the live state untouched */
+    {
+        uint32_t wild_pc = (uint32_t)G->memory_state.config.story_size;
+        zWord wild_base = (zWord)(5 + 1);                              /* the save has 5 stack words */
+        bad = malloc(save_size);
+        memcpy(bad, blob, save_size);
+        memcpy(bad + ram, &wild_pc, sizeof wild_pc);
+        CHECK(zvibe_restore_data(ctx, (const char *)bad, save_size) != ZVIBE_OK);
+        CHECK(same(&mutated));
+        memcpy(bad, blob, save_size);
+        memcpy(bad + save_size - sizeof wild_base, &wild_base, sizeof wild_base);
+        CHECK(zvibe_restore_data(ctx, (const char *)bad, save_size) != ZVIBE_OK);
+        CHECK(same(&mutated));
+        wild_base = 5;                                                 /* the boundary itself is fine */
+        memcpy(bad + save_size - sizeof wild_base, &wild_base, sizeof wild_base);
+        CHECK(zvibe_restore_data(ctx, (const char *)bad, save_size) == ZVIBE_OK);
+        set_state(50, 2, 0x999, 7);                                    /* back to the state the checks below expect */
+        take(&mutated);
+        free(bad);
+    }
+
     /* (b) one byte short: still >= the fixed minimum, so only the LATER
      *     serialized-length check can reject it */
     CHECK(save_size - 1 >= ram + 4 + 4 + sizeof(G->base_ptr));

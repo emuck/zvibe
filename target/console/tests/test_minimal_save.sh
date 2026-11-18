@@ -36,26 +36,46 @@ if [ -x "$CONSOLE" ]; then
     check "the console player restores the minimal player's save" "$(has 'Game restored from' "$out")"
 fi
 
-# no save file: refused, the game goes on
+# run a script of commands; sets $out (output) and $rc (exit status of the player)
+run() { out="$(printf "$1" | "$MINIMAL" "$2" 2>&1)"; rc=$?; }
+# the text after the first occurrence of a marker (so "the game goes on" is judged on what comes after the refusal)
+after() { local rest="${1#*"$2"}"; [ "$rest" != "$1" ] && printf '%s' "$rest"; }
+
+# no save file: refused, and the game goes on (look still answers AFTER the refusal; the player exits normally)
 rm -f "$TMP/restaurant.sav"
-out="$(printf 'restore\nlook\nquit\n' | "$MINIMAL" "$TMP/restaurant.z3" 2>&1)"
+run 'restore\nlook\nquit\n' "$TMP/restaurant.z3"
 check "restore without a file says so" "$(has 'No save file found' "$out")"
-check "and the game goes on" "$(has 'On the Ramp' "$out")"
+check "and the game goes on (the room is described after it)" "$(has 'On the Ramp' "$(after "$out" 'No save file found')")"
+check "and the player exits normally" "$rc"
 
 # a damaged file: refused, the game goes on
 printf 'this is not a save' > "$TMP/restaurant.sav"
-out="$(printf 'restore\nlook\nquit\n' | "$MINIMAL" "$TMP/restaurant.z3" 2>&1)"
-check "a damaged save is refused" "$(grep -q 'Game restored from' <<<"$out"; echo $((1 - $?)))"
-check "and the game goes on" "$(has 'On the Ramp' "$out")"
+run 'restore\nlook\nquit\n' "$TMP/restaurant.z3"
+check "a damaged save is refused with a message" "$(has 'Error: That save does not fit this game' "$out")"
+check "and the game goes on" "$(has 'On the Ramp' "$(after "$out" 'does not fit this game')")"
+check "and the player exits normally" "$rc"
+
+# a huge file is refused before it is read
+dd if=/dev/zero of="$TMP/restaurant.sav" bs=1048576 count=3 2>/dev/null
+run 'restore\nlook\nquit\n' "$TMP/restaurant.z3"
+check "a 3 MB save file is refused" "$(has 'Error: Invalid save file size' "$out")"
+check "and the game goes on" "$(has 'On the Ramp' "$(after "$out" 'Invalid save file size')")"
+
+# a path as long as the buffer, ending in .z3, does not overflow the file name (nothing to load; the one-byte overflow only
+# shows in a sanitizer build: make BUILD_DIR=build_asan EXTRA_CFLAGS='-fsanitize=address -g' and ZVIBE_BUILD=build_asan)
+long="$(python3 -c "import os; n=int(os.popen('getconf PATH_MAX /').read() or 4096); print('/tmp/' + 'a' * (n - 1 - 5 - 3) + '.z3')")"
+"$MINIMAL" "$long" >/dev/null 2>&1; r=$?
+check "a story path of exactly PATH_MAX-1 characters ending in .z3 does not crash" "$([ "$r" -lt 128 ]; echo $?)"
 
 # an unwritable place: the save fails with a message, the game goes on
 mkdir "$TMP/ro" && cp "$STORY" "$TMP/ro/restaurant.z3" && chmod 555 "$TMP/ro"
 if [ -w "$TMP/ro" ]; then
     echo "SKIP  unwritable directory (running as a user who can write anywhere)"
 else
-    out="$(printf 'save\nlook\nquit\n' | "$MINIMAL" "$TMP/ro/restaurant.z3" 2>&1)"
+    run 'save\nlook\nquit\n' "$TMP/ro/restaurant.z3"
     check "saving where it cannot says so" "$(has 'Cannot create save file' "$out")"
-    check "and the game goes on" "$(has 'On the Ramp' "$out")"
+    check "and the game goes on" "$(has 'On the Ramp' "$(after "$out" 'Cannot create save file')")"
+    check "no temporary file is left behind" "$(ls "$TMP/ro" | grep -q tmp; echo $((1 - $?)))"
 fi
 chmod 755 "$TMP/ro"
 

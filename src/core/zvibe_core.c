@@ -486,6 +486,16 @@ int z_restore_save_data(const void *data, size_t length) {
     if (stack_size > ZVIBE_STACK_WORDS) return 3; /* Invalid stack size */
     if (length - minimum_size < stack_size * sizeof(zWord)) return 2;
 
+    /* The execution state must point inside the machine: the program counter into the story, the base pointer
+     * into the saved stack (it indexes the stack unchecked). The frames on the stack are not walked: a save file is
+     * trusted beyond this (the embedded players protect theirs with a CRC; a host's file can be edited by hand). */
+    {
+        zWord saved_base;
+        memcpy(&saved_base, ptr + stack_size * sizeof(zWord), sizeof(saved_base));
+        if (pc_addr >= G->memory_state.config.story_size) return 5; /* Program counter outside the story */
+        if (saved_base > stack_size) return 5;               /* Base pointer outside the stack */
+    }
+
 #if ZVIBE_VERIFY_SAVE_IDENTITY
     /* The save must belong to the story that is running. Restoring another story's
      * (or another version's) image would put a foreign header and continuation into

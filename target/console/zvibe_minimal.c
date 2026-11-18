@@ -44,19 +44,20 @@ static size_t read_input(char *buffer, size_t max_length) {
 static char save_filename[PATH_MAX];
 
 static void setup_save_filename(const char *story) {
-    char *dot;
-    size_t len;
-    strncpy(save_filename, story, PATH_MAX - 1);
-    save_filename[PATH_MAX - 1] = '\0';
-    dot = strrchr(save_filename, '.');
-    if (dot && (strcmp(dot, ".z3") == 0 || strcmp(dot, ".Z3") == 0)) {
-        strcpy(dot, ".sav");
-    } else {
-        len = strlen(save_filename);
-        if (len < PATH_MAX - 5) strcat(save_filename, ".sav");
-        else save_filename[0] = '\0';          /* path too long: no saving */
+    size_t len = strlen(story);
+    const char *dot = strrchr(story, '.');
+    int z3 = dot && (strcmp(dot, ".z3") == 0 || strcmp(dot, ".Z3") == 0);
+    /* ".z3" -> ".sav" is one byte longer; anything else gets ".sav" appended. Too long: no saving (never truncated). */
+    if (len + (z3 ? 1 : 4) + 1 > PATH_MAX) {
+        save_filename[0] = '\0';
+        return;
     }
+    memcpy(save_filename, story, len + 1);
+    strcpy(save_filename + len - (z3 ? 3 : 0), ".sav");
 }
+
+/* A save file is a RAM image plus a stack: far below this. A bigger file is refused before it is read. */
+#define MAX_SAVE_FILE (1L << 20)
 
 static void do_save(zvibeContext *ctx) {
     size_t size = zvibe_get_save_size(ctx), got;
@@ -69,14 +70,23 @@ static void do_save(zvibeContext *ctx) {
     } else if ((got = zvibe_get_save_data(ctx, buf, size)) == 0) {
         printf("\n[Error: Cannot save]\n");
     } else {
-        FILE *f = fopen(save_filename, "wb");
+        /* Written beside the save under another name and renamed over it, so a write that fails (a full disk) leaves the
+         * previous save as it was. */
+        char tmp_name[PATH_MAX + 5];
+        FILE *f;
+        snprintf(tmp_name, sizeof tmp_name, "%s.tmp", save_filename);
+        f = fopen(tmp_name, "wb");
         if (!f) {
             printf("\n[Error: Cannot create save file %s]\n", save_filename);
         } else {
             ok = fwrite(buf, 1, got, f) == got;
             ok = (fclose(f) == 0) && ok;
+#ifdef _WIN32
+            if (ok) remove(save_filename);          /* rename() will not replace a file on Windows */
+#endif
+            ok = ok && rename(tmp_name, save_filename) == 0;
             if (ok) printf("\n[Game saved to %s]\n", save_filename);
-            else printf("\n[Error: Failed to write save data]\n");
+            else { remove(tmp_name); printf("\n[Error: Failed to write save data]\n"); }
         }
     }
     free(buf);
@@ -89,11 +99,10 @@ static void do_restore(zvibeContext *ctx) {
     if (!f) {
         printf("\n[No save file found: %s]\n", save_filename);
     } else {
-        long size;
-        fseek(f, 0, SEEK_END);
-        size = ftell(f);
-        fseek(f, 0, SEEK_SET);
-        if (size <= 0) {
+        long size = -1;
+        if (fseek(f, 0, SEEK_END) == 0) size = ftell(f);
+        if (size >= 0 && fseek(f, 0, SEEK_SET) != 0) size = -1;
+        if (size <= 0 || size > MAX_SAVE_FILE) {
             printf("\n[Error: Invalid save file size]\n");
         } else {
             void *buf = malloc((size_t)size);

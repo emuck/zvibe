@@ -59,6 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it failed (no save, damaged, another story, unavailable).
 
 ### Fixed
+- A save file with a wild program counter or base pointer is refused by the core's restore (the base pointer indexes the stack
+  unchecked, so a hand-edited save could reach outside it); the frames on the stack are still trusted. The console and minimal
+  players wrote one byte past their save-file-name buffer for a story path of exactly the buffer's length ending in `.z3`
+  (found with AddressSanitizer); a path too long gets no save file name. The minimal player writes a save through a temporary
+  file and renames it, so a failed write keeps the previous save, and refuses a save file over 1 MB before reading it.
 - RISC-V flash saves (Arty and MAX10, V3 and V4): a power cut during a save left the newest slot with its header and
   partial data, and a restore then failed although the save before it was intact. The reader now checks each slot's CRC-16 and
   falls back to the next newest, and the next save goes to the damaged slot instead of erasing the good one.
