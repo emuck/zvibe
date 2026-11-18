@@ -392,7 +392,15 @@ static void test_no_whole_slot_reads_as_damaged(void) {
     CHECK(flash_save_write(a, sizeof a) == SAVE_OK);
     flash_img[SAVE_HEADER_SIZE + 700] ^= 0x10;
     flash_save_init(0, 2);
-    CHECK(flash_save_exists());
+    CHECK(!flash_save_exists());                           /* nothing whole to offer ... */
+    CHECK(flash_save_read(got, sizeof got) == SAVE_ERR_DAMAGED);      /* ... but the reader knows something was written */
+    /* a first header cut short after its magic (the sequence number still erased) is damage too, not "no save" */
+    flash_wipe();
+    {
+        uint32_t magic = SAVE_MAGIC;
+        memcpy(flash_img, &magic, sizeof magic);
+    }
+    flash_save_init(0, 2);
     CHECK(flash_save_read(got, sizeof got) == SAVE_ERR_DAMAGED);
 }
 

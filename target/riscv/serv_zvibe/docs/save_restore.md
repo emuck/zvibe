@@ -57,8 +57,9 @@ On restore: copy original game data from XIP flash → apply delta patches → r
 ### Wear Leveling
 
 Round-robin rotation across all slots. Each new save goes to the next slot,
-wrapping around. The slot with the highest sequence number is the current save.
-Sequence numbers are scanned at `flash_save_init()` time.
+wrapping around. The current save is the slot with the highest sequence number whose data matches
+its CRC-16: a save cut short by a power failure (header written, data missing) is passed over for the one before it,
+and the next save goes to that damaged slot. Sequence numbers are scanned at `flash_save_init()` time.
 
 ### Flash API
 

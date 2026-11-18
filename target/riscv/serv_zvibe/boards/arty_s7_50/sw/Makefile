@@ -127,7 +127,7 @@ endif
 # not delete the image that was built in another mode.
 BUILD_MODE := v4=$(V4) dyn=$(V4_DYN) ram=$(ARTY_RAM_KB) probe=$(PROBE)
 QUERY_ONLY := $(if $(MAKECMDGOALS),$(if $(filter-out ram-kb ram-budget help check-layout,$(MAKECMDGOALS)),,yes))
-DRY_RUN    := $(findstring n,$(firstword $(filter-out -%,$(MAKEFLAGS))))
+DRY_RUN    := $(or $(findstring n,$(firstword $(filter-out -%,$(MAKEFLAGS)))),$(findstring q,$(firstword $(filter-out -%,$(MAKEFLAGS)))))
 ifneq ($(shell cat .build_mode 2>/dev/null),$(BUILD_MODE))
   ifeq ($(QUERY_ONLY)$(DRY_RUN),)
     $(shell rm -rf *.o src *.elf *.bin *.dis *.map; echo '$(BUILD_MODE)' > .build_mode)

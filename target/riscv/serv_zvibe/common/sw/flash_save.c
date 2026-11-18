@@ -178,23 +178,19 @@ int flash_save_write(const void *data, size_t data_len) {
     return SAVE_OK;
 }
 
-/* The slot with the highest sequence number whose header was written, whole or not (to tell "damaged" from "none"). */
-static int newest_written_slot(void) {
-    uint32_t best_seq = 0;
-    int      best     = -1;
+/* Has anything been written to the ring (the magic of any slot, a header cut short included)? Tells "damaged" from "none". */
+static int anything_written(void) {
     for (int i = 0; i < g_num_slots; i++) {
         save_hdr_t hdr;
         flash_read_bytes(slot_base(i), &hdr, sizeof(hdr));
-        if (hdr_written(&hdr) && hdr.seq > best_seq) {
-            best_seq = hdr.seq;
-            best     = i;
-        }
+        if (hdr.magic == SAVE_MAGIC)
+            return 1;
     }
-    return best;
+    return 0;
 }
 
 int flash_save_exists(void) {
-    return newest_written_slot() >= 0;
+    return find_slot() >= 0;
 }
 
 int flash_save_has_slots(void) {
@@ -204,7 +200,7 @@ int flash_save_has_slots(void) {
 int flash_save_read(void *buf, size_t buf_len) {
     int idx = find_slot();
     if (idx < 0)
-        return newest_written_slot() >= 0 ? SAVE_ERR_DAMAGED : SAVE_ERR_NOT_FOUND;
+        return anything_written() ? SAVE_ERR_DAMAGED : SAVE_ERR_NOT_FOUND;
 
     save_hdr_t hdr;
     flash_read_bytes(slot_base(idx), &hdr, sizeof(hdr));

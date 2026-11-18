@@ -123,6 +123,15 @@ cd common/sw && make max10-flash-test
 - Slot count: 5 (dynamic; computed by build_flash.py from remaining UFM after firmware + game)
 - Save slot size: 2KB per slot; firmware size ~34.5KB
 
+### Quartus Prime 25.1 Lite and the flash save fix (Verified Nov 17, 2026)
+- Quartus Prime 25.1std Lite (Ubuntu 24.04): `make generate-ip` and `make build` complete with 0 errors; setup slack +0.946 ns
+  at 100 MHz, 1,914 of 8,064 logic elements (24%), UFM 1 of 1; `make program-complete` configures CFM + UFM and SRAM.
+- After the CRC-checked slot fallback in `flash_save.c` (a save cut short by a power failure no longer hides the one before it):
+  Restaurant 212 commands PASSED, and `tests/test_save_restore.py` PASSED: save, walk, restore (back where it was), second
+  save, `.sof` reload through JTAG (a power cycle for the UFM saves), restore: the newest save comes back. A cut inside a save
+  itself cannot be made on the board; that case is covered by the host test (`common/sw/tests`).
+- The UART adapter was `/dev/ttyUSB1` here (a second adapter was `ttyUSB0`): use `/dev/serial/by-id/*CP210*`.
+
 ### Programming
 - USB-BlasterII auto-detected
 - CFM + UFM programmed in ~11 seconds via `make program-complete`

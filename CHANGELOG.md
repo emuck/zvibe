@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RISC-V flash saves (Arty and MAX10, V3 and V4): a power cut during a save left the newest slot with its header and
   partial data, and a restore then failed although the save before it was intact. The reader now checks each slot's CRC-16 and
   falls back to the next newest, and the next save goes to the damaged slot instead of erasing the good one.
+  A sequence number past 2^24 (a header cut short) is ignored, a ring with no whole slot reads as damaged (the V3 player
+  has no checksum of its own), and `flash_save_exists()` means a whole save exists. Verified on the MAX10 with Quartus 25.1
+  (`tests/test_save_restore.py`) and on the host.
+- Arty build: a RAM-size query or a dry run of `sw/Makefile` no longer deletes the flash image (the documented `program-flash`
+  flow did), plain `make` in `fpga/` builds the bitstream, a flash image given to `program-complete` is not rebuilt, a build
+  with negative setup slack stops, and a failed build leaves no older bitstream to be programmed.
 - SAM E51 save store: the first save of a story that replaced another in its slot could be stranded by a power cut (recovery
   compared story tags and refused to finish the copy; it now goes by sequence number), and a save right after a refused one
   could put the only whole copy at risk (every save now first finishes a copy still pending in the scratch). The menu's size

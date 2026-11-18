@@ -9,6 +9,9 @@ set design_name "servant_zvibe_arty_s7_50"
 set part "xc7s50csga324-1"
 set build_dir "build"
 
+## A bitstream from an earlier build must not survive a build that fails (timing, an error): the Makefile would program it
+file delete -force $build_dir/$design_name.bit
+
 ## Create project
 create_project -force $design_name $build_dir -part $part
 

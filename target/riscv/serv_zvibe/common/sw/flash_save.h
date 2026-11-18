@@ -50,7 +50,7 @@ int flash_save_write(const void *data, size_t data_len);
 int flash_save_read(void *buf, size_t buf_len);
 
 /*
- * Returns 1 if a valid save exists, 0 otherwise.
+ * Returns 1 if a whole save exists (one that matches its CRC), 0 otherwise (damaged saves included).
  */
 int flash_save_exists(void);
 

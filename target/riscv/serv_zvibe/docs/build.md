@@ -16,7 +16,7 @@ Complete build and programming reference for both supported boards.
 ### MAX10 08 Eval Board
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| Quartus Prime (Lite or Standard) | FPGA synthesis + programming | `quartus_sh`, `quartus_pgm`, `quartus_cpf` must be in PATH |
+| Quartus Prime (Lite or Standard; 25.1 Lite verified) | FPGA synthesis + programming | `quartus_sh`, `quartus_pgm`, `quartus_cpf` must be in PATH (e.g. `<install>/25.1std/quartus/bin`) |
 | USB-Blaster driver | JTAG programming | Typically needs udev rule on Linux |
 
 ### Arty S7-50

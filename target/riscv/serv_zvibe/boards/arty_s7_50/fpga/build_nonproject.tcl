@@ -48,6 +48,9 @@ foreach line $lines {
 puts "Read $nsrc source files"
 read_xdc arty_s7_50.xdc
 
+## A bitstream from an earlier build must not survive a build that fails (timing, an error): the Makefile would program it
+file delete -force $build_dir/$design_name.bit
+
 ## Synthesis
 synth_design -top $design_name -part $part -generic RAM_KB=$ram_kb
 report_utilization -file $build_dir/utilization_synth.txt
